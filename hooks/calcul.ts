@@ -305,6 +305,17 @@ export function formatJour(t: number): string {
   return `${JOURS[d.getDay()]} ${quantieme} ${MOIS[d.getMonth()]}`
 }
 
+/** Met `ticket` en tête des tickets récents, sans doublon, six au plus. */
+export function ajouterRecent(recents: readonly string[], ticket: string): string[] {
+  return [ticket, ...recents.filter(t => t !== ticket)].slice(0, 6)
+}
+
+/** Une barre de `largeur` cases : la part pleine et la part vide, proportionnelles à `minutes / max`. */
+export function barre(minutes: number, max: number, largeur: number): [string, string] {
+  const plein = max > 0 ? Math.max(minutes > 0 ? 1 : 0, Math.round((minutes / max) * largeur)) : 0
+  return ['━'.repeat(plein), '─'.repeat(largeur - plein)]
+}
+
 export function ligneStatut(format: string, ticket: string, minutes: number, enPause: boolean): string {
   const texte = format.replaceAll('{ticket}', ticket).replaceAll('{duree}', formatDuree(minutes))
   return enPause ? `${texte} · en pause` : texte

@@ -1,4 +1,4 @@
-import type { On } from 'claude-code'
+import type { On, RenderSurface } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 
 const h = (heure: number, minute = 0) => new Date(2026, 10, 12, heure, minute).getTime()
@@ -25,14 +25,15 @@ const BANDEAU = {
   plugin: 'temps-ticket',
   component: 'AbovePrompt',
   requestId: 'above-prompt',
-  props: { hasSurvey: false, isCollapsed: false, isWorking: false, maxRows: 6, bodyColumns: 120, scroll: { offset: 0, bodyRows: 6 }, view: {} },
+  props: { hasSurvey: false, isCollapsed: false, isWorking: false, maxRows: 40, bodyColumns: 120, scroll: { offset: 0, bodyRows: 40 }, view: {} },
 } as const
 
-/** Ce qui se trouve sous le mod pendant le test : horloge, store, disque en mémoire, session S1. */
-function monde(on: On) {
+/** Ce qui se trouve sous le mod pendant le test : horloge, store, disque en mémoire, session et branche Git. */
+function monde(on: On, surfaces: readonly RenderSurface[] = ['terminal']) {
   const horloge = mock.clock(on, { now: h(9) })
   mock.store(on)
   mock.env(on, { USERPROFILE: 'C:\\Users\\test' })
+  const etat = { session: 'S1', branche: 'main' }
   const fichiers = new Map<string, string>()
   const toasts: string[] = []
   const statuts: (string | undefined)[] = []
@@ -54,10 +55,12 @@ function monde(on: On) {
       name, kind: 'file' as const, size: 0, mtimeMs: horloge.now(), isLink: false,
     })),
   }))
-  on('session.id', () => ({ value: 'S1' }))
+  on('process.run', () => ({ value: { exitCode: 0, stdout: `${etat.branche}\n`, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  on('session.id', () => ({ value: etat.session }))
   on('session.cwd', () => ({ value: 'D:/WORK/FSY' }))
-  on('session.surfaces', () => ({ value: ['terminal'] }))
+  on('session.surfaces', () => ({ value: surfaces }))
   on('command.register', (_, e) => ({ value: { command: e.name } }))
+  on('command.run', () => ({ text: '' }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('ui.toast', (_, e) => {
     toasts.push(e.text)
@@ -70,17 +73,17 @@ function monde(on: On) {
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('prompt.submit', (_, e) => ({ text: e.text }))
   on('turn.complete', (_, e) => ({ text: e.answer }))
-  return { horloge, fichiers, toasts, statuts }
+  return { horloge, fichiers, toasts, statuts, etat }
 }
 
 test('un message avec un ID compte pour ce ticket, partout', async ($, on) => {
-  const { horloge, fichiers, toasts, statuts } = monde(on)
+  const { horloge, fichiers, toasts, statuts } = monde(on, ['vscode'])
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
   expect(fichiers.has('C:/Users/test/.claude/temps.json')).toBe(true)
 
   await $.prompt.submit({ ...PROMPT, text: 'Corrige le bug FLO-I165 stp' })
   await horloge.settle()
-  expect(toasts).toContain('Temps compté pour FLO-I165')
+  expect(toasts).toContain('Temps compté pour FLO-I165, cité dans votre message')
   await horloge.advance(10 * 60_000)
   await $.turn.complete({ answer: 'fait', durationMs: 600_000, isAborted: false, turnId: 't1', reason: 'answer' })
   await horloge.settle()
@@ -95,10 +98,41 @@ test('un message avec un ID compte pour ce ticket, partout', async ($, on) => {
 
   for (const surface of SURFACES) {
     const ui = await $.ui.mount({ ...PANNEAU, surface })
-    expect((await ui.find({ type: 'Text', text: /FLO-I165 : 10 min/ }))?.text).toBe('● FLO-I165 : 10 min')
+    expect(await ui.find({ type: 'Text', text: /FLO-I165/ })).toBeDefined()
+    expect((await ui.find({ type: 'Text', text: /10 min/ }))?.text?.trim()).toBe('10 min')
+    expect(await ui.find({ key: 'ticket-FLO-I165' })).toBeDefined()
     expect(await ui.find({ key: 'pause' })).toBeDefined()
     await ui.unmount()
   }
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ ...BANDEAU, surface })
+    expect(await ui.find({ key: 'puce' })).toBeDefined()
+    expect(await ui.find({ key: 'pause' })).toBeUndefined()
+    await ui.press({ key: 'puce' })
+    expect(await ui.find({ key: 'pause' })).toBeDefined()
+    await ui.press({ key: 'puce' })
+    await ui.unmount()
+  }
+})
+
+test('une nouvelle session prend le ticket de la branche, sinon celui du dossier', async ($, on) => {
+  const { horloge, toasts, etat } = monde(on)
+  etat.branche = 'feature/FSY-I9-export'
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await horloge.settle()
+  expect(toasts).toContain('Temps compté pour FSY-I9, pris dans la branche Git')
+
+  etat.branche = 'main'
+  etat.session = 'S2'
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await horloge.settle()
+  expect(toasts).toContain('Temps compté pour FSY-I9, comme la dernière session de ce dossier')
+
+  etat.branche = 'feature/FLO-I7-fix'
+  await $.prompt.submit({ ...PROMPT, text: 'je continue' })
+  await horloge.settle()
+  expect(toasts).toContain('Temps compté pour FLO-I7, pris dans la branche Git')
 })
 
 test('un long écart demande pause ou travail, et la réponse compte', async ($, on) => {
@@ -110,16 +144,16 @@ test('un long écart demande pause ou travail, et la réponse compte', async ($,
   await horloge.advance(45 * 60_000)
   await $.prompt.submit({ ...PROMPT, text: 'je reviens' })
   await horloge.settle()
-  expect(toasts).toContain('Écart de 45 min sur FLO-I165 : pause ou travail ?')
+  expect(toasts).toContain('45 min sans message sur FLO-I165 : pause ou travail ?')
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...BANDEAU, surface })
-    expect(await ui.find({ type: 'Text', text: /pause ou travail/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /C'était/ })).toBeDefined()
     await ui.unmount()
   }
   const ui = await $.ui.mount({ ...BANDEAU, surface: 'desktop' })
   await ui.press({ key: 'ecart-travail' })
-  expect(await ui.find({ type: 'Text', text: /pause ou travail/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /C'était/ })).toBeUndefined()
   await ui.unmount()
 
   const { text } = await $.command.run({ ...COMMANDE, args: '' })
