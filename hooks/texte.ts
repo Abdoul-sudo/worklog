@@ -1,14 +1,15 @@
 // Textes de la commande /temps, faits pour être recopiés dans Zoho Sprints.
 import type { Ecart, Ligne } from '../types'
-import { type Bilan, dureeEcart, formatDuree, formatHeure, formatJour } from './calcul'
+import { type Bilan, dureeEcart, formatDuree, formatHeure, formatJetons, formatJour, majuscule } from './calcul'
 
-const majuscule = (texte: string) => texte.charAt(0).toUpperCase() + texte.slice(1)
-
-function tableau(lignes: readonly Ligne[], total: number): string[] {
+function tableau(lignes: readonly Ligne[], total: number, jetons: number | null): string[] {
   const largeur = Math.max('Total'.length, ...lignes.map(l => l.item.length))
-  const ligne = (nom: string, minutes: number, suite = '') =>
-    `  ${nom.padEnd(largeur)}  ${formatDuree(minutes).padStart(7)}${suite}`
-  return [...lignes.map(l => ligne(l.item, l.minutes, l.enCours ? '  (en cours)' : '')), ligne('Total', total)]
+  const ligne = (nom: string, minutes: number, n: number, suite = '') =>
+    `  ${nom.padEnd(largeur)}  ${formatDuree(minutes).padStart(7)}${jetons === null ? '' : `  ${formatJetons(n).padStart(7)} tokens`}${suite}`
+  return [
+    ...lignes.map(l => ligne(l.item, l.minutes, l.jetons, l.enCours ? '  (en cours)' : '')),
+    ligne('Total', total, jetons ?? 0),
+  ]
 }
 
 export function listeEcarts(ecarts: readonly Ecart[]): string[] {
@@ -23,45 +24,38 @@ export function listeEcarts(ecarts: readonly Ecart[]): string[] {
   ]
 }
 
-export function recapJour(jour: number, bilan: Bilan, ecarts: readonly Ecart[]): string {
-  const lignes = [`Temps du ${formatJour(jour)}`, '']
-  const j = bilan.jours[0]
-  if (j === undefined) {
-    lignes.push("  Aucun temps compté aujourd'hui.")
-  } else {
-    lignes.push(...tableau(j.lignes, j.total))
-    if (j.total > j.reel) {
-      lignes.push('', `Temps réel : ${formatDuree(j.reel)}. Le total est plus grand, car des sessions ont tourné en parallèle.`)
+/** Le récapitulatif d'une période : par jour si `parJour`, puis le total par item. */
+export function recap(titre: string, bilan: Bilan, ecarts: readonly Ecart[], avecJetons: boolean, parJour: boolean): string {
+  if (bilan.lignes.length === 0) return `${titre} : aucun temps compté.`
+  const lignes = [titre]
+  if (parJour) {
+    for (const j of bilan.jours) {
+      lignes.push('', majuscule(formatJour(j.debut)), ...tableau(j.lignes, j.total, avecJetons ? j.jetons : null))
     }
+    lignes.push('', 'Total')
+  } else {
+    lignes.push('')
+  }
+  lignes.push(...tableau(bilan.lignes, bilan.total, avecJetons ? bilan.jetons : null))
+  if (bilan.total > bilan.reel) {
+    lignes.push('', `Temps réel : ${formatDuree(bilan.reel)}. Le total est plus grand, car des sessions ont tourné en parallèle.`)
   }
   if (ecarts.length > 0) lignes.push('', ...listeEcarts(ecarts))
   return lignes.join('\n')
 }
 
-export function recapSemaine(bilan: Bilan, ecarts: readonly Ecart[]): string {
-  if (bilan.jours.length === 0) return 'Aucun temps compté sur les 7 derniers jours.'
-  const lignes = ['Temps des 7 derniers jours']
-  for (const j of bilan.jours) lignes.push('', majuscule(formatJour(j.debut)), ...tableau(j.lignes, j.total))
-  lignes.push('', 'Total des 7 jours', ...tableau(bilan.lignes, bilan.total))
-  if (ecarts.length > 0) {
-    const s = ecarts.length > 1 ? 's' : ''
-    lignes.push('', `${ecarts.length} écart${s} à confirmer : tapez /temps confirmer.`)
-  }
-  return lignes.join('\n')
-}
-
-export function aide(fichierReglages: string): string {
+export function aide(): string {
   return [
     'Commandes du temps par item :',
-    "  /temps                      récapitulatif d'aujourd'hui",
-    '  /temps semaine              récapitulatif des 7 derniers jours',
-    "  /temps FLO-I165             change l'item de cette session",
-    '  /temps stop                 met le compteur de cette session en pause',
-    '  /temps confirmer            liste les écarts à classer',
-    "  /temps confirmer 1 travail  classe l'écart 1 (numéros ou tout, puis travail ou pause)",
-    '  /temps panneau              ouvre le panneau',
-    '  /temps aide                 affiche cette aide',
+    "  /temps                      le temps d'aujourd'hui",
+    '  /temps semaine              la semaine en cours, jour par jour',
+    '  /temps mois                 le mois en cours',
+    "  /temps FLO-I165             passe cette session sur l'item FLO-I165",
+    '  /temps stop                 met cette session en pause',
+    '  /temps confirmer            liste les silences à classer',
+    '  /temps confirmer 1 travail  classe le silence 1 (numéros ou tout, puis travail ou pause)',
+    '  /temps panneau              ouvre le panneau (utile dans VS Code)',
     '',
-    `Réglages : ${fichierReglages}`,
+    'Réglages : cliquez sur la puce ⏱, puis sur ⚙.',
   ].join('\n')
 }

@@ -3,7 +3,10 @@ import { describe, expect, test } from 'claude-code/testing'
 import {
   type Activite,
   type Evenement,
-  REGLAGES_PAR_DEFAUT,
+  OPTIONS_PAR_DEFAUT,
+  bornes,
+  formatJetons,
+  lireOptions,
   SANS_ITEM,
   bilan,
   calculer,
@@ -14,13 +17,11 @@ import {
   jourSuivant,
   libellePuce,
   lireLignes,
-  lireReglages,
-  motifsDuProjet,
   nomDuGroupe,
 } from '../hooks/calcul'
-import { recapJour, recapSemaine } from '../hooks/texte'
+import { recap } from '../hooks/texte'
 
-const R = REGLAGES_PAR_DEFAUT
+const R = OPTIONS_PAR_DEFAUT
 /** Une heure du 12 novembre 2026 (ou d'un autre jour de novembre), à l'heure locale. */
 const h = (heure: number, minute = 0, jour = 12) => new Date(2026, 10, jour, heure, minute).getTime()
 const ev = (t: number, s: string, e: Activite, k: string | null = null): Evenement => ({ t, s, e, k })
@@ -114,7 +115,7 @@ describe('écart court ou long', () => {
     const evts = [ev(h(9), 'A', 'message', 'FLO-I1')]
     const vivants = new Map([['A', h(9, 10)]])
     const b = bilan(evts, R, h(11), JOUR, jourSuivant(JOUR), vivants)
-    expect(b.jours[0]?.lignes).toEqual([{ item: 'FLO-I1', minutes: 12, enCours: false }])
+    expect(b.jours[0]?.lignes).toEqual([{ item: 'FLO-I1', minutes: 12, enCours: false, jetons: 0 }])
     expect(calculer(evts, R, h(9, 11), vivants).actives.get('A')).toBe('FLO-I1')
   })
 
@@ -175,8 +176,8 @@ describe('items', () => {
     ]
     const b = bilan(evts, R, h(10, 30, 13), JOUR, jourSuivant(jourSuivant(JOUR)))
     expect(b.jours.map(j => [j.debut, j.total])).toEqual([[JOUR, 20], [jourSuivant(JOUR), 50]])
-    expect(b.lignes).toEqual([{ item: 'FLO-I1', minutes: 70, enCours: false }])
-    expect(recapSemaine(b, [])).toContain('Total des 7 jours\n  FLO-I1   1 h 10')
+    expect(b.lignes).toEqual([{ item: 'FLO-I1', minutes: 70, enCours: false, jetons: 0 }])
+    expect(recap('Semaine', b, [], false, true)).toContain('Total\n  FLO-I1   1 h 10')
   })
 
   test('un changement de item dans la session coupe le temps au bon moment', async () => {
@@ -193,20 +194,20 @@ describe('items', () => {
   })
 
   test('un message sans ID compte pour « item ? »', async () => {
-    expect(detecterItem('corrige le bug du formulaire', R.motifs)).toBe(null)
+    expect(detecterItem('corrige le bug du formulaire', R.motif)).toBe(null)
     const { parItem } = minutesDuJour([ev(h(9), 'A', 'message'), ev(h(9, 10), 'A', 'reponse')], h(9, 10))
     expect(parItem).toEqual({ [SANS_ITEM]: 10 })
   })
 
   test('la détection prend le premier ID Zoho du texte et respecte les bords de mot', async () => {
-    expect(detecterItem('voir FLO-I165.', R.motifs)).toBe('FLO-I165')
-    expect(detecterItem('FSY-I478 puis FLO-I165', R.motifs)).toBe('FSY-I478')
-    expect(detecterItem('fichier UTF-8 et norme ISO-8601', R.motifs)).toBe(null)
-    expect(detecterItem('FLO-I165a', R.motifs)).toBe(null)
-    expect(detecterItem('un motif cassé', ['([', 'XYZ-I\\d+'])).toBe(null)
-    expect(detecterItem('FSY-I478 puis FLO-I165', ['FLO-I\\d+', 'FSY-I\\d+'])).toBe('FLO-I165')
-    expect(estUnItem('FLO-I165', R.motifs)).toBe(true)
-    expect(estUnItem('semaine', R.motifs)).toBe(false)
+    expect(detecterItem('voir FLO-I165.', R.motif)).toBe('FLO-I165')
+    expect(detecterItem('FSY-I478 puis FLO-I165', R.motif)).toBe('FSY-I478')
+    expect(detecterItem('fichier UTF-8 et norme ISO-8601', R.motif)).toBe(null)
+    expect(detecterItem('FLO-I165a', R.motif)).toBe(null)
+    expect(detecterItem('un motif cassé', '([')).toBe(null)
+    expect(detecterItem('FSY-I478 puis FLO-I165', 'FLO-I\\d+|FSY-I\\d+')).toBe('FSY-I478')
+    expect(estUnItem('FLO-I165', R.motif)).toBe(true)
+    expect(estUnItem('semaine', R.motif)).toBe(false)
   })
 
   test("sans item, le temps va au nom par défaut de la session, puis au premier item trouvé", async () => {
@@ -239,22 +240,12 @@ describe('items', () => {
     )
     expect(parItem).toEqual({ 'FSY-I478': 45, 'FLO-I165': 5 })
   })
-
-  test('les motifs du projet le plus précis passent avant les motifs généraux', async () => {
-    const reglages = { ...R, projets: { 'D:/WORK/FSY': ['FSY-I\\d+'], 'D:/WORK/FSY/fsy.api': ['API-\\d+'] } }
-    expect(motifsDuProjet(reglages, 'D:\\WORK\\FSY\\fsy.front\\src')).toEqual(['FSY-I\\d+'])
-    expect(motifsDuProjet(reglages, 'd:/work/fsy/fsy.api')).toEqual(['API-\\d+'])
-    expect(motifsDuProjet(reglages, 'D:/WORK/FSY2')).toEqual(R.motifs)
-  })
 })
 
 describe('fichiers et textes', () => {
-  test('les réglages manquants prennent la valeur par défaut', async () => {
-    expect(lireReglages(undefined).reglages).toEqual(R)
-    expect(lireReglages('{ pas du json').erreur).toBe("le fichier n'est pas du JSON valide")
-    const { reglages } = lireReglages('{ "seuilPauseMinutes": 30, "motifs": "FLO" }')
-    expect(reglages.seuilPauseMinutes).toBe(30)
-    expect(reglages.motifs).toEqual(R.motifs)
+  test('les réglages invalides prennent la valeur par défaut', async () => {
+    expect(lireOptions(undefined)).toEqual(R)
+    expect(lireOptions({ seuilPause: 30, motif: '([', jetons: false, activite: 'oui' })).toEqual({ ...R, seuilPause: 30, jetons: false })
   })
 
   test('une ligne de journal abîmée est ignorée', async () => {
@@ -283,16 +274,20 @@ describe('fichiers et textes', () => {
     expect(nomDuGroupe('pas du json', 'local_a')).toBe(null)
   })
 
-  test('le récapitulatif du jour', async () => {
-    const evts = [ev(h(9), 'A', 'message', 'FLO-I165'), ev(h(10), 'A', 'reponse', 'FLO-I165')]
+  test('le récapitulatif du jour, avec les tokens', async () => {
+    const evts: Evenement[] = [
+      ev(h(9), 'A', 'message', 'FLO-I165'),
+      ev(h(10), 'A', 'reponse', 'FLO-I165'),
+      { t: h(10), s: 'A', e: 'jetons', n: 245_000, k: 'FLO-I165' },
+    ]
     const b = bilan(evts, R, h(11), JOUR, jourSuivant(JOUR))
     const ecart = { item: 'FLO-I165', debut: h(14), fin: h(14, 45), session: 'A' }
-    expect(recapJour(JOUR, b, [ecart])).toBe(
+    expect(recap("Aujourd'hui", b, [ecart], true, false)).toBe(
       [
-        'Temps du jeudi 12 novembre',
+        "Aujourd'hui",
         '',
-        '  FLO-I165   1 h 00',
-        '  Total      1 h 00',
+        '  FLO-I165   1 h 00    245 k tokens',
+        '  Total      1 h 00    245 k tokens',
         '',
         'Écarts à confirmer, non comptés (7 derniers jours) :',
         '  1. jeudi 12 novembre, FLO-I165, de 14 h 00 à 14 h 45 (45 min)',
@@ -300,5 +295,49 @@ describe('fichiers et textes', () => {
         'Exemple : /temps confirmer 1 travail',
       ].join('\n'),
     )
+  })
+})
+
+describe('corrections, tokens et périodes', () => {
+  const evts: Evenement[] = [
+    ev(h(9), 'A', 'message', 'FSY'),
+    ev(h(9, 30), 'A', 'reponse', 'FSY'),
+    { t: h(9, 30), s: 'A', e: 'jetons', n: 1_000, k: 'FSY' },
+    ev(h(9), 'B', 'message', 'FLO-I1'),
+    ev(h(9, 20), 'B', 'reponse', 'FLO-I1'),
+    { t: h(9, 20), s: 'B', e: 'jetons', n: 500, k: 'FLO-I1' },
+  ]
+
+  test('les tokens sont comptés par item et au total', async () => {
+    const b = bilan(evts, R, h(9, 30), JOUR, jourSuivant(JOUR))
+    expect(b.lignes.map(l => [l.item, l.minutes, l.jetons])).toEqual([['FSY', 30, 1000], ['FLO-I1', 30, 500]])
+    expect(b.jetons).toBe(1500)
+  })
+
+  test('un renommage change le nom partout, même en chaîne', async () => {
+    const corrections = { renommages: { FSY: 'FSY-I9', 'FSY-I9': 'FSY-I10' }, retraits: [] }
+    const b = bilan(evts, R, h(9, 30), JOUR, jourSuivant(JOUR), new Map(), corrections)
+    expect(b.lignes.map(l => l.item)).toEqual(['FSY-I10', 'FLO-I1'])
+  })
+
+  test('un retrait enlève le temps et les tokens de cet item sur la période seulement', async () => {
+    const corrections = { renommages: {}, retraits: [{ item: 'FSY', debut: h(9), fin: h(9, 15) }] }
+    const b = bilan(evts, R, h(9, 30), JOUR, jourSuivant(JOUR), new Map(), corrections)
+    expect(b.lignes.map(l => [l.item, l.minutes, l.jetons])).toEqual([['FLO-I1', 30, 500], ['FSY', 15, 1000]])
+  })
+
+  test('les bornes et les titres des périodes', async () => {
+    expect(bornes('jour', 0, h(15))).toEqual({ debut: JOUR, fin: jourSuivant(JOUR), titre: "Aujourd'hui" })
+    expect(bornes('jour', -1, h(15)).titre).toBe('Hier')
+    expect(bornes('jour', -2, h(15)).titre).toBe('Mardi 10 novembre')
+    const semaine = bornes('semaine', 0, h(15))
+    expect([new Date(semaine.debut).getDate(), new Date(semaine.fin).getDate(), semaine.titre]).toEqual([9, 16, 'Cette semaine'])
+    expect(bornes('semaine', -2, h(15)).titre).toBe('Semaine du 26 octobre')
+    expect(bornes('mois', 0, h(15)).titre).toBe('Novembre')
+    expect(bornes('mois', -11, h(15)).titre).toBe('Décembre 2025')
+  })
+
+  test('le format des tokens', async () => {
+    expect([850, 12_400, 245_000, 1_200_000, 3_000_000].map(formatJetons)).toEqual(['850', '12,4 k', '245 k', '1,2 M', '3 M'])
   })
 })

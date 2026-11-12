@@ -8,20 +8,41 @@ const DUREE_MAX_TOUR = 3 * 60 * MINUTE
 // Chaque session vivante donne signe de vie toutes les 30 s ; au-delà de cette marge, elle est tenue pour morte
 // (fenêtre fermée sans fin de session notée).
 const MARGE_VIE = 2 * MINUTE
+// Un silence plus long est un arrêt (la nuit, le week-end) : il n'est pas proposé à confirmer.
+const ECART_MAX = 4 * 60 * MINUTE
 
-export type Reglages = {
-  seuilPauseMinutes: number
-  ecartMaxMinutes: number
-  motifs: string[]
-  projets: Record<string, string[]>
+/** Les réglages, modifiables dans la vue Réglages du popover. */
+export type Options = {
+  seuilPause: number
+  motif: string
+  jetons: boolean
+  activite: boolean
+  question: boolean
 }
 
-export const REGLAGES_PAR_DEFAUT: Reglages = {
-  seuilPauseMinutes: 20,
-  ecartMaxMinutes: 240,
+export const OPTIONS_PAR_DEFAUT: Options = {
+  seuilPause: 20,
   // Les ID des items Zoho Sprints : FLO-I165, FSY-I478, LBA-I12...
-  motifs: ['[A-Z]+-I\\d+'],
-  projets: {},
+  motif: '[A-Z]+-I\\d+',
+  jetons: true,
+  activite: true,
+  question: true,
+}
+
+export const SEUILS = [10, 15, 20, 30, 45, 60]
+
+/** Les réglages enregistrés, chaque valeur invalide remplacée par sa valeur par défaut. */
+export function lireOptions(brut: unknown): Options {
+  const r = typeof brut === 'object' && brut !== null ? (brut as Record<string, unknown>) : {}
+  const d = OPTIONS_PAR_DEFAUT
+  const oui = (v: unknown, defaut: boolean) => (typeof v === 'boolean' ? v : defaut)
+  return {
+    seuilPause: typeof r.seuilPause === 'number' && r.seuilPause > 0 ? r.seuilPause : d.seuilPause,
+    motif: typeof r.motif === 'string' && expression(r.motif, false) !== null ? r.motif : d.motif,
+    jetons: oui(r.jetons, d.jetons),
+    activite: oui(r.activite, d.activite),
+    question: oui(r.question, d.question),
+  }
 }
 
 export type Choix = 'travail' | 'pause'
@@ -30,55 +51,25 @@ export type Activite = 'ouverture' | 'message' | 'reponse' | 'item' | 'pause' | 
 // `d` : le nom par défaut de la session (groupe de l'app desktop, sinon projet).
 type EvenementActivite = { t: number; s: string; e: Activite; k: string | null; d?: string }
 type EvenementClassement = { t: number; s: string; e: 'classement'; session: string; debut: number; choix: Choix }
-export type Evenement = EvenementActivite | EvenementClassement
+type EvenementJetons = { t: number; s: string; e: 'jetons'; n: number; k: string | null; d?: string }
+export type Evenement = EvenementActivite | EvenementClassement | EvenementJetons
 
-export type Jour = { debut: number; lignes: Ligne[]; total: number; reel: number }
+/** Un temps retiré à la main : celui de `item` entre `debut` et `fin`. */
+export type Retrait = { item: string; debut: number; fin: number }
+/** Les corrections faites à la main : noms changés, temps retirés. */
+export type Corrections = { renommages: Readonly<Record<string, string>>; retraits: readonly Retrait[] }
+export const SANS_CORRECTION: Corrections = { renommages: {}, retraits: [] }
+
+export type Jour = { debut: number; lignes: Ligne[]; total: number; reel: number; jetons: number }
 /** `parSession` : les minutes de chaque session sur la période. */
-export type Bilan = { jours: Jour[]; lignes: Ligne[]; total: number; ecarts: Ecart[]; parSession: Map<string, number> }
-
-export function lireReglages(texte: string | undefined): { reglages: Reglages; erreur?: string } {
-  const defaut = REGLAGES_PAR_DEFAUT
-  if (texte === undefined) return { reglages: defaut }
-  let brut: unknown
-  try {
-    brut = JSON.parse(texte)
-  } catch {
-    return { reglages: defaut, erreur: "le fichier n'est pas du JSON valide" }
-  }
-  if (typeof brut !== 'object' || brut === null || Array.isArray(brut)) {
-    return { reglages: defaut, erreur: 'le fichier doit contenir un objet JSON' }
-  }
-  const r = brut as Record<string, unknown>
-  const nombre = (v: unknown, d: number) => (typeof v === 'number' && v > 0 ? v : d)
-  const textes = (v: unknown) => (Array.isArray(v) && v.every(x => typeof x === 'string') ? (v as string[]) : null)
-  const projets: Record<string, string[]> = {}
-  if (typeof r.projets === 'object' && r.projets !== null) {
-    for (const [dossier, motifs] of Object.entries(r.projets)) {
-      const liste = textes(motifs)
-      if (liste !== null) projets[dossier] = liste
-    }
-  }
-  return {
-    reglages: {
-      seuilPauseMinutes: nombre(r.seuilPauseMinutes, defaut.seuilPauseMinutes),
-      ecartMaxMinutes: nombre(r.ecartMaxMinutes, defaut.ecartMaxMinutes),
-      motifs: textes(r.motifs) ?? defaut.motifs,
-      projets,
-    },
-  }
-}
-
-/** Les motifs du projet le plus précis qui contient `cwd`, sinon les motifs généraux. */
-export function motifsDuProjet(reglages: Reglages, cwd: string): string[] {
-  const norme = (chemin: string) => chemin.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
-  const dossier = norme(cwd)
-  let meilleur: string | null = null
-  for (const cle of Object.keys(reglages.projets)) {
-    const projet = norme(cle)
-    const contient = dossier === projet || dossier.startsWith(`${projet}/`)
-    if (contient && (meilleur === null || projet.length > norme(meilleur).length)) meilleur = cle
-  }
-  return meilleur === null ? reglages.motifs : (reglages.projets[meilleur] ?? reglages.motifs)
+export type Bilan = {
+  jours: Jour[]
+  lignes: Ligne[]
+  total: number
+  reel: number
+  jetons: number
+  ecarts: Ecart[]
+  parSession: Map<string, number>
 }
 
 function expression(motif: string, entier: boolean): RegExp | null {
@@ -89,17 +80,28 @@ function expression(motif: string, entier: boolean): RegExp | null {
   }
 }
 
-/** Le premier ID trouvé, en essayant les motifs dans l'ordre. */
-export function detecterItem(texte: string, motifs: readonly string[]): string | null {
-  for (const motif of motifs) {
-    const trouve = expression(motif, false)?.exec(texte)
-    if (trouve) return trouve[0]
-  }
-  return null
+/** Le premier ID du texte, ou null. */
+export function detecterItem(texte: string, motif: string): string | null {
+  return expression(motif, false)?.exec(texte)?.[0] ?? null
 }
 
-export function estUnItem(texte: string, motifs: readonly string[]): boolean {
-  return motifs.some(motif => expression(motif, true)?.test(texte) === true)
+export function estUnItem(texte: string, motif: string): boolean {
+  return expression(motif, true)?.test(texte) === true
+}
+
+export function motifValide(motif: string): boolean {
+  return motif.trim() !== '' && expression(motif, false) !== null
+}
+
+/** Le nom à afficher : suit les renommages, sans boucler. */
+export function nommer(item: string, renommages: Readonly<Record<string, string>>): string {
+  let nom = item
+  for (let i = 0; i < 20; i++) {
+    const suivant = renommages[nom]
+    if (suivant === undefined || suivant === nom) break
+    nom = suivant
+  }
+  return nom
 }
 
 /** Lit un journal JSONL ; une ligne abîmée (écriture en cours) est ignorée. */
@@ -133,6 +135,12 @@ export function jourSuivant(debut: number): number {
   return decalerJours(debut, 1)
 }
 
+/** Le lundi de la semaine de `t`, à minuit. */
+export function debutSemaine(t: number): number {
+  const jour = debutJour(t)
+  return decalerJours(jour, -((new Date(jour).getDay() + 6) % 7))
+}
+
 const deuxChiffres = (n: number) => String(n).padStart(2, '0')
 
 export function cleJour(t: number): string {
@@ -144,7 +152,9 @@ export function cleJour(t: number): string {
 export function dernierEvenement(evenements: readonly Evenement[], session: string): EvenementActivite | null {
   let dernier: EvenementActivite | null = null
   for (const ev of evenements) {
-    if (ev.e !== 'classement' && ev.s === session && (dernier === null || ev.t >= dernier.t)) dernier = ev
+    if (ev.e !== 'classement' && ev.e !== 'jetons' && ev.s === session && (dernier === null || ev.t >= dernier.t)) {
+      dernier = ev
+    }
   }
   return dernier
 }
@@ -156,19 +166,28 @@ export function dernierEvenement(evenements: readonly Evenement[], session: stri
  */
 export function calculer(
   evenements: readonly Evenement[],
-  reglages: Reglages,
+  options: Options,
   maintenant: number,
   vivants: ReadonlyMap<string, number> = new Map(),
 ) {
-  const seuil = reglages.seuilPauseMinutes * MINUTE
-  const ecartMax = reglages.ecartMaxMinutes * MINUTE
+  const seuil = options.seuilPause * MINUTE
   const choix = new Map<string, Choix>()
   const sessions = new Map<string, EvenementActivite[]>()
+  const consos: EvenementJetons[] = []
   for (const ev of [...evenements].sort((a, b) => a.t - b.t)) {
     if (ev.e === 'classement') choix.set(`${ev.session}@${ev.debut}`, ev.choix)
+    else if (ev.e === 'jetons') consos.push(ev)
     else if (sessions.has(ev.s)) sessions.get(ev.s)!.push(ev)
     else sessions.set(ev.s, [ev])
   }
+
+  // Le premier item trouvé dans la session reçoit aussi le temps passé avant lui ;
+  // sans item, le temps va au nom par défaut.
+  const premiers = new Map<string, string>()
+  for (const ev of [...evenements].sort((a, b) => a.t - b.t)) {
+    if (ev.e !== 'classement' && ev.k !== null && !premiers.has(ev.s)) premiers.set(ev.s, ev.k)
+  }
+  const itemDe = (ev: EvenementActivite | EvenementJetons) => ev.k ?? premiers.get(ev.s) ?? ev.d ?? SANS_ITEM
 
   const plages: Ecart[] = []
   const ecarts: Ecart[] = []
@@ -184,9 +203,6 @@ export function calculer(
       if (ev.e !== 'ouverture') relance = false
     }
 
-    // Le premier item trouvé dans la session reçoit aussi le temps passé avant lui ;
-    // sans item, le temps va au nom par défaut.
-    const premierItem = liste.find(ev => ev.k !== null)?.k ?? null
     // Début du tour de Claude en cours : entre un message et sa réponse, Claude travaille.
     let debutTour: number | null = null
     for (let i = 0; i < liste.length; i++) {
@@ -202,19 +218,20 @@ export function calculer(
 
       const finDeVie = (vivants.get(session) ?? maintenant) + MARGE_VIE
       const fin = b?.t ?? Math.max(a.t, Math.min(maintenant, finDeVie))
-      const plage: Ecart = { item: a.k ?? premierItem ?? a.d ?? SANS_ITEM, debut: a.t, fin, session }
+      const plage: Ecart = { item: itemDe(a), debut: a.t, fin, session }
       const claudeTravaille = debutTour !== null && b?.relance !== true && fin - debutTour <= DUREE_MAX_TOUR
       if (claudeTravaille || fin - a.t <= seuil) {
         plages.push(plage)
         if (b === undefined && finDeVie >= maintenant) actives.set(session, plage.item)
-      } else if (b !== undefined && fin - a.t <= ecartMax) {
+      } else if (b !== undefined && fin - a.t <= ECART_MAX) {
         const classe = choix.get(`${session}@${a.t}`)
         if (classe === 'travail') plages.push(plage)
         else if (classe === undefined) ecarts.push(plage)
       }
     }
   }
-  return { plages, ecarts, actives }
+  const jetons = consos.map(ev => ({ item: itemDe(ev), t: ev.t, n: ev.n, session: ev.s }))
+  return { plages, ecarts, actives, jetons }
 }
 
 type Segment = [number, number]
@@ -236,46 +253,80 @@ function recouvrement(segments: readonly Segment[], debut: number, fin: number):
   return total
 }
 
-const parTemps = (a: Ligne, b: Ligne) => b.minutes - a.minutes || a.item.localeCompare(b.item)
+/** Ce qui reste d'une plage une fois les temps retirés de son item enlevés. */
+function sansRetraits(plage: Ecart, retraits: readonly Retrait[]): Ecart[] {
+  let morceaux = [plage]
+  for (const r of retraits) {
+    if (r.item !== plage.item) continue
+    morceaux = morceaux.flatMap(m => {
+      if (r.fin <= m.debut || r.debut >= m.fin) return [m]
+      const restes: Ecart[] = []
+      if (m.debut < r.debut) restes.push({ ...m, fin: r.debut })
+      if (r.fin < m.fin) restes.push({ ...m, debut: r.fin })
+      return restes
+    })
+  }
+  return morceaux
+}
 
-/** Temps par item et par jour sur [debut, fin[, bornes au début d'un jour. */
+const parTemps = (a: Ligne, b: Ligne) => b.minutes - a.minutes || b.jetons - a.jetons || a.item.localeCompare(b.item)
+
+/** Temps et tokens par item et par jour sur [debut, fin[, bornes au début d'un jour. */
 export function bilan(
   evenements: readonly Evenement[],
-  reglages: Reglages,
+  options: Options,
   maintenant: number,
   debut: number,
   fin: number,
   vivants: ReadonlyMap<string, number> = new Map(),
+  corrections: Corrections = SANS_CORRECTION,
 ): Bilan {
-  const { plages, ecarts, actives } = calculer(evenements, reglages, maintenant, vivants)
+  const calcul = calculer(evenements, options, maintenant, vivants)
+  const nom = (item: string) => nommer(item, corrections.renommages)
+  const retire = (item: string, t: number) => corrections.retraits.some(r => r.item === item && t >= r.debut && t < r.fin)
+  const plages = calcul.plages.flatMap(p => sansRetraits({ ...p, item: nom(p.item) }, corrections.retraits))
+  const jetons = calcul.jetons.map(j => ({ ...j, item: nom(j.item) })).filter(j => !retire(j.item, j.t))
+  const enCours = new Set([...calcul.actives.values()].map(nom))
+
   const items = new Map<string, Segment[]>()
-  for (const item of new Set(plages.map(p => p.item))) {
+  for (const item of new Set([...plages.map(p => p.item), ...jetons.map(j => j.item)])) {
     items.set(item, unir(plages.filter(p => p.item === item)))
   }
   const tous = unir(plages)
-  const enCours = new Set(actives.values())
+  const jetonsParJour = new Map<string, number>()
+  for (const j of jetons) {
+    const cle = `${debutJour(j.t)}|${j.item}`
+    jetonsParJour.set(cle, (jetonsParJour.get(cle) ?? 0) + j.n)
+  }
 
   const jours: Jour[] = []
-  const totaux = new Map<string, number>()
+  const totaux = new Map<string, { minutes: number; jetons: number }>()
   for (let jour = debut; jour < fin; jour = jourSuivant(jour)) {
     const lendemain = jourSuivant(jour)
     const lignes: Ligne[] = []
     for (const [item, segments] of items) {
       const minutes = Math.round(recouvrement(segments, jour, lendemain) / MINUTE)
-      if (minutes === 0) continue
-      lignes.push({ item, minutes, enCours: enCours.has(item) })
-      totaux.set(item, (totaux.get(item) ?? 0) + minutes)
+      const n = jetonsParJour.get(`${jour}|${item}`) ?? 0
+      if (minutes === 0 && n === 0) continue
+      lignes.push({ item, minutes, enCours: enCours.has(item), jetons: n })
+      const cumul = totaux.get(item) ?? { minutes: 0, jetons: 0 }
+      totaux.set(item, { minutes: cumul.minutes + minutes, jetons: cumul.jetons + n })
     }
     if (lignes.length === 0) continue
-    const total = lignes.reduce((somme, l) => somme + l.minutes, 0)
-    const reel = Math.round(recouvrement(tous, jour, lendemain) / MINUTE)
-    jours.push({ debut: jour, lignes: lignes.sort(parTemps), total, reel })
+    jours.push({
+      debut: jour,
+      lignes: lignes.sort(parTemps),
+      total: lignes.reduce((s, l) => s + l.minutes, 0),
+      reel: Math.round(recouvrement(tous, jour, lendemain) / MINUTE),
+      jetons: lignes.reduce((s, l) => s + l.jetons, 0),
+    })
   }
 
-  const lignes = [...totaux].map(([item, minutes]) => ({ item, minutes, enCours: enCours.has(item) }))
+  const lignes = [...totaux].map(([item, t]) => ({ item, minutes: t.minutes, enCours: enCours.has(item), jetons: t.jetons }))
   // Un écart déjà couvert par une autre session sur le même item n'a rien à confirmer.
-  const aConfirmer = ecarts
-    .filter(e => e.debut >= debut && e.debut < fin)
+  const aConfirmer = calcul.ecarts
+    .map(e => ({ ...e, item: nom(e.item) }))
+    .filter(e => e.debut >= debut && e.debut < fin && !retire(e.item, e.debut))
     .filter(e => e.fin - e.debut - recouvrement(items.get(e.item) ?? [], e.debut, e.fin) >= MINUTE)
     .sort((a, b) => a.debut - b.debut)
   const parSession = new Map<string, number>()
@@ -287,7 +338,9 @@ export function bilan(
     parSession,
     jours,
     lignes: lignes.sort(parTemps),
-    total: lignes.reduce((somme, l) => somme + l.minutes, 0),
+    total: lignes.reduce((s, l) => s + l.minutes, 0),
+    reel: jours.reduce((s, j) => s + j.reel, 0),
+    jetons: lignes.reduce((s, l) => s + l.jetons, 0),
     ecarts: aConfirmer,
   }
 }
@@ -295,6 +348,15 @@ export function bilan(
 export function formatDuree(minutes: number): string {
   if (minutes < 60) return `${minutes} min`
   return `${Math.floor(minutes / 60)} h ${deuxChiffres(minutes % 60)}`
+}
+
+/** `850`, `12,4 k`, `245 k`, `1,2 M`. */
+export function formatJetons(n: number): string {
+  const virgule = (x: number) => x.toFixed(1).replace('.', ',').replace(/,0$/, '')
+  if (n < 1_000) return String(n)
+  if (n < 100_000) return `${virgule(n / 1_000)} k`
+  if (n < 1_000_000) return `${Math.round(n / 1_000)} k`
+  return `${virgule(n / 1_000_000)} M`
 }
 
 export function dureeEcart(ecart: Plage): string {
@@ -308,11 +370,35 @@ export function formatHeure(t: number): string {
 
 const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi']
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
+export const majuscule = (texte: string) => texte.charAt(0).toUpperCase() + texte.slice(1)
 
 export function formatJour(t: number): string {
   const d = new Date(t)
   const quantieme = d.getDate() === 1 ? '1er' : String(d.getDate())
   return `${JOURS[d.getDay()]} ${quantieme} ${MOIS[d.getMonth()]}`
+}
+
+export type Periode = 'jour' | 'semaine' | 'mois'
+
+/** Les bornes et le titre d'une période, `decalage` périodes avant celle de `maintenant`. */
+export function bornes(periode: Periode, decalage: number, maintenant: number): { debut: number; fin: number; titre: string } {
+  if (periode === 'jour') {
+    const debut = decalerJours(debutJour(maintenant), decalage)
+    const titre = decalage === 0 ? "Aujourd'hui" : decalage === -1 ? 'Hier' : majuscule(formatJour(debut))
+    return { debut, fin: jourSuivant(debut), titre }
+  }
+  if (periode === 'semaine') {
+    const debut = decalerJours(debutSemaine(maintenant), 7 * decalage)
+    const d = new Date(debut)
+    const titre =
+      decalage === 0 ? 'Cette semaine' : decalage === -1 ? 'La semaine dernière' : `Semaine du ${d.getDate()} ${MOIS[d.getMonth()]}`
+    return { debut, fin: decalerJours(debut, 7), titre }
+  }
+  const d = new Date(maintenant)
+  const debut = new Date(d.getFullYear(), d.getMonth() + decalage, 1).getTime()
+  const m = new Date(debut)
+  const annee = m.getFullYear() === d.getFullYear() ? '' : ` ${m.getFullYear()}`
+  return { debut, fin: new Date(m.getFullYear(), m.getMonth() + 1, 1).getTime(), titre: `${majuscule(MOIS[m.getMonth()]!)}${annee}` }
 }
 
 /** Met `item` en tête des items récents, sans doublon, six au plus. */
