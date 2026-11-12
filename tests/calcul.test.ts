@@ -21,7 +21,7 @@ import {
 } from '../hooks/calcul'
 import { recap } from '../hooks/texte'
 
-const R = OPTIONS_PAR_DEFAUT
+const R = { ...OPTIONS_PAR_DEFAUT, seuilPause: 20 }
 /** Une heure du 12 novembre 2026 (ou d'un autre jour de novembre), à l'heure locale. */
 const h = (heure: number, minute = 0, jour = 12) => new Date(2026, 10, jour, heure, minute).getTime()
 const ev = (t: number, s: string, e: Activite, k: string | null = null): Evenement => ({ t, s, e, k })
@@ -117,6 +117,22 @@ describe('écart court ou long', () => {
     const b = bilan(evts, R, h(11), JOUR, jourSuivant(JOUR), vivants)
     expect(b.jours[0]?.lignes).toEqual([{ item: 'FLO-I1', minutes: 12, enCours: false, jetons: 0 }])
     expect(calculer(evts, R, h(9, 11), vivants).actives.get('A')).toBe('FLO-I1')
+  })
+
+  test('quand des sous-agents travaillent deux heures, ce temps compte, sans question', async () => {
+    const { b, parItem } = minutesDuJour(
+      [
+        ev(h(9), 'A', 'message', 'FLO-I1'),
+        ev(h(9, 1), 'A', 'reponse', 'FLO-I1'),
+        ev(h(9, 2), 'A', 'agents-debut', 'FLO-I1'),
+        ev(h(11, 2), 'A', 'agents-fin', 'FLO-I1'),
+        ev(h(11, 5), 'A', 'message', 'FLO-I1'),
+        ev(h(11, 10), 'A', 'reponse', 'FLO-I1'),
+      ],
+      h(11, 10),
+    )
+    expect(parItem).toEqual({ 'FLO-I1': 130 })
+    expect(b.ecarts).toEqual([])
   })
 
   test('la pause arrête le compteur, sans écart à confirmer', async () => {
@@ -244,8 +260,9 @@ describe('items', () => {
 
 describe('fichiers et textes', () => {
   test('les réglages invalides prennent la valeur par défaut', async () => {
-    expect(lireOptions(undefined)).toEqual(R)
-    expect(lireOptions({ seuilPause: 30, motif: '([', jetons: false, activite: 'oui' })).toEqual({ ...R, seuilPause: 30, jetons: false })
+    expect(lireOptions(undefined)).toEqual(OPTIONS_PAR_DEFAUT)
+    expect(OPTIONS_PAR_DEFAUT.seuilPause).toBe(45)
+    expect(lireOptions({ seuilPause: 30, motif: '([', jetons: false, activite: 'oui' })).toEqual({ ...OPTIONS_PAR_DEFAUT, seuilPause: 30, jetons: false })
   })
 
   test('une ligne de journal abîmée est ignorée', async () => {

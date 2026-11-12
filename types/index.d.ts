@@ -16,7 +16,8 @@ export type Onglet = 'jour' | 'semaine' | 'mois' | 'reglages'
 export type Interface = {
   onglet: Onglet
   decalage: number
-  edition: 'renommer' | 'autre' | null
+  /** Le champ ouvert : « Autre item », ou le renommage d'une ligne. */
+  edition: 'autre' | { renommer: string } | null
   annulation: { item: string; debut: number; fin: number } | { recent: string } | null
 }
 

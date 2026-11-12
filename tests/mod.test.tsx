@@ -41,7 +41,7 @@ function monde(on: On, surfaces: readonly RenderSurface[] = ['terminal'], env: R
   const horloge = mock.clock(on, { now: h(9) })
   mock.store(on)
   mock.env(on, { USERPROFILE: 'C:\\Users\\test', ...env })
-  const etat = { session: 'S1', branche: 'main' }
+  const etat = { session: 'S1', branche: 'main', agents: [] as { id: string; status: string }[] }
   const fichiers = new Map<string, string>()
   const toasts: string[] = []
   const statuts: (string | undefined)[] = []
@@ -64,6 +64,7 @@ function monde(on: On, surfaces: readonly RenderSurface[] = ['terminal'], env: R
     })),
   }))
   on('process.run', () => ({ value: { exitCode: 0, stdout: `${etat.branche}\n`, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  on('agent.list', () => ({ value: etat.agents.map(a => ({ ...a, description: 'agent', type: 'general-purpose' })) as never }))
   on('session.id', () => ({ value: etat.session }))
   on('session.cwd', () => ({ value: 'D:/WORK/FSY' }))
   on('session.repo', () => ({ value: null }))
@@ -110,7 +111,7 @@ test('un message avec un ID compte pour cet item ; la puce est sous la saisie et
     expect(await bande.find({ key: 'onglet-jour' })).toBeUndefined()
     await puce.press({ key: 'puce' })
     expect(await bande.find({ key: 'onglet-jour' })).toBeDefined()
-    expect(await bande.find({ type: 'Text', text: /^FLO-I165$/ })).toBeDefined()
+    expect((await bande.find({ key: 'choisir-FLO-I165' }))?.text).toBe('FLO-I165')
     expect(await bande.find({ key: 'crayon' })).toBeDefined()
     await puce.press({ key: 'puce' })
     expect(await bande.find({ key: 'onglet-jour' })).toBeUndefined()
@@ -252,20 +253,20 @@ test('un long silence demande « Du travail ? », et la réponse compte', async 
   const { horloge } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
   await travailler($, horloge, 'FLO-I165 : on commence', 5)
-  await horloge.advance(45 * 60_000)
+  await horloge.advance(50 * 60_000)
   await $.prompt.submit({ ...PROMPT, text: 'je reviens' })
   await horloge.settle()
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const bande = await $.ui.mount({ ...BANDE, surface })
-    expect(await bande.find({ type: 'Text', text: /45 min sans message sur FLO-I165/ })).toBeDefined()
+    expect(await bande.find({ type: 'Text', text: /50 min sans message sur FLO-I165/ })).toBeDefined()
     await bande.unmount()
   }
   const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
   await bande.press({ key: 'ecart-oui' })
   expect(await bande.find({ type: 'Text', text: /sans message/ })).toBeUndefined()
   await bande.unmount()
-  expect((await $.command.run({ ...COMMANDE, args: '' })).text).toContain('  FLO-I165   50 min')
+  expect((await $.command.run({ ...COMMANDE, args: '' })).text).toContain('  FLO-I165   55 min')
 })
 
 test('les sous-commandes : item, pause, confirmer, mois, erreur', async ($, on) => {
@@ -273,11 +274,11 @@ test('les sous-commandes : item, pause, confirmer, mois, erreur', async ($, on) 
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
 
   expect((await $.command.run({ ...COMMANDE, args: 'FSY-I478' })).text).toBe('Item de cette session : FSY-I478.')
-  await horloge.advance(30 * 60_000)
+  await horloge.advance(50 * 60_000)
   await $.prompt.submit({ ...PROMPT, text: 'suite' })
   await horloge.settle()
   expect((await $.command.run({ ...COMMANDE, args: 'confirmer' })).text).toContain(
-    '  1. jeudi 12 novembre, FSY-I478, de 9 h 00 à 9 h 30 (30 min)',
+    '  1. jeudi 12 novembre, FSY-I478, de 9 h 00 à 9 h 50 (50 min)',
   )
   expect((await $.command.run({ ...COMMANDE, args: 'confirmer 1 pause' })).text).toBe('1 écart classé comme pause.')
   expect((await $.command.run({ ...COMMANDE, args: 'confirmer' })).text).toBe('Aucun écart à confirmer sur les 7 derniers jours.')
@@ -288,4 +289,21 @@ test('les sous-commandes : item, pause, confirmer, mois, erreur', async ($, on) 
   expect((await $.command.run({ ...COMMANDE, args: 'semaien' })).text).toStartWith("« semaien » n'est ni une commande ni un ID d'item.")
   expect((await $.command.run({ ...COMMANDE, args: 'semaine' })).text).toContain('Cette semaine')
   expect((await $.command.run({ ...COMMANDE, args: 'mois' })).text).toContain('Novembre')
+})
+
+test('quand des sous-agents travaillent deux heures, le temps compte et aucune question ne vient', async ($, on) => {
+  const { horloge, etat } = monde(on)
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await travailler($, horloge, 'FLO-I165 : lance le workflow', 1)
+  etat.agents = [{ id: 'a1', status: 'running' }]
+  await horloge.advance(120 * 60_000)
+  etat.agents = [{ id: 'a1', status: 'completed' }]
+  await horloge.advance(60_000)
+  await $.prompt.submit({ ...PROMPT, text: 'je regarde le résultat' })
+  await horloge.settle()
+
+  const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
+  expect(await bande.find({ type: 'Text', text: /sans message/ })).toBeUndefined()
+  await bande.unmount()
+  expect((await $.command.run({ ...COMMANDE, args: '' })).text).toContain('  FLO-I165   2 h 02')
 })

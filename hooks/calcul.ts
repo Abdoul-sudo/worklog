@@ -3,8 +3,8 @@ import type { Ecart, Ligne, Plage } from '../types'
 
 export const SANS_ITEM = 'sans nom'
 export const MINUTE = 60_000
-// Un tour de Claude plus long, sans réponse notée, est tenu pour abandonné.
-const DUREE_MAX_TOUR = 3 * 60 * MINUTE
+// Un tour de Claude, ou des sous-agents, actifs plus longtemps sans fin notée sont tenus pour abandonnés.
+const DUREE_MAX_TOUR = 12 * 60 * MINUTE
 // Chaque session vivante donne signe de vie toutes les 30 s ; au-delà de cette marge, elle est tenue pour morte
 // (fenêtre fermée sans fin de session notée).
 const MARGE_VIE = 2 * MINUTE
@@ -21,7 +21,7 @@ export type Options = {
 }
 
 export const OPTIONS_PAR_DEFAUT: Options = {
-  seuilPause: 20,
+  seuilPause: 45,
   // Les ID des items Zoho Sprints : FLO-I165, FSY-I478, LBA-I12...
   motif: '[A-Z]+-I\\d+',
   jetons: true,
@@ -46,7 +46,8 @@ export function lireOptions(brut: unknown): Options {
 }
 
 export type Choix = 'travail' | 'pause'
-export type Activite = 'ouverture' | 'message' | 'reponse' | 'item' | 'pause' | 'fermeture'
+// `agents-debut` et `agents-fin` : des sous-agents (workflows, Ultracode) travaillent, puis s'arrêtent.
+export type Activite = 'ouverture' | 'message' | 'reponse' | 'item' | 'pause' | 'fermeture' | 'agents-debut' | 'agents-fin'
 // `k` : l'item choisi ou trouvé (ID cité, branche Git, choix dans la liste).
 // `d` : le nom par défaut de la session (groupe de l'app desktop, sinon projet).
 type EvenementActivite = { t: number; s: string; e: Activite; k: string | null; d?: string }
@@ -205,21 +206,29 @@ export function calculer(
 
     // Début du tour de Claude en cours : entre un message et sa réponse, Claude travaille.
     let debutTour: number | null = null
+    // Début du travail des sous-agents : tant qu'ils tournent, Claude travaille aussi, même sans message.
+    let debutAgents: number | null = null
     for (let i = 0; i < liste.length; i++) {
       const a = liste[i]!
       const b = liste[i + 1]
-      if (a.relance) debutTour = null
+      if (a.relance) {
+        debutTour = null
+        debutAgents = null
+      }
       if (a.e === 'message') {
         debutTour = debutTour !== null && a.t - debutTour <= DUREE_MAX_TOUR ? debutTour : a.t
-      } else if (a.e !== 'item') {
+      } else if (a.e !== 'item' && a.e !== 'agents-debut' && a.e !== 'agents-fin') {
         debutTour = null
       }
+      if (a.e === 'agents-debut') debutAgents ??= a.t
+      if (a.e === 'agents-fin') debutAgents = null
       if (a.e === 'pause' || a.e === 'fermeture') continue
 
       const finDeVie = (vivants.get(session) ?? maintenant) + MARGE_VIE
       const fin = b?.t ?? Math.max(a.t, Math.min(maintenant, finDeVie))
       const plage: Ecart = { item: itemDe(a), debut: a.t, fin, session }
-      const claudeTravaille = debutTour !== null && b?.relance !== true && fin - debutTour <= DUREE_MAX_TOUR
+      const enCoursDepuis = (debut: number | null) => debut !== null && b?.relance !== true && fin - debut <= DUREE_MAX_TOUR
+      const claudeTravaille = enCoursDepuis(debutTour) || enCoursDepuis(debutAgents)
       if (claudeTravaille || fin - a.t <= seuil) {
         plages.push(plage)
         if (b === undefined && finDeVie >= maintenant) actives.set(session, plage.item)

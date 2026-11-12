@@ -57,7 +57,7 @@ const INTERFACE_INITIALE: Interface = { onglet: 'jour', decalage: 0, edition: nu
 const session = atom({ plugin: 'temps-item', key: 'session' } as const, null, { shape: 'session-1' })
 const question = atom({ plugin: 'temps-item', key: 'question' } as const, null, { shape: 'question-2' })
 const deplie = atom({ plugin: 'temps-item', key: 'deplie' } as const, false)
-const ui = atom({ plugin: 'temps-item', key: 'ui' } as const, INTERFACE_INITIALE, { shape: 'ui-1' })
+const ui = atom({ plugin: 'temps-item', key: 'ui' } as const, INTERFACE_INITIALE, { shape: 'ui-2' })
 const vue = atom({ plugin: 'temps-item', key: 'vue' } as const, null, { shape: 'vue-1' })
 const frise = atom({ plugin: 'temps-item', key: 'frise' } as const, null, { shape: 'frise-1' })
 const reglages = atom({ plugin: 'temps-item', key: 'reglages' } as const, null, { shape: 'reglages-1' })
@@ -68,6 +68,8 @@ let tourCompte = true
 let heritageClear: { item: string; manuel: boolean } | null = null
 let brancheVue: string | null = null
 let nomParDefaut: string | null = null
+// Dernier état connu des sous-agents de la session : null tant qu'il n'est pas lu.
+let agentsOccupes: boolean | null = null
 // Minutes des jours passés pour la frise, recalculées une fois par jour ou après une correction.
 let friseCalculeeLe: string | null = null
 const minutesPassees = new Map<string, number>()
@@ -220,6 +222,17 @@ async function noterJetons($: Moteur, n: number): Promise<void> {
   await noter($, { t: await $.clock.now(), s, e: 'jetons', n, k: await itemDe($, s), ...(d === undefined ? {} : { d }) })
 }
 
+/** Note quand des sous-agents (workflows, Ultracode) commencent ou cessent de travailler : ce temps compte. */
+async function suivreAgents($: Moteur): Promise<void> {
+  const occupes = (await $.agent.list()).some(a => a.status === 'running' || a.status === 'pending' || a.status === 'waiting')
+  if (occupes === agentsOccupes || (agentsOccupes === null && !occupes)) {
+    agentsOccupes = occupes
+    return
+  }
+  agentsOccupes = occupes
+  await noterActivite($, occupes ? 'agents-debut' : 'agents-fin')
+}
+
 /** Passe cette session sur un item, choisi à la main. */
 async function changerItem($: Moteur, item: string): Promise<void> {
   await definirItem($, await $.session.id(), item, true)
@@ -239,6 +252,7 @@ async function rafraichir($: Moteur): Promise<void> {
   const maintenant = await $.clock.now()
   nomParDefaut = await calculerNomParDefaut($)
   await donnerSigneDeVie($)
+  await suivreAgents($).catch(() => undefined)
   const jour = debutJour(maintenant)
   const { b, evenements, options, corrections } = await bilanDe($, jour, jourSuivant(jour))
   const brut = (await itemDe($, s)) ?? nomParDefaut
@@ -451,9 +465,7 @@ function puce($: Moteur, e: Site, etat: Session) {
       <Button
         key="puce"
         plain
-        dimColor
         label={libellePuce(etat.item, etat.minutes, etat.enPause)}
-        hover={{ dimColor: false, backgroundColor: 'subtle' }}
         onPress={() => ouvrirOuFermer($)}
       />
     </Box>
@@ -497,7 +509,7 @@ function enTete($: Moteur, e: Site, etat: Interface, titre: string) {
             key="reglages"
             plain
             dimColor={!enReglages}
-            label={enReglages ? '✕' : '⚙'}
+            label={enReglages ? '✕' : '⚙️'}
             onPress={() => choisirOnglet($, enReglages ? 'jour' : 'reglages', 0)}
           />
         </Box>
@@ -506,32 +518,36 @@ function enTete($: Moteur, e: Site, etat: Interface, titre: string) {
   )
 }
 
-/** Une ligne : pastille, nom (clic pour passer dessus, ✎ pour renommer), tokens, temps, × pour retirer. */
+/** Une ligne : pastille, nom (clic : passer dessus, ou renommer l'item de la session), tokens, temps, × pour retirer. */
 function ligne($: Moteur, e: Site, l: Ligne, actuel: string | null, etat: Interface, periode: Vue, options: Reglages) {
   const { Box, Button, Input, Text } = $.ui.resolve(e)
   const estActuel = l.item === actuel
+  const sansNom = l.item === SANS_ITEM
   const couleur = estActuel ? 'claude' : l.enCours ? 'success' : 'inactive'
+  const enRenommage = etat.edition !== null && etat.edition !== 'autre' && etat.edition.renommer === l.item
+  const ouvrirRenommage = () => update($, ui, x => ({ ...x, edition: { renommer: l.item } }))
+  const croix = <Button key={`retirer-${l.item}`} plain dimColor label="×" onPress={() => retirer($, l, periode)} />
   return (
     <Box key={`ligne-${l.item}`} flexDirection="row" justifyContent="space-between" alignItems="center" gap={2}>
       <Box flexDirection="row" gap={1} alignItems="center" flexGrow={1}>
         <Text color={couleur}>●</Text>
-        {estActuel && etat.edition === 'renommer' ? (
+        {enRenommage ? (
           <Input
             key="renommer"
-            value={l.item}
+            value={sansNom ? '' : l.item}
             placeholder="Nouveau nom, puis Entrée"
             onSubmit={texte => renommer($, l.item, texte.trim().slice(0, 60))}
           />
-        ) : estActuel ? (
-          <Box flexDirection="row" gap={1} alignItems="center">
-            <Text weight="semibold">{l.item}</Text>
-            <Button key="crayon" plain dimColor label="✎" onPress={() => update($, ui, x => ({ ...x, edition: 'renommer' as const }))} />
-          </Box>
-        ) : l.item === SANS_ITEM ? (
-          <Text dimColor>{l.item}</Text>
         ) : (
-          <Button key={`choisir-${l.item}`} plain label={l.item} onPress={() => choisirItem($, l.item)} />
+          <Button
+            key={`choisir-${l.item}`}
+            plain
+            dimColor={sansNom}
+            label={l.item}
+            onPress={() => (estActuel || sansNom ? ouvrirRenommage() : choisirItem($, l.item))}
+          />
         )}
+        {estActuel && !enRenommage && <Button key="crayon" plain dimColor label="✎" onPress={ouvrirRenommage} />}
       </Box>
       <Box flexDirection="row" gap={2} alignItems="center">
         {options.jetons && l.jetons > 0 && (
@@ -540,7 +556,16 @@ function ligne($: Moteur, e: Site, l: Ligne, actuel: string | null, etat: Interf
           </Text>
         )}
         {l.minutes > 0 && <Text tabular>{formatDuree(l.minutes)}</Text>}
-        <Button key={`retirer-${l.item}`} plain dimColor label="×" onPress={() => retirer($, l, periode)} />
+        {e.surface === 'desktop' ? (
+          // Dans l'app desktop, × n'apparaît qu'au survol de la ligne, sans décaler les colonnes.
+          <Box width={2}>
+            <Box display="none" hover={{ display: 'flex' }}>
+              {croix}
+            </Box>
+          </Box>
+        ) : (
+          croix
+        )}
       </Box>
     </Box>
   )
@@ -618,18 +643,21 @@ function resume(
       <Box flexDirection="column">
         {contenu.lignes.length === 0 && <Text dimColor>Rien sur cette période.</Text>}
         {contenu.lignes.map(l => ligne($, e, l, d.actuel, etat, contenu, options))}
-        {etat.edition === 'autre' ? (
-          <Input
-            key="autre-item"
-            placeholder="ID ou nom, puis Entrée"
-            onSubmit={texte => {
-              const item = texte.trim().slice(0, 60)
-              return item === '' ? update($, ui, x => ({ ...x, edition: null })) : choisirItem($, item)
-            }}
-          />
-        ) : (
-          <Button key="autre" plain dimColor label="+ Autre item" onPress={() => update($, ui, x => ({ ...x, edition: 'autre' as const }))} />
-        )}
+        <Box flexDirection="row" gap={1} alignItems="center">
+          <Text dimColor>+</Text>
+          {etat.edition === 'autre' ? (
+            <Input
+              key="autre-item"
+              placeholder="ID ou nom, puis Entrée"
+              onSubmit={texte => {
+                const item = texte.trim().slice(0, 60)
+                return item === '' ? update($, ui, x => ({ ...x, edition: null })) : choisirItem($, item)
+              }}
+            />
+          ) : (
+            <Button key="autre" plain dimColor label="Autre item" onPress={() => update($, ui, x => ({ ...x, edition: 'autre' as const }))} />
+          )}
+        </Box>
       </Box>
       {annulation !== null && (
         <Box flexDirection="row" gap={1} alignItems="center">
