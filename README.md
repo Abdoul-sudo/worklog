@@ -12,6 +12,7 @@ Vous travaillez normalement. Le soir, ouvrez la puce `⏱` ou tapez `/temps`, et
 - **Tokens par item.** Ce que chaque item a consommé.
 - **Frise d'activité.** Vos 26 dernières semaines, comme sur GitHub.
 - **Sessions en parallèle.** Chaque session compte. Deux sessions sur le même item sont regroupées.
+- **L'IA qui travaille seule compte.** Sous-agents, workflows, Ultracode : pas de question « Du travail ? » après deux heures de travail autonome.
 - **Projets perso aussi.** Sans ID, le temps va au groupe ou au projet. Vous pouvez aussi taper un nom libre.
 
 ## Installation
@@ -62,7 +63,7 @@ Cliquez sur ⚙ dans le popover.
 | Tokens par item | affichés |
 | Frise d'activité | affichée |
 | « Du travail ? » après un long silence | activé |
-| Silence compté comme travail | jusqu'à 20 min |
+| Silence compté comme travail | jusqu'à 45 min |
 | Format des ID (expression régulière) | `[A-Z]+-I\d+`, les ID Zoho comme `FSY-I478` |
 
 ### Commandes
@@ -91,13 +92,14 @@ Aujourd'hui
 <summary>Les règles</summary>
 
 - Le temps part du premier message de la session. Ouvrir une session ne compte pas.
-- Pendant que Claude travaille, tout compte.
-- Un silence de moins de 20 min compte. Un silence plus long ne compte pas, sauf si vous répondez « Oui ».
+- Pendant que Claude travaille, tout compte : vos tours, et aussi les sous-agents, workflows et Ultracode qui tournent seuls, même pendant des heures.
+- Un silence de moins de 45 min compte. Un silence plus long ne compte pas, sauf si vous répondez « Oui ».
 - Le premier ID trouvé dans une session reçoit aussi le temps passé avant lui.
 - L'item reste celui de la session, même le lendemain.
 - La puce donne le temps de la session. La liste donne le temps par item, toutes sessions confondues.
 - Deux sessions sur deux items comptent chacune : le total du jour peut dépasser le temps réel. Le popover le signale (« dont 40 min en parallèle »).
-- Les tokens sont ceux des réponses de Claude, sous-agents compris, lecture du cache comprise.
+- Les tokens sont ceux des réponses de Claude : sessions, sous-sessions et sous-agents, lecture du cache comprise. Chaque réponse compte une fois.
+- `/stats` donne d'autres chiffres : il ne compte pas les sous-agents, il compte certaines réponses plusieurs fois, et il coupe les jours à minuit UTC.
 - Si vous fermez une fenêtre sans quitter Claude Code, le compteur s'arrête au plus 2 min après.
 
 </details>
