@@ -1,0 +1,6 @@
+{
+  "name": "temps-ticket",
+  "description": "Temps par ticket : compte le temps passé par ticket dans Claude Code",
+  "owner": { "name": "Abdoul-sudo" },
+  "plugins": [{ "name": "temps-ticket", "source": "./" }]
+}
