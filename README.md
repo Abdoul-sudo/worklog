@@ -8,8 +8,10 @@ Vous n'avez rien à lancer ni à arrêter. Le soir, tapez `/temps` et recopiez l
 
 - Chaque message que vous envoyez à Claude marque une activité.
 - Le mod cherche un ID de ticket dans le message, par exemple `FLO-I165` ou `FSY-I478`. Le premier ID trouvé devient le ticket de la session.
-- Le ticket reste celui de la session, même le lendemain, jusqu'à ce qu'un message cite un autre ID.
-- Sans ID, le temps va dans « ticket ? ».
+- Sans ID dans le message, le mod regarde la branche Git. Une branche comme `feature/FLO-I165-export` donne le ticket `FLO-I165`. Quand la branche change, le ticket suit.
+- Une nouvelle session sans ID ni branche reprend le dernier ticket utilisé dans le même dossier.
+- Le ticket reste celui de la session, même le lendemain, jusqu'à ce qu'un message cite un autre ID ou que la branche change.
+- Sans aucun indice, le temps va dans « ticket ? ».
 - Pendant que Claude travaille (entre votre message et sa réponse), le temps compte.
 - Un silence de moins de 20 minutes compte comme du travail.
 - Un silence plus long ne compte pas. Il passe dans la liste « à confirmer ». Vous le classez ensuite en travail ou en pause.
@@ -56,14 +58,25 @@ L'extension doit être en version 2.1.299 ou plus. Avant cette version, les mods
 
 ## Ce que vous voyez
 
+Au-dessus de la zone de saisie, une puce donne le ticket de la session et son temps du jour : `⏱ FLO-I165 · 2 h 14`.
+
+Cliquez sur la puce. Elle s'ouvre en carte :
+
+- le temps de chaque ticket du jour, avec une barre ; le point vert marque les tickets qui comptent en ce moment ;
+- le temps réel, quand des sessions ont tourné en parallèle ;
+- les silences à confirmer, avec les boutons **Travail** et **Pause** ;
+- les tickets récents : un clic change le ticket de la session ; **Autre…** permet de taper un ID ;
+- les boutons **Mettre en pause** et **Récap de la semaine**.
+
+Cliquez à nouveau sur la puce pour fermer la carte.
+
+Après un long silence, une ligne au-dessus de la puce demande si c'était du travail ou une pause.
+
 | Où | Ce qui s'affiche |
 | --- | --- |
-| Terminal | Une ligne de statut sous la zone de saisie, par exemple `FLO-I165 · 2 h 14 aujourd'hui`. Le terminal la préfixe par `⚠ temps-ticket:`. |
-| App desktop | Un panneau à côté de la conversation : les tickets du jour, leur temps en direct, un bouton **Pause** et un bouton **Changer de ticket**. |
-| VS Code | Le même panneau, et la ligne de statut au-dessus de la zone de saisie. |
-| Terminal et app desktop | Après un long silence, une bande au-dessus de la zone de saisie demande « pause ou travail ? », avec deux boutons. |
-
-Le panneau s'ouvre tout seul dans l'app desktop et dans VS Code. Dans le terminal, tapez `/temps panneau` pour l'ouvrminal, les boutons se cliquent seulement en mode plein écran. Pour l'activer, tapez `/tui fullscreen` une fois. Sans ce mode, utilisez les commandes `/temps`.
+| App desktop | La puce et la carte. |
+| Terminal | La puce et la carte. Les boutons se cliquent seulement en mode plein écran : tapez `/tui fullscreen` une fois. Sans ce mode, utilisez les commandes `/temps`. |
+| VS Code | VS Code n'affiche pas la zone au-dessus de la saisie. Vous y voyez une ligne de statut, par exemple `FLO-I165 · 2 h 14 aujourd'hui`. Tapez `/temps panneau` pour ouvrir la carte dans un panneau. |
 
 ## Commandes
 
@@ -121,7 +134,7 @@ Les données restent sur votre ordinateur, dans `~/.claude/temps/journal/`. Il y
 - Le mod compte seulement l'activité dans Claude Code. Le travail hors de Claude (réunion, lecture, appel) ne compte pas.
 - Le total du jour peut dépasser le temps réel, car des sessions en parallèle comptent chacune. `/temps` donne alors aussi le temps réel.
 - Le motif générique `[A-Z]+-I?\d+` peut prendre `UTF-8` ou `ISO-8601` pour un ticket. Si cela vous gêne, retirez-le de `motifs`, ou forcez le ticket avec `/temps FLO-I165`.
-- Les ID doivent être en majuscules : `flo-i165` n'est pas reconnu.
+- Les ID doivent être en majuscules, dans les messages comme dans les branches : `flo-i165` n'est pas reconnu.
 - Si vous fermez une fenêtre sans quitter Claude Code, le compteur s'arrête au dernier signe de vie de la session, au plus 2 minutes après.
 - Les données ne passent pas d'un ordinateur à l'autre.
 - Le mod ne remplit pas Zoho Sprints. Il donne les durées à recopier.
@@ -138,5 +151,5 @@ claude plugin validate .
 
 - `hooks/calcul.ts` : le calcul du temps, sans effet de bord.
 - `hooks/texte.ts` : les textes de `/temps`.
-- `hooks/register.tsx` : les hooks, la commande, le panneau et la bande.
+- `hooks/register.tsx` : les hooks, la commande, la puce, la carte et le panneau.
 - `tests/` : les tests du calcul et du mod.
