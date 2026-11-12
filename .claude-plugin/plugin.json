@@ -1,7 +1,7 @@
 {
   "name": "temps-item",
   "displayName": "Temps par item",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Compte le temps passé par item à partir de l'activité dans Claude Code",
   "types": "./types/index.d.ts",
   "author": { "name": "Abdoul-sudo", "url": "https://github.com/Abdoul-sudo" },
