@@ -358,6 +358,23 @@ function liste($: Moteur, e: Site, vu: Apercu) {
   )
 }
 
+/** La puce : `⏱ FSY-I478 · 1 h 12`, discrète ; un clic ouvre ou ferme la liste. */
+function puce($: Moteur, e: Site, vu: Apercu) {
+  const { Box, Button } = $.ui.resolve(e)
+  return (
+    <Box key="zone-puce">
+      <Button
+        key="puce"
+        plain
+        dimColor
+        label={libellePuce(vu.item, vu.minutesSession, vu.enPause)}
+        hover={{ dimColor: false, backgroundColor: 'subtle' }}
+        onPress={() => update($, deplie, v => !v)}
+      />
+    </Box>
+  )
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -405,36 +422,28 @@ export const register: Register = on => {
     return <Text dimColor>Calcul en cours…</Text>
   })
 
-  // Sous la saisie, à gauche : la puce. Un clic ouvre la liste du jour au-dessus de la saisie.
+  // Terminal : la puce va sur la ligne sous la saisie. L'app desktop ne dessine pas cette ligne.
   on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
     const vu = await read($, apercu)
     const ligne = await next(e)
-    if (vu === null) return ligne
-    const { Box, Button } = $.ui.resolve(e)
-
+    if (vu === null || e.surface !== 'terminal') return ligne
+    const { Box } = $.ui.resolve(e)
     return (
       <Box flexDirection="row" gap={2}>
-        <Box key="zone-puce">
-          <Button
-            key="puce"
-            plain
-            dimColor
-            label={libellePuce(vu.item, vu.minutesSession, vu.enPause)}
-            hover={{ dimColor: false, backgroundColor: 'subtle' }}
-            onPress={() => update($, deplie, v => !v)}
-          />
-        </Box>
+        {puce($, e, vu)}
         {ligne}
       </Box>
     )
   })
 
-  // Au-dessus de la saisie : la liste quand elle est ouverte, et la question après un long silence.
+  // Au-dessus de la saisie : la liste ouverte, la question après un long silence, et la puce hors du terminal.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const vu = await read($, apercu)
+    if (vu === null || e.props.hasSurvey) return next(e)
     const ecart = await read($, question)
     const ouvert = await read($, deplie)
-    if (vu === null || e.props.hasSurvey || (!ouvert && ecart === null)) return next(e)
+    const avecPuce = e.surface !== 'terminal'
+    if (!ouvert && ecart === null && !avecPuce) return next(e)
     const autres = await next(e)
     const { Box, Button, Text } = $.ui.resolve(e)
 
@@ -451,7 +460,14 @@ export const register: Register = on => {
             <Button key="ecart-non" label="Non" variant="secondary" onPress={() => repondre($, ecart, 'pause')} />
           </Box>
         )}
-        {autres}
+        {avecPuce ? (
+          <Box flexDirection="row" justifyContent="space-between" alignItems="center">
+            {puce($, e, vu)}
+            {autres}
+          </Box>
+        ) : (
+          autres
+        )}
       </Box>
     )
   })
