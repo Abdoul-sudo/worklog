@@ -436,14 +436,27 @@ export const register: Register = on => {
     )
   })
 
-  // Au-dessus de la saisie : la liste ouverte, la question après un long silence, et la puce hors du terminal.
+  // App desktop : la puce va en bas, devant le mode de la session (« Bypass permissions »).
+  on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
+    const vu = await read($, apercu)
+    const modes = await next(e)
+    if (vu === null || e.surface === 'terminal') return modes
+    const { Box } = $.ui.resolve(e)
+    return (
+      <Box flexDirection="row" gap={2} alignItems="center">
+        {puce($, e, vu)}
+        {modes}
+      </Box>
+    )
+  })
+
+  // Au-dessus de la saisie : la liste quand elle est ouverte, et la question après un long silence.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const vu = await read($, apercu)
     if (vu === null || e.props.hasSurvey) return next(e)
     const ecart = await read($, question)
     const ouvert = await read($, deplie)
-    const avecPuce = e.surface !== 'terminal'
-    if (!ouvert && ecart === null && !avecPuce) return next(e)
+    if (!ouvert && ecart === null) return next(e)
     const autres = await next(e)
     const { Box, Button, Text } = $.ui.resolve(e)
 
@@ -460,14 +473,7 @@ export const register: Register = on => {
             <Button key="ecart-non" label="Non" variant="secondary" onPress={() => repondre($, ecart, 'pause')} />
           </Box>
         )}
-        {avecPuce ? (
-          <Box flexDirection="row" justifyContent="space-between" alignItems="center">
-            {puce($, e, vu)}
-            {autres}
-          </Box>
-        ) : (
-          autres
-        )}
+        {autres}
       </Box>
     )
   })

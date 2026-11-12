@@ -5,7 +5,7 @@ Le temps passé sur chaque item, compté tout seul dans Claude Code.
 Vous travaillez normalement. Le soir, tapez `/temps` et recopiez les durées dans Zoho Sprints.
 
 ```
-⏱ FSY-I478 · 1 h 12                    ← au-dessus de la saisie, un clic pour ouvrir
+⏱ FSY-I478 · 1 h 12                    ← en bas de l'écran, un clic pour ouvrir
 
 ╭──────────────────────────────────╮
 │ Aujourd'hui               3 h 19 │
@@ -45,9 +45,9 @@ C'est tout. Le mod tourne dans le terminal, dans l'app desktop et dans VS Code.
 
 ## Utilisation
 
-**Au quotidien, vous ne faites rien.** La puce `⏱` au-dessus de la saisie montre l'item de la session et son temps du jour.
+**Au quotidien, vous ne faites rien.** La puce `⏱`, en bas de l'écran, montre l'item de la session et son temps du jour dans cette session.
 
-Cliquez sur la puce pour ouvrir la liste du jour :
+Cliquez sur la puce : la liste du jour s'ouvre au-dessus de la saisie.
 
 - cliquez sur une ligne pour passer cette session sur cet item ;
 - tapez un ID ou un nom dans le champ, puis Entrée.

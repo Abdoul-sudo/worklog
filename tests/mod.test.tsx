@@ -28,6 +28,13 @@ const PUCE = {
   props: { isDraft: false, isWorking: false, hint: '? for shortcuts' },
 } as const
 
+const MODE = {
+  plugin: 'temps-item',
+  component: 'SessionMode',
+  requestId: 'session-mode',
+  props: { modes: ['Bypass permissions'] },
+} as const
+
 const BANDEAU = {
   plugin: 'temps-item',
   component: 'AbovePrompt',
@@ -113,14 +120,14 @@ test('un message avec un ID compte pour cet item, partout', async ($, on) => {
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const bande = await $.ui.mount({ ...BANDEAU, surface })
-    const puce = surface === 'terminal' ? await $.ui.mount({ ...PUCE, surface }) : bande
+    const puce = await $.ui.mount({ ...(surface === 'terminal' ? PUCE : MODE), surface })
     expect((await puce.find({ key: 'puce' }))?.text).toContain('⏱ FLO-I165 · 10 min')
     expect(await bande.find({ key: 'autre-item' })).toBeUndefined()
     await puce.press({ key: 'puce' })
     expect(await bande.find({ key: 'autre-item' })).toBeDefined()
     await puce.press({ key: 'puce' })
     expect(await bande.find({ key: 'autre-item' })).toBeUndefined()
-    if (puce !== bande) await puce.unmount()
+    await puce.unmount()
     await bande.unmount()
   }
 })
@@ -140,13 +147,14 @@ test("l'item vient de la branche Git, et la liste permet d'en choisir un autre",
   await horloge.settle()
   expect(toasts).toContain('Temps compté pour FLO-I7')
 
-  // Dans l'app desktop, la puce et la liste sont dans la même zone, au-dessus de la saisie.
-  const puce = await $.ui.mount({ ...BANDEAU, surface: 'desktop' })
-  const bande = puce
+  // Dans l'app desktop, la puce est en bas ; la liste s'ouvre au-dessus de la saisie.
+  const puce = await $.ui.mount({ ...MODE, surface: 'desktop' })
+  const bande = await $.ui.mount({ ...BANDEAU, surface: 'desktop' })
   await puce.press({ key: 'puce' })
   await bande.press({ key: 'choisir-FSY-I9' })
   expect((await puce.find({ key: 'puce' }))?.text).toContain('FSY-I9 ·')
   await puce.unmount()
+  await bande.unmount()
 })
 
 test("sans item, le temps va au groupe de l'app desktop ; on peut taper un nom libre", async ($, on) => {
@@ -161,23 +169,24 @@ test("sans item, le temps va au groupe de l'app desktop ; on peut taper un nom l
   await $.prompt.submit({ ...PROMPT, text: 'ajoute le menu' })
   await horloge.advance(15 * 60_000)
   await horloge.settle()
-  // Dans l'app desktop, la puce et la liste sont dans la même zone, au-dessus de la saisie.
-  const puce = await $.ui.mount({ ...BANDEAU, surface: 'desktop' })
-  const bande = puce
+  // Dans l'app desktop, la puce est en bas ; la liste s'ouvre au-dessus de la saisie.
+  const puce = await $.ui.mount({ ...MODE, surface: 'desktop' })
+  const bande = await $.ui.mount({ ...BANDEAU, surface: 'desktop' })
   expect((await puce.find({ key: 'puce' }))?.text).toContain('⏱ Codepath · 15 min')
 
   await puce.press({ key: 'puce' })
   await bande.input({ key: 'autre-item', text: 'Refonte menu' })
   expect((await puce.find({ key: 'puce' }))?.text).toContain('⏱ Refonte menu · 15 min')
   await puce.unmount()
+  await bande.unmount()
 })
 
 test("un item choisi à la main ne change plus tout seul ; la puce donne le temps de la session", async ($, on) => {
   const { horloge, etat } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
-  // Dans l'app desktop, la puce et la liste sont dans la même zone, au-dessus de la saisie.
-  const puce = await $.ui.mount({ ...BANDEAU, surface: 'desktop' })
-  const bande = puce
+  // Dans l'app desktop, la puce est en bas ; la liste s'ouvre au-dessus de la saisie.
+  const puce = await $.ui.mount({ ...MODE, surface: 'desktop' })
+  const bande = await $.ui.mount({ ...BANDEAU, surface: 'desktop' })
   await puce.press({ key: 'puce' })
   await bande.input({ key: 'autre-item', text: 'FLO-I1' })
 
@@ -200,6 +209,7 @@ test("un item choisi à la main ne change plus tout seul ; la puce donne le temp
   expect((await puce.find({ key: 'puce' }))?.text).toContain('⏱ FLO-I1 · 15 min')
   expect(await bande.find({ type: 'Text', text: /FLO-I1 · 25 min/ })).toBeDefined()
   await puce.unmount()
+  await bande.unmount()
 })
 
 test('un long écart demande pause ou travail, et la réponse compte', async ($, on) => {
