@@ -1,9 +1,9 @@
 {
-  "name": "temps-ticket",
-  "displayName": "Temps par ticket",
+  "name": "temps-item",
+  "displayName": "Temps par item",
   "version": "1.0.0",
-  "description": "Compte le temps passé par ticket à partir de l'activité dans Claude Code",
+  "description": "Compte le temps passé par item à partir de l'activité dans Claude Code",
   "types": "./types/index.d.ts",
   "author": { "name": "Abdoul-sudo", "url": "https://github.com/Abdoul-sudo" },
-  "repository": "https://github.com/Abdoul-sudo/claude-temps-ticket"
+  "repository": "https://github.com/Abdoul-sudo/claude-temps-item"
 }

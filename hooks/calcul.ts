@@ -1,7 +1,7 @@
 // Logique pure du comptage : aucun appel à `$`, testée par tests/calcul.test.ts.
 import type { Ecart, Ligne, Plage } from '../types'
 
-export const SANS_TICKET = 'ticket ?'
+export const SANS_ITEM = 'sans nom'
 export const MINUTE = 60_000
 // Un tour de Claude plus long, sans réponse notée, est tenu pour abandonné.
 const DUREE_MAX_TOUR = 3 * 60 * MINUTE
@@ -14,25 +14,27 @@ export type Reglages = {
   ecartMaxMinutes: number
   motifs: string[]
   projets: Record<string, string[]>
-  format: string
 }
 
 export const REGLAGES_PAR_DEFAUT: Reglages = {
   seuilPauseMinutes: 20,
   ecartMaxMinutes: 240,
-  motifs: ['FLO-I\\d+', 'FSY-I\\d+', '[A-Z]+-I?\\d+'],
+  // Les ID des items Zoho Sprints : FLO-I165, FSY-I478, LBA-I12...
+  motifs: ['[A-Z]+-I\\d+'],
   projets: {},
-  format: "{ticket} · {duree} aujourd'hui",
 }
 
 export type Choix = 'travail' | 'pause'
-export type Activite = 'ouverture' | 'message' | 'reponse' | 'ticket' | 'pause' | 'fermeture'
-type EvenementActivite = { t: number; s: string; e: Activite; k: string | null }
+export type Activite = 'ouverture' | 'message' | 'reponse' | 'item' | 'pause' | 'fermeture'
+// `k` : l'item choisi ou trouvé (ID cité, branche Git, choix dans la liste).
+// `d` : le nom par défaut de la session (groupe de l'app desktop, sinon projet).
+type EvenementActivite = { t: number; s: string; e: Activite; k: string | null; d?: string }
 type EvenementClassement = { t: number; s: string; e: 'classement'; session: string; debut: number; choix: Choix }
 export type Evenement = EvenementActivite | EvenementClassement
 
 export type Jour = { debut: number; lignes: Ligne[]; total: number; reel: number }
-export type Bilan = { jours: Jour[]; lignes: Ligne[]; total: number; ecarts: Ecart[] }
+/** `parSession` : les minutes de chaque session sur la période. */
+export type Bilan = { jours: Jour[]; lignes: Ligne[]; total: number; ecarts: Ecart[]; parSession: Map<string, number> }
 
 export function lireReglages(texte: string | undefined): { reglages: Reglages; erreur?: string } {
   const defaut = REGLAGES_PAR_DEFAUT
@@ -62,7 +64,6 @@ export function lireReglages(texte: string | undefined): { reglages: Reglages; e
       ecartMaxMinutes: nombre(r.ecartMaxMinutes, defaut.ecartMaxMinutes),
       motifs: textes(r.motifs) ?? defaut.motifs,
       projets,
-      format: typeof r.format === 'string' ? r.format : defaut.format,
     },
   }
 }
@@ -89,7 +90,7 @@ function expression(motif: string, entier: boolean): RegExp | null {
 }
 
 /** Le premier ID trouvé, en essayant les motifs dans l'ordre. */
-export function detecterTicket(texte: string, motifs: readonly string[]): string | null {
+export function detecterItem(texte: string, motifs: readonly string[]): string | null {
   for (const motif of motifs) {
     const trouve = expression(motif, false)?.exec(texte)
     if (trouve) return trouve[0]
@@ -97,7 +98,7 @@ export function detecterTicket(texte: string, motifs: readonly string[]): string
   return null
 }
 
-export function estUnTicket(texte: string, motifs: readonly string[]): boolean {
+export function estUnItem(texte: string, motifs: readonly string[]): boolean {
   return motifs.some(motif => expression(motif, true)?.test(texte) === true)
 }
 
@@ -151,7 +152,7 @@ export function dernierEvenement(evenements: readonly Evenement[], session: stri
 /**
  * Découpe l'activité de chaque session en plages comptées et en écarts à confirmer.
  * `vivants` donne le dernier signe de vie connu de chaque session.
- * `actives` donne, pour chaque session qui compte en ce moment, son ticket.
+ * `actives` donne, pour chaque session qui compte en ce moment, son item.
  */
 export function calculer(
   evenements: readonly Evenement[],
@@ -169,7 +170,7 @@ export function calculer(
     else sessions.set(ev.s, [ev])
   }
 
-  const plages: Plage[] = []
+  const plages: Ecart[] = []
   const ecarts: Ecart[] = []
   const actives = new Map<string, string>()
   for (const [session, brute] of sessions) {
@@ -183,6 +184,9 @@ export function calculer(
       if (ev.e !== 'ouverture') relance = false
     }
 
+    // Le premier item trouvé dans la session reçoit aussi le temps passé avant lui ;
+    // sans item, le temps va au nom par défaut.
+    const premierItem = liste.find(ev => ev.k !== null)?.k ?? null
     // Début du tour de Claude en cours : entre un message et sa réponse, Claude travaille.
     let debutTour: number | null = null
     for (let i = 0; i < liste.length; i++) {
@@ -191,22 +195,22 @@ export function calculer(
       if (a.relance) debutTour = null
       if (a.e === 'message') {
         debutTour = debutTour !== null && a.t - debutTour <= DUREE_MAX_TOUR ? debutTour : a.t
-      } else if (a.e !== 'ticket') {
+      } else if (a.e !== 'item') {
         debutTour = null
       }
       if (a.e === 'pause' || a.e === 'fermeture') continue
 
       const finDeVie = (vivants.get(session) ?? maintenant) + MARGE_VIE
       const fin = b?.t ?? Math.max(a.t, Math.min(maintenant, finDeVie))
-      const plage: Plage = { ticket: a.k ?? SANS_TICKET, debut: a.t, fin }
+      const plage: Ecart = { item: a.k ?? premierItem ?? a.d ?? SANS_ITEM, debut: a.t, fin, session }
       const claudeTravaille = debutTour !== null && b?.relance !== true && fin - debutTour <= DUREE_MAX_TOUR
       if (claudeTravaille || fin - a.t <= seuil) {
         plages.push(plage)
-        if (b === undefined && finDeVie >= maintenant) actives.set(session, plage.ticket)
+        if (b === undefined && finDeVie >= maintenant) actives.set(session, plage.item)
       } else if (b !== undefined && fin - a.t <= ecartMax) {
         const classe = choix.get(`${session}@${a.t}`)
         if (classe === 'travail') plages.push(plage)
-        else if (classe === undefined) ecarts.push({ ...plage, session })
+        else if (classe === undefined) ecarts.push(plage)
       }
     }
   }
@@ -232,9 +236,9 @@ function recouvrement(segments: readonly Segment[], debut: number, fin: number):
   return total
 }
 
-const parTemps = (a: Ligne, b: Ligne) => b.minutes - a.minutes || a.ticket.localeCompare(b.ticket)
+const parTemps = (a: Ligne, b: Ligne) => b.minutes - a.minutes || a.item.localeCompare(b.item)
 
-/** Temps par ticket et par jour sur [debut, fin[, bornes au début d'un jour. */
+/** Temps par item et par jour sur [debut, fin[, bornes au début d'un jour. */
 export function bilan(
   evenements: readonly Evenement[],
   reglages: Reglages,
@@ -244,9 +248,9 @@ export function bilan(
   vivants: ReadonlyMap<string, number> = new Map(),
 ): Bilan {
   const { plages, ecarts, actives } = calculer(evenements, reglages, maintenant, vivants)
-  const tickets = new Map<string, Segment[]>()
-  for (const ticket of new Set(plages.map(p => p.ticket))) {
-    tickets.set(ticket, unir(plages.filter(p => p.ticket === ticket)))
+  const items = new Map<string, Segment[]>()
+  for (const item of new Set(plages.map(p => p.item))) {
+    items.set(item, unir(plages.filter(p => p.item === item)))
   }
   const tous = unir(plages)
   const enCours = new Set(actives.values())
@@ -256,11 +260,11 @@ export function bilan(
   for (let jour = debut; jour < fin; jour = jourSuivant(jour)) {
     const lendemain = jourSuivant(jour)
     const lignes: Ligne[] = []
-    for (const [ticket, segments] of tickets) {
+    for (const [item, segments] of items) {
       const minutes = Math.round(recouvrement(segments, jour, lendemain) / MINUTE)
       if (minutes === 0) continue
-      lignes.push({ ticket, minutes, enCours: enCours.has(ticket) })
-      totaux.set(ticket, (totaux.get(ticket) ?? 0) + minutes)
+      lignes.push({ item, minutes, enCours: enCours.has(item) })
+      totaux.set(item, (totaux.get(item) ?? 0) + minutes)
     }
     if (lignes.length === 0) continue
     const total = lignes.reduce((somme, l) => somme + l.minutes, 0)
@@ -268,13 +272,19 @@ export function bilan(
     jours.push({ debut: jour, lignes: lignes.sort(parTemps), total, reel })
   }
 
-  const lignes = [...totaux].map(([ticket, minutes]) => ({ ticket, minutes, enCours: enCours.has(ticket) }))
-  // Un écart déjà couvert par une autre session sur le même ticket n'a rien à confirmer.
+  const lignes = [...totaux].map(([item, minutes]) => ({ item, minutes, enCours: enCours.has(item) }))
+  // Un écart déjà couvert par une autre session sur le même item n'a rien à confirmer.
   const aConfirmer = ecarts
     .filter(e => e.debut >= debut && e.debut < fin)
-    .filter(e => e.fin - e.debut - recouvrement(tickets.get(e.ticket) ?? [], e.debut, e.fin) >= MINUTE)
+    .filter(e => e.fin - e.debut - recouvrement(items.get(e.item) ?? [], e.debut, e.fin) >= MINUTE)
     .sort((a, b) => a.debut - b.debut)
+  const parSession = new Map<string, number>()
+  for (const session of new Set(plages.map(p => p.session))) {
+    const segments = unir(plages.filter(p => p.session === session))
+    parSession.set(session, Math.round(recouvrement(segments, debut, fin) / MINUTE))
+  }
   return {
+    parSession,
     jours,
     lignes: lignes.sort(parTemps),
     total: lignes.reduce((somme, l) => somme + l.minutes, 0),
@@ -305,18 +315,29 @@ export function formatJour(t: number): string {
   return `${JOURS[d.getDay()]} ${quantieme} ${MOIS[d.getMonth()]}`
 }
 
-/** Met `ticket` en tête des tickets récents, sans doublon, six au plus. */
-export function ajouterRecent(recents: readonly string[], ticket: string): string[] {
-  return [ticket, ...recents.filter(t => t !== ticket)].slice(0, 6)
+/** Met `item` en tête des items récents, sans doublon, six au plus. */
+export function ajouterRecent(recents: readonly string[], item: string): string[] {
+  return [item, ...recents.filter(t => t !== item)].slice(0, 6)
 }
 
-/** Une barre de `largeur` cases : la part pleine et la part vide, proportionnelles à `minutes / max`. */
-export function barre(minutes: number, max: number, largeur: number): [string, string] {
-  const plein = max > 0 ? Math.max(minutes > 0 ? 1 : 0, Math.round((minutes / max) * largeur)) : 0
-  return ['━'.repeat(plein), '─'.repeat(largeur - plein)]
+/** Le texte de la puce : `⏱ FSY-I478 · 2 h 14`, ou `⏱ 2 h 14` sans nom. */
+export function libellePuce(item: string | null, minutes: number, enPause: boolean): string {
+  const nom = item === null ? '' : `${item} · `
+  return `${enPause ? '⏸' : '⏱'} ${nom}${formatDuree(minutes)}`
 }
 
-export function ligneStatut(format: string, ticket: string, minutes: number, enPause: boolean): string {
-  const texte = format.replaceAll('{ticket}', ticket).replaceAll('{duree}', formatDuree(minutes))
-  return enPause ? `${texte} · en pause` : texte
+/** Le nom du groupe de l'app desktop où se trouve la session `hote`, lu dans la config de l'app. */
+export function nomDuGroupe(config: string, hote: string): string | null {
+  type Portee = { groups?: { id?: unknown; name?: unknown }[]; assignments?: Record<string, unknown> }
+  try {
+    const portees = JSON.parse(config)?.preferences?.epitaxyPrefs?.['dframe-group-scopes'] as Record<string, Portee> | undefined
+    for (const portee of Object.values(portees ?? {})) {
+      const id = portee.assignments?.[`code:${hote}`]
+      const nom = portee.groups?.find(g => g.id === id)?.name
+      if (id !== undefined && typeof nom === 'string' && nom.trim() !== '') return nom.trim()
+    }
+  } catch {
+    // Config illisible : pas de groupe.
+  }
+  return null
 }

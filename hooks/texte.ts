@@ -5,10 +5,10 @@ import { type Bilan, dureeEcart, formatDuree, formatHeure, formatJour } from './
 const majuscule = (texte: string) => texte.charAt(0).toUpperCase() + texte.slice(1)
 
 function tableau(lignes: readonly Ligne[], total: number): string[] {
-  const largeur = Math.max('Total'.length, ...lignes.map(l => l.ticket.length))
+  const largeur = Math.max('Total'.length, ...lignes.map(l => l.item.length))
   const ligne = (nom: string, minutes: number, suite = '') =>
     `  ${nom.padEnd(largeur)}  ${formatDuree(minutes).padStart(7)}${suite}`
-  return [...lignes.map(l => ligne(l.ticket, l.minutes, l.enCours ? '  (en cours)' : '')), ligne('Total', total)]
+  return [...lignes.map(l => ligne(l.item, l.minutes, l.enCours ? '  (en cours)' : '')), ligne('Total', total)]
 }
 
 export function listeEcarts(ecarts: readonly Ecart[]): string[] {
@@ -16,7 +16,7 @@ export function listeEcarts(ecarts: readonly Ecart[]): string[] {
   return [
     'Écarts à confirmer, non comptés (7 derniers jours) :',
     ...ecarts.map(
-      (e, i) => `  ${i + 1}. ${formatJour(e.debut)}, ${e.ticket}, de ${formatHeure(e.debut)} à ${formatHeure(e.fin)} (${dureeEcart(e)})`,
+      (e, i) => `  ${i + 1}. ${formatJour(e.debut)}, ${e.item}, de ${formatHeure(e.debut)} à ${formatHeure(e.fin)} (${dureeEcart(e)})`,
     ),
     'Pour les classer : /temps confirmer <numéros ou tout> <travail ou pause>',
     'Exemple : /temps confirmer 1 travail',
@@ -52,10 +52,10 @@ export function recapSemaine(bilan: Bilan, ecarts: readonly Ecart[]): string {
 
 export function aide(fichierReglages: string): string {
   return [
-    'Commandes du temps par ticket :',
+    'Commandes du temps par item :',
     "  /temps                      récapitulatif d'aujourd'hui",
     '  /temps semaine              récapitulatif des 7 derniers jours',
-    '  /temps FLO-I165             change le ticket de cette session',
+    "  /temps FLO-I165             change l'item de cette session",
     '  /temps stop                 met le compteur de cette session en pause',
     '  /temps confirmer            liste les écarts à classer',
     "  /temps confirmer 1 travail  classe l'écart 1 (numéros ou tout, puis travail ou pause)",

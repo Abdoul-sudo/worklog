@@ -1,62 +1,59 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Apercu, Ecart } from '../types'
+import type { Apercu, Ecart, Ligne } from '../types'
 import {
   type Activite,
   type Choix,
   type Evenement,
   REGLAGES_PAR_DEFAUT,
   type Reglages,
-  SANS_TICKET,
+  SANS_ITEM,
   ajouterRecent,
-  barre,
   bilan,
   cleJour,
   debutJour,
   decalerJours,
   dernierEvenement,
-  detecterTicket,
+  detecterItem,
   dureeEcart,
-  estUnTicket,
+  estUnItem,
   formatDuree,
   formatHeure,
-  formatJour,
   jourSuivant,
-  ligneStatut,
+  libellePuce,
   lireLignes,
   lireReglages,
   motifsDuProjet,
+  nomDuGroupe,
 } from './calcul'
 import { aide, listeEcarts, recapJour, recapSemaine } from './texte'
 
 type Moteur = EngineInterface
 type Site = Parameters<Moteur['ui']['resolve']>[0]
 
-const PANNEAU = 'temps-ticket'
-const TITRE = 'Temps par ticket'
+const PANNEAU = 'temps-item'
+const TITRE = 'Temps par item'
 const RAFRAICHISSEMENT_MS = 30_000
 // Les tours qui partent seuls (tâche planifiée, observateur) ne comptent pas.
 const AUTOMATIQUES = ['scheduled-trigger', 'observer', 'observer-activity']
-// L'ID du ticket se cherche dans ce qu'une personne a écrit, ou dans le brief d'une session lancée par une autre.
+// L'ID de l'item se cherche dans ce qu'une personne a écrit, ou dans le brief d'une session lancée par une autre.
 const ECRITS = ['composer', 'bridge', 'sdk', 'slack-ping', 'coordinator', 'projects-relay']
 
-const apercu = atom({ plugin: 'temps-ticket', key: 'apercu' } as const, null, { shape: 'apercu-2' })
-const question = atom({ plugin: 'temps-ticket', key: 'question' } as const, null, { shape: 'question-1' })
-const saisie = atom({ plugin: 'temps-ticket', key: 'saisie' } as const, false)
-const deplie = atom({ plugin: 'temps-ticket', key: 'deplie' } as const, false)
+const apercu = atom({ plugin: 'temps-item', key: 'apercu' } as const, null, { shape: 'apercu-4' })
+const question = atom({ plugin: 'temps-item', key: 'question' } as const, null, { shape: 'question-2' })
+const deplie = atom({ plugin: 'temps-item', key: 'deplie' } as const, false)
 
 let chemins: { reglages: string; journal: string } | null = null
 let ecritures: Promise<unknown> = Promise.resolve()
 let tourCompte = true
-let ticketApresClear: string | null = null
+let heritageClear: { item: string; manuel: boolean } | null = null
 let brancheVue: string | null = null
+let nomParDefaut: string | null = null
 let erreurSignalee = false
 
 /** Travail lancé sans l'attendre : une erreur (session fermée, module rechargé) ne casse rien. */
 const enFond = (travail: Promise<unknown>) => void travail.catch(() => undefined)
-
-const cleDossier = (cwd: string) => `dossier:${cwd.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()}`
 
 async function dossiers($: Moteur) {
   if (chemins === null) {
@@ -73,7 +70,7 @@ async function chargerReglages($: Moteur): Promise<Reglages> {
   const { reglages, erreur } = lireReglages(texte)
   if (erreur !== undefined && !erreurSignalee) {
     erreurSignalee = true
-    $.ui.toast(`Temps par ticket : réglages ignorés, ${erreur} (${fichier}).`)
+    $.ui.toast(`Temps par item : réglages ignorés, ${erreur} (${fichier}).`)
   }
   return reglages
 }
@@ -119,15 +116,20 @@ async function lireJournal($: Moteur, debut: number, fin: number) {
   return { evenements, vivants }
 }
 
-async function ticketDe($: Moteur, session: string): Promise<string | null> {
-  const enregistre = await $.store.get(`ticket:${session}`)
+async function itemDe($: Moteur, session: string): Promise<string | null> {
+  const enregistre = await $.store.get(`item:${session}`)
   if (typeof enregistre === 'string') return enregistre
-  if (ticketApresClear === null) return null
-  // Après /clear, la nouvelle session garde le ticket de l'ancienne.
-  const herite = ticketApresClear
-  ticketApresClear = null
-  await $.store.set(`ticket:${session}`, herite)
-  return herite
+  if (heritageClear === null) return null
+  // Après /clear, la nouvelle session garde l'item de l'ancienne.
+  const { item, manuel } = heritageClear
+  heritageClear = null
+  await definirItem($, session, item, manuel)
+  return item
+}
+
+/** Un item choisi à la main ne change plus tout seul. */
+async function estManuel($: Moteur, session: string): Promise<boolean> {
+  return (await $.store.get(`manuel:${session}`)) === true
 }
 
 async function lireRecents($: Moteur): Promise<string[]> {
@@ -135,38 +137,51 @@ async function lireRecents($: Moteur): Promise<string[]> {
   return Array.isArray(recents) ? recents.filter((t): t is string => typeof t === 'string') : []
 }
 
-/** Fixe le ticket de la session et le retient pour les tickets récents et pour ce dossier. */
-async function definirTicket($: Moteur, session: string, ticket: string, annonce?: string): Promise<void> {
-  await $.store.set(`ticket:${session}`, ticket)
-  await $.store.set('recents', ajouterRecent(await lireRecents($), ticket))
-  await $.store.set(cleDossier(await $.session.cwd()), ticket)
-  if (annonce !== undefined) $.ui.toast(annonce)
+/** Fixe l'item de la session et le garde dans les items récents. */
+async function definirItem($: Moteur, session: string, item: string, manuel: boolean): Promise<void> {
+  await $.store.set(`item:${session}`, item)
+  await $.store.set(`manuel:${session}`, manuel)
+  await $.store.set('recents', ajouterRecent(await lireRecents($), item))
+}
+
+/**
+ * Le nom par défaut de la session : son groupe dans l'app desktop, sinon le nom du projet.
+ * L'app desktop range les groupes dans sa config, à côté du dossier `claude-code` de son exécutable.
+ */
+async function calculerNomParDefaut($: Moteur): Promise<string | null> {
+  const hote = await $.env.get('CLAUDE_CODE_HOST_SESSION_ID')
+  const executable = (await $.env.get('CLAUDE_CODE_EXECPATH'))?.replace(/\\/g, '/')
+  const dossierApp = executable?.includes('/claude-code/') ? executable.split('/claude-code/')[0] : undefined
+  if (hote !== undefined && dossierApp !== undefined) {
+    const config = await $.fs.read(`${dossierApp}/claude_desktop_config.json`).catch(() => '')
+    const groupe = nomDuGroupe(config, hote)
+    if (groupe !== null) return groupe
+  }
+  const racine = (await $.session.repo())?.root ?? (await $.session.cwd())
+  return racine.replace(/\\/g, '/').replace(/\/+$/, '').split('/').pop() || null
 }
 
 /** L'ID de la branche Git, seulement quand la branche a changé depuis la dernière lecture. */
-async function ticketDeNouvelleBranche($: Moteur, motifs: readonly string[]): Promise<string | null> {
+async function itemDeNouvelleBranche($: Moteur, motifs: readonly string[]): Promise<string | null> {
   const git = await $.process.run(['git', 'branch', '--show-current'], { timeoutMs: 5_000 }).catch(() => null)
   const branche = git?.exitCode === 0 ? git.stdout.trim() : ''
   if (branche === brancheVue) return null
   brancheVue = branche
-  return detecterTicket(branche, motifs)
+  return detecterItem(branche, motifs)
 }
 
 async function noterActivite($: Moteur, e: Activite): Promise<number> {
   const s = await $.session.id()
   const t = await $.clock.now()
-  await noter($, { t, s, e, k: await ticketDe($, s) })
+  nomParDefaut ??= await calculerNomParDefaut($)
+  const d = nomParDefaut ?? undefined
+  await noter($, { t, s, e, k: await itemDe($, s), ...(d === undefined ? {} : { d }) })
   return t
 }
 
-async function changerTicket($: Moteur, ticket: string): Promise<void> {
-  await definirTicket($, await $.session.id(), ticket)
-  await noterActivite($, 'ticket')
-  await rafraichir($)
-}
-
-async function mettreEnPause($: Moteur): Promise<void> {
-  await noterActivite($, 'pause')
+async function changerItem($: Moteur, item: string): Promise<void> {
+  await definirItem($, await $.session.id(), item, true)
+  await noterActivite($, 'item')
   await rafraichir($)
 }
 
@@ -175,16 +190,17 @@ async function classer($: Moteur, ecart: Ecart, choix: Choix): Promise<void> {
   await noter($, { t, s: await $.session.id(), e: 'classement', session: ecart.session, debut: ecart.debut, choix })
 }
 
-/** Recalcule la journée pour la puce, la carte et le panneau. */
+/** Recalcule la journée pour la puce et la liste. */
 async function rafraichir($: Moteur): Promise<Apercu> {
   const maintenant = await $.clock.now()
   const session = await $.session.id()
   const reglages = await chargerReglages($)
   const jour = debutJour(maintenant)
+  nomParDefaut = await calculerNomParDefaut($)
   await donnerSigneDeVie($)
   const { evenements, vivants } = await lireJournal($, decalerJours(jour, -1), jourSuivant(jour))
   const b = bilan(evenements, reglages, maintenant, jour, jourSuivant(jour), vivants)
-  const ticket = await ticketDe($, session)
+  const item = (await itemDe($, session)) ?? nomParDefaut
   const enPause = dernierEvenement(evenements, session)?.e === 'pause'
   const aujourdhui = b.jours[0]
   const lignes = aujourdhui?.lignes ?? []
@@ -193,56 +209,40 @@ async function rafraichir($: Moteur): Promise<Apercu> {
     lignes,
     total: aujourdhui?.total ?? 0,
     reel: aujourdhui?.reel ?? 0,
-    ticket,
+    item,
     enPause,
     ecarts: b.ecarts,
     recents: await lireRecents($),
+    minutesSession: b.parSession.get(session) ?? 0,
   }
   await update($, apercu, () => vu)
-  // La bande au-dessus de la saisie n'existe pas dans VS Code : la ligne de statut la remplace.
-  const minutes = lignes.find(l => l.ticket === (ticket ?? SANS_TICKET))?.minutes ?? 0
+  // VS Code n'affiche pas la zone au-dessus de la saisie : la ligne de statut la remplace.
   const dansVsCode = (await $.session.surfaces()).includes('vscode')
-  $.ui.status(dansVsCode ? ligneStatut(reglages.format, ticket ?? SANS_TICKET, minutes, enPause) : undefined)
+  $.ui.status(dansVsCode ? libellePuce(item, vu.minutesSession, enPause) : undefined)
   return vu
 }
 
-async function apresMessage($: Moteur, texte: string, chercherTicket: boolean): Promise<void> {
+async function apresMessage($: Moteur, texte: string, chercherItem: boolean): Promise<void> {
   const session = await $.session.id()
-  const motifs = await motifsIci($)
-  const deBranche = await ticketDeNouvelleBranche($, motifs)
-  const duMessage = chercherTicket ? detecterTicket(texte, motifs) : null
-  const nouveau = duMessage ?? deBranche
-  if (nouveau !== null && nouveau !== (await ticketDe($, session))) {
-    const source = duMessage !== null ? 'cité dans votre message' : 'pris dans la branche Git'
-    await definirTicket($, session, nouveau, `Temps compté pour ${nouveau}, ${source}`)
+  if (!(await estManuel($, session))) {
+    const motifs = await motifsIci($)
+    const deBranche = await itemDeNouvelleBranche($, motifs)
+    const nouveau = (chercherItem ? detecterItem(texte, motifs) : null) ?? deBranche
+    if (nouveau !== null && nouveau !== (await itemDe($, session))) {
+      await definirItem($, session, nouveau, false)
+      $.ui.toast(`Temps compté pour ${nouveau}`)
+    }
   }
   const t = await noterActivite($, 'message')
   const vu = await rafraichir($)
   const ecart = vu.ecarts.find(x => x.session === session && x.fin === t) ?? null
   await update($, question, () => ecart)
-  if (ecart !== null) $.ui.toast(`${dureeEcart(ecart)} sans message sur ${ecart.ticket} : pause ou travail ?`)
-}
-
-/** Une nouvelle session prend le ticket de sa branche Git, sinon celui de la dernière session du dossier. */
-async function choisirTicketAuDepart($: Moteur): Promise<void> {
-  const session = await $.session.id()
-  const deBranche = await ticketDeNouvelleBranche($, await motifsIci($))
-  if ((await ticketDe($, session)) !== null) return
-  if (deBranche !== null) {
-    await definirTicket($, session, deBranche, `Temps compté pour ${deBranche}, pris dans la branche Git`)
-    return
-  }
-  const duDossier = await $.store.get(cleDossier(await $.session.cwd()))
-  if (typeof duDossier === 'string') {
-    await definirTicket($, session, duDossier, `Temps compté pour ${duDossier}, comme la dernière session de ce dossier`)
-  }
 }
 
 async function repondre($: Moteur, ecart: Ecart, choix: Choix): Promise<void> {
   await classer($, ecart, choix)
-  await update($, question, x => (x?.session === ecart.session && x.debut === ecart.debut ? null : x))
+  await update($, question, () => null)
   await rafraichir($)
-  $.ui.toast(`${dureeEcart(ecart)} comptées comme ${choix}.`)
 }
 
 async function commande($: Moteur, args: string): Promise<string> {
@@ -267,7 +267,8 @@ async function commande($: Moteur, args: string): Promise<string> {
     }
     case 'stop':
     case 'pause':
-      await mettreEnPause($)
+      await noterActivite($, 'pause')
+      await rafraichir($)
       return 'Compteur en pause pour cette session. Il repart à votre prochain message.'
     case 'confirmer':
       return confirmer($, mots.slice(1), (await surSemaine()).ecarts)
@@ -277,11 +278,11 @@ async function commande($: Moteur, args: string): Promise<string> {
     case 'aide':
       return aide((await dossiers($)).reglages)
   }
-  if (mots.length === 1 && estUnTicket(mots[0]!, motifsDuProjet(reglages, await $.session.cwd()))) {
-    await changerTicket($, mots[0]!)
-    return `Ticket de cette session : ${mots[0]}. Le temps compte pour ce ticket à partir de maintenant.`
+  if (mots.length === 1 && estUnItem(mots[0]!, motifsDuProjet(reglages, await $.session.cwd()))) {
+    await changerItem($, mots[0]!)
+    return `Item de cette session : ${mots[0]}.`
   }
-  return `« ${args} » n'est ni une commande ni un ID de ticket reconnu.\n\n${aide((await dossiers($)).reglages)}`
+  return `« ${args} » n'est ni une commande ni un ID d'item.\n\n${aide((await dossiers($)).reglages)}`
 }
 
 async function confirmer($: Moteur, mots: string[], ecarts: Ecart[]): Promise<string> {
@@ -301,108 +302,58 @@ async function confirmer($: Moteur, mots: string[], ecarts: Ecart[]): Promise<st
   return `${choisis.length} écart${s} classé${s} comme ${choix}.`
 }
 
-/** La carte du jour : temps par ticket, écarts à confirmer, choix du ticket. Dans la bande et dans le panneau. */
-async function carte($: Moteur, e: Site, vu: Apercu, colonnes: number) {
+/** Les items du jour, puis les items récents sans temps aujourd'hui : six lignes au plus. */
+function lignesAAfficher(vu: Apercu): Ligne[] {
+  const vus = new Set(vu.lignes.map(l => l.item))
+  const recents = vu.recents.filter(t => !vus.has(t)).map(item => ({ item, minutes: 0, enCours: false }))
+  return [...vu.lignes, ...recents].slice(0, 6)
+}
+
+/** La liste du jour : un clic sur une ligne la choisit pour cette session. Dans la bande et dans le panneau. */
+function liste($: Moteur, e: Site, vu: Apercu) {
   const { Box, Button, Input, Text } = $.ui.resolve(e)
-  const enSaisie = await read($, saisie)
-  const largeurNom = Math.max(8, ...vu.lignes.map(l => l.ticket.length))
-  const largeurBarre = Math.max(6, Math.min(24, colonnes - largeurNom - 16))
-  const max = Math.max(...vu.lignes.map(l => l.minutes), 1)
-  const choix = (vu.ticket === null ? vu.recents : ajouterRecent(vu.recents, vu.ticket)).slice(0, 5)
+  const choisir = async (item: string) => {
+    await update($, deplie, () => false)
+    if (item !== vu.item) await changerItem($, item)
+  }
 
   return (
-    <Box flexDirection="column" gap={1} borderStyle="round" borderColor="inactive" paddingX={1}>
+    <Box flexDirection="column" borderStyle="round" borderColor="inactive" paddingX={1}>
       <Box flexDirection="row" justifyContent="space-between">
-        <Text bold>Aujourd'hui, {formatJour(vu.jour)}</Text>
-        <Text bold color="claude">
-          {formatDuree(vu.total)}
-        </Text>
+        <Text dimColor>Aujourd'hui</Text>
+        <Text bold>{formatDuree(vu.total)}</Text>
       </Box>
-
-      <Box flexDirection="column">
-        {vu.lignes.length === 0 && <Text dimColor>Rien de compté pour l'instant. Le temps part de votre prochain message.</Text>}
-        {vu.lignes.map(l => {
-          const [plein, vide] = barre(l.minutes, max, largeurBarre)
+      {lignesAAfficher(vu).map(l => {
+        const texte = l.minutes > 0 ? `${l.item} · ${formatDuree(l.minutes)}` : l.item
+        if (l.item === vu.item) {
           return (
-            <Box flexDirection="row">
-              <Text color={l.enCours ? 'success' : 'inactive'}>{l.enCours ? '● ' : '○ '}</Text>
-              <Text bold={l.ticket === vu.ticket}>{`${l.ticket.padEnd(largeurNom)} `}</Text>
-              <Text color="claude">{plein}</Text>
-              <Text dimColor>{vide}</Text>
-              <Text>{` ${formatDuree(l.minutes).padStart(7)}`}</Text>
-            </Box>
+            <Text bold>
+              <Text color="success">● </Text>
+              {texte}
+            </Text>
           )
-        })}
-        {vu.total > vu.reel && (
-          <Text dimColor>Temps réel {formatDuree(vu.reel)} : des sessions ont tourné en parallèle.</Text>
-        )}
-      </Box>
-
-      {vu.ecarts.length > 0 && (
-        <Box flexDirection="column">
-          <Text bold color="warning">
-            À confirmer (non compté)
-          </Text>
-          {vu.ecarts.map(x => (
-            <Box flexDirection="row" gap={1}>
-              <Text>
-                {formatHeure(x.debut)} → {formatHeure(x.fin)} · {x.ticket} · {dureeEcart(x)}
-              </Text>
-              <Button key={`travail-${x.session}-${x.debut}`} label="Travail" variant="secondary" onPress={() => repondre($, x, 'travail')} />
-              <Button key={`pause-${x.session}-${x.debut}`} label="Pause" variant="secondary" onPress={() => repondre($, x, 'pause')} />
-            </Box>
-          ))}
-        </Box>
-      )}
-
-      <Box flexDirection="column">
-        <Text dimColor>Ticket de cette session</Text>
-        <Box flexDirection="row" gap={1}>
-          {choix.map(t => (
+        }
+        if (l.item === SANS_ITEM) return <Text dimColor>{`  ${texte}`}</Text>
+        return (
+          <Box key={`ligne-${l.item}`}>
             <Button
-              key={`ticket-${t}`}
-              label={t}
-              variant={t === vu.ticket ? 'primary' : 'secondary'}
-              onPress={async () => {
-                if (t !== vu.ticket) await changerTicket($, t)
-                await update($, deplie, () => false)
-              }}
+              key={`choisir-${l.item}`}
+              plain
+              label={`  ${texte}`}
+              hover={{ backgroundColor: 'subtle' }}
+              onPress={() => choisir(l.item)}
             />
-          ))}
-          <Button key="autre" label="Autre…" variant="secondary" onPress={() => update($, saisie, ouvert => !ouvert)} />
-        </Box>
-        {enSaisie && (
-          <Input
-            key="ticket"
-            label="ID du ticket"
-            placeholder="FLO-I165"
-            submitLabel="Valider"
-            onSubmit={async texte => {
-              const ticket = texte.trim()
-              if (!estUnTicket(ticket, await motifsIci($))) {
-                $.ui.toast(`« ${ticket} » n'est pas un ID de ticket reconnu.`)
-                return
-              }
-              await update($, saisie, () => false)
-              await changerTicket($, ticket)
-            }}
-          />
-        )}
-      </Box>
-
-      <Box flexDirection="row" gap={1}>
-        {vu.enPause ? (
-          <Text dimColor>En pause : le compteur repart à votre prochain message.</Text>
-        ) : (
-          <Button key="pause" label="Mettre en pause" variant="secondary" onPress={() => mettreEnPause($)} />
-        )}
-        <Button
-          key="semaine"
-          label="Récap de la semaine"
-          variant="secondary"
-          onPress={() => enFond($.command.run({ command: 'temps', args: 'semaine' }))}
-        />
-      </Box>
+          </Box>
+        )
+      })}
+      <Input
+        key="autre-item"
+        placeholder="Autre : ID ou nom, puis Entrée"
+        onSubmit={async texte => {
+          const item = texte.trim().slice(0, 60)
+          if (item !== '') await choisir(item)
+        }}
+      />
     </Box>
   )
 }
@@ -411,13 +362,15 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'temps',
-      description: 'Temps par ticket : récapitulatif, ticket, pause, écarts à confirmer',
-      argumentHint: '[semaine | <ticket> | stop | confirmer | panneau | aide]',
+      description: 'Temps par item : récapitulatif du jour, de la semaine, changement d’item',
+      argumentHint: '[semaine | <item> | stop | confirmer | aide]',
       immediate: true,
     })
     const { reglages } = await dossiers($)
     if (!(await $.fs.exists(reglages))) await $.fs.write(reglages, `${JSON.stringify(REGLAGES_PAR_DEFAUT, null, 2)}\n`)
-    await choisirTicketAuDepart($)
+    const session = await $.session.id()
+    const deBranche = await itemDeNouvelleBranche($, await motifsIci($))
+    if (deBranche !== null && (await itemDe($, session)) === null) await definirItem($, session, deBranche, false)
     await noterActivite($, 'ouverture')
     enFond(rafraichir($))
     $.clock.every(RAFRAICHISSEMENT_MS, () => enFond(rafraichir($)))
@@ -437,9 +390,9 @@ export const register: Register = on => {
   })
 
   on('session.end', async ($, e, next) => {
-    const ticket = await ticketDe($, e.sessionId)
-    if (e.reason === 'clear') ticketApresClear = ticket
-    await noter($, { t: await $.clock.now(), s: e.sessionId, e: 'fermeture', k: ticket })
+    const item = await itemDe($, e.sessionId)
+    if (e.reason === 'clear' && item !== null) heritageClear = { item, manuel: await estManuel($, e.sessionId) }
+    await noter($, { t: await $.clock.now(), s: e.sessionId, e: 'fermeture', k: item })
     return next(e)
   })
 
@@ -447,39 +400,58 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'Pane', requestId: PANNEAU }, async ($, e) => {
     const vu = await read($, apercu)
-    if (vu !== null) return carte($, e, vu, e.props.bodyColumns)
+    if (vu !== null) return liste($, e, vu)
     const { Text } = $.ui.resolve(e)
     return <Text dimColor>Calcul en cours…</Text>
   })
 
-  // La bande au-dessus de la saisie : une puce qui s'ouvre en carte, et la question après un long silence.
+  // Sous la saisie, à gauche : la puce. Un clic ouvre la liste du jour au-dessus de la saisie.
+  on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
+    const vu = await read($, apercu)
+    const ligne = await next(e)
+    if (vu === null) return ligne
+    const { Box, Button } = $.ui.resolve(e)
+
+    return (
+      <Box flexDirection="row" gap={2}>
+        <Box key="zone-puce">
+          <Button
+            key="puce"
+            plain
+            dimColor
+            label={libellePuce(vu.item, vu.minutesSession, vu.enPause)}
+            hover={{ dimColor: false, backgroundColor: 'subtle' }}
+            onPress={() => update($, deplie, v => !v)}
+          />
+        </Box>
+        {ligne}
+      </Box>
+    )
+  })
+
+  // Au-dessus de la saisie : la liste quand elle est ouverte, et la question après un long silence.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const vu = await read($, apercu)
-    if (vu === null || e.props.hasSurvey) return next(e)
     const ecart = await read($, question)
     const ouvert = await read($, deplie)
+    if (vu === null || e.props.hasSurvey || (!ouvert && ecart === null)) return next(e)
     const autres = await next(e)
     const { Box, Button, Text } = $.ui.resolve(e)
-    const minutes = vu.lignes.find(l => l.ticket === (vu.ticket ?? SANS_TICKET))?.minutes ?? 0
-    const nom = vu.ticket ?? 'Choisir un ticket'
-    const libelle = vu.enPause ? `⏸ ${nom} · en pause` : `⏱ ${nom} · ${formatDuree(minutes)}`
 
     return (
       <Box flexDirection="column" gap={1}>
-        {ouvert && (await carte($, e, vu, e.props.bodyColumns))}
+        {ouvert && liste($, e, vu)}
         {ecart !== null && (
-          <Box flexDirection="row" gap={1}>
-            <Text color="warning">
-              {dureeEcart(ecart)} sans message sur {ecart.ticket} ({formatHeure(ecart.debut)} → {formatHeure(ecart.fin)}). C'était :
+          <Box flexDirection="row" gap={1} alignItems="center">
+            <Text>
+              {dureeEcart(ecart)} sans message sur {ecart.item} ({formatHeure(ecart.debut)} → {formatHeure(ecart.fin)}). Du
+              travail ?
             </Text>
-            <Button key="ecart-travail" label="Du travail" variant="primary" onPress={() => repondre($, ecart, 'travail')} />
-            <Button key="ecart-pause" label="Une pause" variant="secondary" onPress={() => repondre($, ecart, 'pause')} />
+            <Button key="ecart-oui" label="Oui" variant="primary" onPress={() => repondre($, ecart, 'travail')} />
+            <Button key="ecart-non" label="Non" variant="secondary" onPress={() => repondre($, ecart, 'pause')} />
           </Box>
         )}
-        <Box flexDirection="row" justifyContent="space-between">
-          <Button key="puce" label={libelle} variant="secondary" onPress={() => update($, deplie, v => !v)} />
-          {autres}
-        </Box>
+        {autres}
       </Box>
     )
   })

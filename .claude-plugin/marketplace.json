@@ -1,6 +1,6 @@
 {
-  "name": "temps-ticket",
-  "description": "Temps par ticket : compte le temps passé par ticket dans Claude Code",
+  "name": "temps-item",
+  "description": "Temps par item : compte le temps passé par item dans Claude Code",
   "owner": { "name": "Abdoul-sudo" },
-  "plugins": [{ "name": "temps-ticket", "source": "./" }]
+  "plugins": [{ "name": "temps-item", "source": "./" }]
 }
