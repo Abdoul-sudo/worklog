@@ -129,7 +129,7 @@ export type Bilan = {
   parSession: Map<string, Map<string, number>>
   /** La dernière activité de chaque item sur la période : la fin de son dernier temps, ou sa dernière dépense de tokens. */
   derniere: Map<string, number>
-  /** Les sessions arrêtées par /worklog stop, une fois que Claude a fini son travail. */
+  /** Les sessions en pause (bouton ou /worklog pause), une fois que Claude a fini son travail. */
   enPause: Set<string>
 }
 
@@ -206,7 +206,7 @@ export function cleJour(t: number): string {
  * `vivants` donne le dernier signe de vie connu de chaque session.
  * `actives` donne, pour chaque session en cours, son item : Claude y travaille, ou un message, une réponse ou une dépense
  * de tokens date de moins de deux minutes. Passer sur un item sans rien envoyer ne le met pas en cours.
- * `enPause` donne les sessions arrêtées par /worklog stop, une fois que Claude a fini son travail.
+ * `enPause` donne les sessions en pause (bouton ou /worklog pause), une fois que Claude a fini son travail.
  */
 export function calculer(
   evenements: readonly Evenement[],
@@ -267,7 +267,7 @@ export function calculer(
     let debutTour: number | null = null
     // Début du travail des sous-agents : tant qu'ils tournent, Claude travaille aussi, même sans message.
     let debutAgents: number | null = null
-    // Après /worklog stop, jusqu'au prochain message : seul le travail de Claude compte encore, jusqu'à sa fin.
+    // Après une pause, jusqu'au prochain message : seul le travail de Claude compte encore, jusqu'à sa fin.
     let arrete = false
     for (let i = 0; i < liste.length; i++) {
       const a = liste[i]!

@@ -35,7 +35,7 @@ That is all. Worklog needs Claude Code 2.1.290 or later.
 
 - **After 1 hour without activity.** When you come back, Worklog asks if this pause was work. Click **Count** to add it, or **Ignore** to leave it out.
 - **After 4 hours without activity**, for example a night. This time does not count, and Worklog does not ask.
-- **When you type `/worklog stop`.** Use it when Claude is done but the timer still runs, for example when you leave. While Claude works, `/worklog stop` does nothing: the real time and tokens count. The timer resumes with your next message.
+- **When you pause it.** Click **‖** next to the name of this session in Worklog, or type `/worklog pause`. Use it when Claude is done but the timer still runs, for example when you leave. While Claude works, you cannot pause: the real time and tokens count. The timer resumes with your next message.
 - **When you quit Claude Code**, or 2 minutes after you close its window.
 
 You can change the 1 hour in the settings.
@@ -68,6 +68,7 @@ In Worklog:
 | Count this session for another name | Point to the name in the list, then click **⇄**. In the terminal, click the name. |
 | Count this session for a new name | Click **+ Add item**, type the name, then press Enter. |
 | Rename the current name | Click **✎** next to it. The new name also replaces the old one on past days. |
+| Pause the timer | Click **‖** next to the name of this session. The button shows only when Claude is not working. |
 | Change the settings | Click the gear. |
 
 With commands:
@@ -76,7 +77,7 @@ With commands:
 | --- | --- |
 | `/worklog` | Shows or hides Worklog. |
 | `/worklog <name>` | Counts this session for `<name>`. For example: `/worklog PROJ-142`. |
-| `/worklog stop` | Stops the timer of this session until your next message. It does nothing while Claude works. |
+| `/worklog pause` | Pauses the timer of this session until your next message. It does nothing while Claude works. |
 
 ## Settings
 
@@ -97,7 +98,7 @@ Open Worklog, then click the gear.
 **Do subagents and Ultracode count?**
 Yes. The timer runs while they work, even when you do not type. Their tokens count too.
 
-**What if I forget to stop the timer?**
+**What if I forget to pause the timer?**
 Nothing to do. The timer stops by itself after 1 hour without activity.
 
 **Does Worklog see my past work?**
