@@ -16,6 +16,7 @@ import {
   MOTIF_ID,
   SANS_ITEM,
   SEUILS,
+  PAUSES_MAX,
   ajouterRecent,
   bilan,
   bornes,
@@ -119,8 +120,6 @@ const reglages = atom({ plugin: 'worklog', key: 'reglages' } as const, null, { s
 let chemins: { journal: string; importe: string; projets: string } | null = null
 let ecritures: Promise<unknown> = Promise.resolve()
 let tourCompte = true
-// Claude répond : entre le début d'un tour de la boucle principale et sa fin.
-let tourEnCours = false
 let heritageClear: { item: string; manuel: boolean } | null = null
 let brancheVue: string | null = null
 let nomParDefaut: string | null = null
@@ -586,22 +585,7 @@ async function changerReglage($: Moteur, changement: Partial<Reglages>): Promise
   await rafraichir($)
 }
 
-/** Claude répond, ou ses agents travaillent : leur temps et leurs tokens réels comptent, la pause attend. */
-const claudeAuTravail = () => tourEnCours || agentsOccupes === true
-
-/** Met le compteur de cette session en pause jusqu'au prochain message, sauf pendant que Claude travaille. Renvoie le
- * texte à montrer. */
-async function mettreEnPause($: Moteur): Promise<string> {
-  const textes = t().commande
-  await suivreAgents($).catch(() => undefined)
-  if (claudeAuTravail()) return textes.travaille
-  await noterActivite($, 'pause')
-  await rafraichir($)
-  return textes.pause
-}
-
-/** /worklog : seul, ouvre ou ferme Worklog ; `pause` met la session en pause ; tout autre texte devient le nom de la
- * session. */
+/** /worklog : seul, ouvre ou ferme Worklog ; tout autre texte devient le nom de la session. */
 async function commande($: Moteur, args: string): Promise<string> {
   // Les textes suivent la langue des réglages.
   await lireReglages($)
@@ -617,8 +601,6 @@ async function commande($: Moteur, args: string): Promise<string> {
     await ouvrirOuFermer($)
     return (await read($, deplie)) ? textes.bande : textes.ferme
   }
-  // `stop`, l'ancien nom de la pause, ne devient pas le nom de la session.
-  if (['pause', 'stop'].includes(texte.toLowerCase())) return mettreEnPause($)
   const nom = texte.slice(0, 60)
   await changerItem($, nom)
   return textes.item(nom)
@@ -854,7 +836,6 @@ function ligne(
   nomFixe: boolean,
   mesure: Mesure,
   largeurs: { jetons: number; temps: number },
-  pausable: boolean,
 ) {
   const { Box, Input, Text } = $.ui.resolve(e)
   const estActuel = l.item === actuel
@@ -888,8 +869,6 @@ function ligne(
   )
   const changer = !estActuel && !sansNom && icone($, e, `choisir-${l.item}`, 'changer', '⇄', () => choisirItem($, l.item))
   const crayon = estActuel && !enRenommage && icone($, e, 'crayon', 'crayon', '✎', ouvrirRenommage)
-  // La pause, toujours visible sur la ligne de la session tant qu'elle peut agir : le temps court et Claude a fini.
-  const pause = estActuel && pausable && !enRenommage && icone($, e, 'pause', 'pause', '‖', async () => $.ui.toast(await mettreEnPause($)))
   // Pas de temps sur la période : un tiret discret, pour que la colonne ne paraisse pas vide par erreur.
   const temps =
     l.minutes > 0 ? (
@@ -934,7 +913,6 @@ function ligne(
             <Box width={largeurs.temps}>{temps}</Box>
           )}
         </Box>
-        {pause}
       </Box>
     )
   }
@@ -944,7 +922,6 @@ function ligne(
       <Box flexDirection="row" gap={1} alignItems="center" minWidth={0} {...(nomFixe ? { width: COLONNES.nom } : { flexGrow: 1, flexShrink: 1 })}>
         {pastille($, e, couleur, l.enCours)}
         {nom}
-        {pause}
         {(crayon !== false || changer !== false) && (
           <Box display="none" hover={{ display: 'flex' }} flexShrink={0}>
             {crayon}
@@ -1031,7 +1008,6 @@ function resume(
     etat: Interface
     contenu: Vue
     actuel: string | null
-    pausable: boolean
     options: Reglages
     activite: Frise | null
     colonnes: number
@@ -1077,7 +1053,7 @@ function resume(
   const colonnesListe = deuxColonnes ? [visibles.slice(0, Math.ceil(parPage / 2)), visibles.slice(Math.ceil(parPage / 2))] : [visibles]
   const rang = (l: Ligne) =>
     // Une seule colonne sur une grande largeur : le nom a une largeur fixe, pour garder les chiffres près de lui.
-    ligne($, e, l, teintes[contenu.lignes.indexOf(l)]!, d.actuel, etat, !deuxColonnes && d.colonnes >= LARGE, options.mesure, largeurs, d.pausable)
+    ligne($, e, l, teintes[contenu.lignes.indexOf(l)]!, d.actuel, etat, !deuxColonnes && d.colonnes >= LARGE, options.mesure, largeurs)
   const retrait = serre ? 0 : ('sm' as const)
   const parallele = enParallele > 0 ? t().parallele(formatDuree(enParallele)) : ''
   // Une stat du terminal : son nom en gris, sa valeur en gras.
@@ -1296,21 +1272,24 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
     const interrupteur = <Svg alt={options[b.cle] ? t().alt.active : t().alt.desactive} source={svgInterrupteur(options[b.cle])} width={28} height={16} />
     return ligneReglage(b.cle, bouton($, e, `reglage-${b.cle}`, b.libelle, 'texte', basculer), cliquable($, e, `interrupteur-${b.cle}`, interrupteur, basculer))
   })
-  const comptage = [
+  const duree = (cle: string, libelle: string, valeurs: readonly number[], actuelle: number, choisir: (m: number) => unknown) =>
     ligneReglage(
-      'seuil',
+      cle,
       <Text size="footnote" {...encre(e, 'texte')}>
-        {t().seuil}
+        {libelle}
       </Text>,
       surFond(
         <Select
-          key="seuil"
-          value={String(options.seuilPause)}
-          options={SEUILS.map(m => ({ value: String(m), label: t().seuilChoix(m) }))}
-          onSelect={valeur => changerReglage($, { seuilPause: Number(valeur) })}
+          key={cle}
+          value={String(actuelle)}
+          options={valeurs.map(m => ({ value: String(m), label: t().seuilChoix(m) }))}
+          onSelect={valeur => choisir(Number(valeur))}
         />,
       ),
-    ),
+    )
+  const comptage = [
+    duree('seuil', t().seuil, SEUILS, options.seuilPause, seuilPause => changerReglage($, { seuilPause })),
+    duree('pause-max', t().pauseMax, PAUSES_MAX, options.pauseMax, pauseMax => changerReglage($, { pauseMax })),
     <Box key="seuil-aide" paddingX="sm">
       <Text size="caption" {...encre(e, 'faible')}>
         {t().seuilAide}
@@ -1397,6 +1376,8 @@ function vueReglagesTerminal($: Moteur, e: Site, options: Reglages, aCote: boole
         {titre(t().sections.comptage)}
         <Text>{t().seuil}</Text>
         {choix('seuil', SEUILS, options.seuilPause, t().seuilChoix, seuilPause => changerReglage($, { seuilPause }))}
+        <Text>{t().pauseMax}</Text>
+        {choix('pause-max', PAUSES_MAX, options.pauseMax, t().seuilChoix, pauseMax => changerReglage($, { pauseMax }))}
         <Text dimColor>{t().seuilAide}</Text>
       </Box>
     </Box>
@@ -1411,9 +1392,7 @@ async function popover($: Moteur, e: Site, colonnes: number, rangees: number, en
   const options = (await read($, reglages)) ?? lireOptions(undefined)
   appliquer(options)
   const contenu = await read($, vue)
-  const etatSession = await read($, session)
-  const actuel = etatSession?.item ?? null
-  const pausable = etatSession !== null && !etatSession.enPause && !claudeAuTravail()
+  const actuel = (await read($, session))?.item ?? null
   const activite = await read($, frise)
   const entete = enTete($, e, etat, contenu?.titre ?? '', colonnes < ETROIT)
   const corps =
@@ -1428,7 +1407,6 @@ async function popover($: Moteur, e: Site, colonnes: number, rangees: number, en
         etat,
         contenu,
         actuel,
-        pausable,
         options,
         activite,
         colonnes,
@@ -1533,7 +1511,6 @@ export const register: Register = on => {
   })
   on('turn.start', ($, e, next) => {
     if (e.agentId !== undefined) enFond(marquerAgents($))
-    else tourEnCours = true
     return next(e)
   })
   on('tool.call', ($, e, next) => {
@@ -1543,7 +1520,6 @@ export const register: Register = on => {
 
   on('turn.complete', ($, e, next) => {
     if (e.agentId !== undefined) enFond(marquerAgents($))
-    else tourEnCours = false
     if (e.agentId === undefined && tourCompte) enFond(noterActivite($, 'reponse').then(() => rafraichir($)))
     const u = e.usage
     if (u !== undefined) {

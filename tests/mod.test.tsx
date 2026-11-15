@@ -309,7 +309,10 @@ test('les tokens, les onglets, les réglages et la frise', async ($, on) => {
       expect((await bande.find({ key: 'seuil-30' }))?.text).toBe('● 30 min')
       expect((await bande.find({ key: 'seuil-60' }))?.text).toBe('○ 1 h')
       await bande.press({ key: 'seuil-60' })
-    } else expect(await bande.find({ key: 'seuil' })).toBeDefined()
+      await bande.press({ key: 'pause-max-480' })
+      expect((await bande.find({ key: 'pause-max-480' }))?.text).toBe('● 8 h')
+      await bande.press({ key: 'pause-max-240' })
+    } else expect([await bande.find({ key: 'seuil' }), await bande.find({ key: 'pause-max' })]).not.toContain(undefined)
     // Les tokens s'affichent toujours : plus de réglage pour les cacher.
     expect(await bande.find({ key: 'reglage-jetons' })).toBeUndefined()
     // Les thèmes (là où la surface dessine) : un aperçu par thème ; un clic choisit le sien, en gras sous son aperçu.
@@ -533,8 +536,8 @@ test('un long silence demande « Du travail ? », et la réponse compte', async 
   expect(await ligneDe($, 'FLO-I165')).toContain('1 h 15')
 })
 
-test('/worklog ouvre et ferme, nomme la session, ou la met en pause', async ($, on) => {
-  const { horloge, fichiers } = monde(on)
+test('/worklog ouvre et ferme, ou nomme la session', async ($, on) => {
+  const { horloge } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
 
   // Seul, il ouvre Worklog au-dessus de la saisie, puis le ferme.
@@ -552,85 +555,47 @@ test('/worklog ouvre et ferme, nomme la session, ou la met en pause', async ($, 
   await $.prompt.submit({ ...PROMPT, text: 'suite' })
   await horloge.settle()
   expect(await ligneDe($, 'site client')).toBeDefined()
-
-  await horloge.advance(5 * 60_000)
-  expect((await $.command.run({ ...COMMANDE, args: 'pause' })).text).toContain('Compteur en pause')
-  expect(fichiers.get(JOURNAL)!.trim().split('\n').at(-1)).toContain('"e":"pause"')
-  // stop, l'ancien nom de la pause, met aussi en pause : il ne devient pas le nom de la session.
-  expect((await $.command.run({ ...COMMANDE, args: 'stop' })).text).toContain('Compteur en pause')
 })
 
-test("/worklog pause ne fait rien pendant que Claude travaille ; après, il arrête le temps, et le message suivant le reprend", async ($, on) => {
-  const { horloge, fichiers } = monde(on)
+test("une pause ne compte qu'au retour : courte, elle s'ajoute ; plus longue, une question ; trop longue, rien", async ($, on) => {
+  // Des réglages courts, pour un test rapide : compter jusqu'à 15 min, demander jusqu'à 1 h.
+  const { horloge } = monde(on, ['terminal'], {}, 'fr', { options: { langue: 'fr', seuilPause: 15, pauseMax: 60 } })
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
-  // Le signe de la puce : ◷ quand le temps court, ‖ en pause.
-  const signe = async () => {
-    const puce = await $.ui.mount({ ...LIGNE_AIDE, surface: 'terminal' })
-    const texte = (await puce.find({ key: 'puce' }))?.text?.trim()
-    await puce.unmount()
-    return texte?.charAt(0)
-  }
-  const USAGE = { model: 'm', input_tokens: 1_000, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }
-  await $.prompt.submit({ ...PROMPT, text: 'FLO-I165 : une longue tâche' })
-  await $.turn.start({ text: 'FLO-I165 : une longue tâche', turnId: 't1' })
-  await horloge.advance(10 * 60_000)
-
-  // Claude répond encore : la pause est refusée, le temps court toujours.
-  expect((await $.command.run({ ...COMMANDE, args: 'pause' })).text).toContain('Claude travaille encore')
-  expect(fichiers.get(JOURNAL)).not.toContain('"e":"pause"')
-  await horloge.advance(5 * 60_000)
-  await $.turn.complete({ ...FIN_DE_TOUR, turnId: 't1', usage: USAGE })
-  await horloge.settle()
-  expect(await signe()).toBe('◷')
-
-  // Claude a fini, mais le temps court encore (une pause courte compte) : la pause l'arrête.
-  await horloge.advance(10 * 60_000)
-  expect((await $.command.run({ ...COMMANDE, args: 'pause' })).text).toContain('Compteur en pause')
-  await horloge.advance(30 * 60_000)
-  await horloge.settle()
-  expect(await signe()).toBe('‖')
-  expect(await ligneDe($, 'FLO-I165')).toContain('25 min')
-
-  // Le message suivant reprend le compteur : le temps s'ajoute aux 25 minutes.
-  await $.prompt.submit({ ...PROMPT, text: 'suite' })
-  await $.turn.start({ text: 'suite', turnId: 't2' })
-  await horloge.advance(5 * 60_000)
-  await $.turn.complete({ ...FIN_DE_TOUR, turnId: 't2', usage: USAGE })
-  await horloge.settle()
-  expect(await signe()).toBe('◷')
-  expect(await ligneDe($, 'FLO-I165')).toContain('30 min')
-})
-
-test("le bouton pause, sur la ligne de la session : absent pendant que Claude travaille, il arrête le temps ensuite", async ($, on) => {
-  const { horloge, fichiers, toasts } = monde(on)
-  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
-  await $.command.run({ ...COMMANDE, args: '' })
-  const bouton = async (surface: 'terminal' | 'desktop') => {
-    const bande = await $.ui.mount({ ...BANDE, surface })
-    const trouve = (await bande.find({ key: 'pause' })) !== undefined
+  const question = async () => {
+    const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
+    const texte = (await bande.find({ type: 'Text', text: /sans activité/ }))?.text
     await bande.unmount()
-    return trouve
+    return texte
   }
-  await $.prompt.submit({ ...PROMPT, text: 'FLO-I165 : une tâche' })
-  await $.turn.start({ text: 'FLO-I165 : une tâche', turnId: 't1' })
-  await horloge.advance(5 * 60_000)
+  await travailler($, horloge, 'FLO-I165 : une tâche', 10)
+  // Claude a fini : le temps attend, la session n'est pas en cours.
+  await horloge.advance(10 * 60_000)
   await horloge.settle()
-  // Claude répond : pas de bouton pause.
-  expect([await bouton('terminal'), await bouton('desktop')]).toEqual([false, false])
+  expect(await ligneDe($, 'FLO-I165')).toStartWith('○')
+  expect(await ligneDe($, 'FLO-I165')).toContain('10 min')
 
-  await $.turn.complete({ ...FIN_DE_TOUR, turnId: 't1', usage: { model: 'm', input_tokens: 1_000, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } })
-  await horloge.advance(60_000)
-  await horloge.settle()
-  // Claude a fini et le temps court : le bouton est là, dans les deux surfaces.
-  expect([await bouton('terminal'), await bouton('desktop')]).toEqual([true, true])
-  const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
-  await bande.press({ key: 'pause' })
+  // Le retour, 10 minutes après : la pause s'ajoute, sans question.
+  await travailler($, horloge, 'suite', 5)
+  expect(await ligneDe($, 'FLO-I165')).toContain('25 min')
+  expect(await question()).toBeUndefined()
+
+  // 30 minutes de pause : une question au retour.
+  await horloge.advance(30 * 60_000)
+  await travailler($, horloge, 'je reviens', 1)
+  expect(await question()).toContain('30 min sans activité')
+
+  // 1 h 30 : rien ne compte, pas de question. Avec « Demander jusqu'à 2 h », la même pause pose la question.
+  await horloge.advance(90 * 60_000)
+  await travailler($, horloge, 'plus tard', 1)
+  expect(await question()).toBeUndefined()
+  await $.command.run({ ...COMMANDE, args: '' })
+  const bande = await $.ui.mount({ ...BANDE, surface: 'terminal' })
+  await bande.press({ key: 'reglages' })
+  await bande.press({ key: 'pause-max-120' })
   await bande.unmount()
-  await horloge.settle()
-  expect(toasts).toContain('Compteur en pause pour cette session. Il reprend à votre prochain message.')
-  expect(fichiers.get(JOURNAL)!.trim().split('\n').at(-1)).toContain('"e":"pause"')
-  // En pause, le bouton disparaît.
-  expect(await bouton('desktop')).toBe(false)
+  await horloge.advance(90 * 60_000)
+  await travailler($, horloge, 'encore', 1)
+  expect(await question()).toContain('1 h 30 sans activité')
 })
 
 test("les agents d'un workflow (Ultracode), absents de la liste des agents, font compter le temps", async ($, on) => {
@@ -647,8 +612,6 @@ test("les agents d'un workflow (Ultracode), absents de la liste des agents, font
   const ligne = await ligneDe($, 'FLO-I165')
   expect(ligne).toContain('●')
   expect(ligne).toContain('2 h 01')
-  // Les agents travaillent encore : la pause est refusée.
-  expect((await $.command.run({ ...COMMANDE, args: 'pause' })).text).toContain('Claude travaille encore')
   const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
   expect(await bande.find({ type: 'Text', text: /sans activité/ })).toBeUndefined()
   await bande.unmount()

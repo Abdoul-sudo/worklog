@@ -89,13 +89,19 @@ describe('écart court ou long', () => {
     expect(b.ecarts).toEqual([])
   })
 
-  test("le compteur tourne jusqu'à maintenant tant que l'écart reste court", async () => {
+  test("une pause encore ouverte ne compte pas : elle compte au retour, ou à la fermeture, si elle reste courte", async () => {
     const evts = [ev(h(9), 'A', 'message', 'FLO-I1'), ev(h(9, 5), 'A', 'reponse', 'FLO-I1')]
-    expect(minutesDuJour(evts, h(9, 15)).parItem).toEqual({ 'FLO-I1': 15 })
+    // Claude a fini à 9 h 05 : le compteur attend, la pause ne compte pas encore.
+    expect(minutesDuJour(evts, h(9, 15)).parItem).toEqual({ 'FLO-I1': 5 })
     expect(minutesDuJour(evts, h(9, 40)).parItem).toEqual({ 'FLO-I1': 5 })
-    // « En cours » est plus strict que le temps compté : deux minutes après la réponse, l'item ne l'est plus.
-    expect(calculer(evts, R, h(9, 6)).actives.get('A')).toBe('FLO-I1')
-    expect(calculer(evts, R, h(9, 15)).actives.size).toBe(0)
+    // Le retour à 9 h 15 : les 10 minutes de pause s'ajoutent, et le nouveau tour compte.
+    expect(minutesDuJour([...evts, ev(h(9, 15), 'A', 'message', 'FLO-I1')], h(9, 16)).parItem).toEqual({ 'FLO-I1': 16 })
+    // La fenêtre fermée à 9 h 10 (dernier signe de vie à 9 h 08) : la pause jusque-là compte.
+    const fenetreFermee = bilan(evts, R, h(9, 30), JOUR, jourSuivant(JOUR), new Map([['A', h(9, 8)]]))
+    expect(fenetreFermee.jours[0]?.lignes.map(l => l.minutes)).toEqual([10])
+    // « En cours » : seulement pendant que Claude travaille.
+    expect(calculer(evts.slice(0, 1), R, h(9, 3)).actives.get('A')).toBe('FLO-I1')
+    expect(calculer(evts, R, h(9, 6)).actives.size).toBe(0)
     // Passer sur un autre item sans rien envoyer ne le met pas en cours.
     expect(calculer([...evts, ev(h(9, 6), 'A', 'item', 'FSY-I2')], R, h(9, 6, 12) + 30_000).actives.size).toBe(0)
     // Une session fermée n'est plus en cours, et son temps s'arrête.
@@ -322,7 +328,7 @@ describe('items', () => {
       ],
       h(9, 20),
     )
-    expect(parItem).toEqual({ Codepath: 20, 'FSY-I478': 20 })
+    expect(parItem).toEqual({ Codepath: 10, 'FSY-I478': 20 })
   })
 
   test("le premier item trouvé reçoit aussi le temps d'avant, pas les suivants", async () => {
@@ -422,8 +428,8 @@ describe('items sans tokens', () => {
     expect([b.total, b.reel, b.jetons]).toEqual([60, 60, 700])
     expect(b.parSession.get('B')).toEqual(new Map([['FSY-I2', 60]]))
     expect(b.derniere.get('FLO-I1')).toBe(h(10))
-    // En cours, un item sans token garde sa ligne.
-    const enCours = bilan(evenements, R, h(10, 31), JOUR, jourSuivant(JOUR), new Map(), undefined, true)
+    // En cours (Claude y travaille), un item sans token garde sa ligne.
+    const enCours = bilan(evenements.filter(e => e.t <= h(10, 20)), R, h(10, 20), JOUR, jourSuivant(JOUR), new Map(), undefined, true)
     expect(enCours.lignes.map(l => l.item).sort()).toEqual(['FLO-I1', 'FSY-I2'])
   })
 })
@@ -452,6 +458,7 @@ describe('fichiers et textes', () => {
     expect(lireOptions({ langue: 'fr' }).langue).toBe('fr')
     expect(lireOptions({ langue: 'de' }).langue).toBe('en')
     expect(OPTIONS_PAR_DEFAUT.seuilPause).toBe(60)
+    expect([OPTIONS_PAR_DEFAUT.pauseMax, lireOptions({ pauseMax: 480 }).pauseMax, lireOptions({ pauseMax: 300 }).pauseMax]).toEqual([240, 480, 240])
     // Une durée qui n'est plus un choix du réglage reprend la valeur par défaut.
     expect(lireOptions({ seuilPause: 45 }).seuilPause).toBe(60)
     expect([OPTIONS_PAR_DEFAUT.theme, lireOptions({ theme: 'braise' }).theme, lireOptions({ theme: 'rose' }).theme]).toEqual(['nuit', 'braise', 'nuit'])
@@ -508,7 +515,7 @@ describe('corrections, tokens et périodes', () => {
 
   test('les tokens sont comptés par item et au total', async () => {
     const b = bilan(evts, R, h(9, 30), JOUR, jourSuivant(JOUR))
-    expect(b.lignes.map(l => [l.item, l.minutes, l.jetons])).toEqual([['FSY', 30, 1000], ['FLO-I1', 30, 500]])
+    expect(b.lignes.map(l => [l.item, l.minutes, l.jetons])).toEqual([['FSY', 30, 1000], ['FLO-I1', 20, 500]])
     expect(b.jetons).toBe(1500)
   })
 
@@ -521,7 +528,7 @@ describe('corrections, tokens et périodes', () => {
   test('un retrait enlève le temps et les tokens de cet item sur la période seulement', async () => {
     const corrections = { renommages: {}, retraits: [{ item: 'FSY', debut: h(9), fin: h(9, 15) }] }
     const b = bilan(evts, R, h(9, 30), JOUR, jourSuivant(JOUR), new Map(), corrections)
-    expect(b.lignes.map(l => [l.item, l.minutes, l.jetons])).toEqual([['FLO-I1', 30, 500], ['FSY', 15, 1000]])
+    expect(b.lignes.map(l => [l.item, l.minutes, l.jetons])).toEqual([['FLO-I1', 20, 500], ['FSY', 15, 1000]])
   })
 
   test("la série compte les jours de travail d'affilée ; un week-end sans travail ne la coupe pas", async () => {

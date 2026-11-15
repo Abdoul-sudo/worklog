@@ -212,7 +212,6 @@ export const ICONES = {
   suivant: 'M4.5 2.5 8 6l-3.5 3.5',
   crayon: 'M2 10l.6-2.4 5.8-5.8a1.1 1.1 0 0 1 1.6 1.6L4.2 9.2z',
   changer: 'M2 4h8M8 2l2 2-2 2M10 8H2M4 6 2 8l2 2',
-  pause: 'M4 2.5v7M8 2.5v7',
 } as const
 /** Une icône du popover, sur 16 unités avec une marge ; au survol, un rond clair derrière elle. */
 export const TAILLE_ICONE = 18

@@ -29,16 +29,19 @@ That is all. Worklog needs Claude Code 2.1.290 or later.
 
 - The timer starts with your first message in a session. Opening a session does not count.
 - The timer runs while Claude works. This includes subagents, workflows and Ultracode, even when they work alone for hours.
-- The timer keeps running while you read or think. A pause shorter than 1 hour counts as work.
+- When Claude is done, the timer waits for you.
 
-### When the timer stops
+### Pauses
 
-- **After 1 hour without activity.** When you come back, Worklog asks if this pause was work. Click **Count** to add it, or **Ignore** to leave it out.
-- **After 4 hours without activity**, for example a night. This time does not count, and Worklog does not ask.
-- **When you pause it.** Click **‖** next to the name of this session in Worklog, or type `/worklog pause`. Use it when Claude is done but the timer still runs, for example when you leave. While Claude works, you cannot pause: the real time and tokens count. The timer resumes with your next message.
-- **When you quit Claude Code**, or 2 minutes after you close its window.
+A pause is the time between the end of Claude's work and your next message. You read, you test, or you leave. Worklog looks at the pause when you come back:
 
-You can change the 1 hour in the settings.
+- **Shorter than 1 hour:** the pause counts as work. Worklog adds it to the total.
+- **From 1 to 4 hours:** Worklog asks if this pause was work. Click **Count** to add it, or **Ignore** to leave it out.
+- **Longer than 4 hours**, for example a night: the pause does not count, and Worklog does not ask.
+
+If you quit Claude Code or close its window, the pause until then counts if it is shorter than 1 hour.
+
+You can change the 1 hour and the 4 hours in the settings.
 
 ### What Worklog counts
 
@@ -67,9 +70,7 @@ In Worklog:
 | See another period | Click **Day**, **Week**, **Month**, **Year** or **All**. Click **‹** or **›** to go back or forward. |
 | Count this session for another name | Point to the name in the list, then click **⇄**. In the terminal, click the name. |
 | Count this session for a new name | Click **+ Add item**, type the name, then press Enter. |
-| Rename the current name | Click **✎** next to it. The new name also replaces the old one on past days. |
-| Pause the timer | Click **‖** next to the name of this session. The button shows only when Claude is not working. |
-| Change the settings | Click the gear. |
+| Rename the current name | Click **✎** next to it. The new name also replaces the old one on past days. || Change the settings | Click the gear. |
 
 With commands:
 
@@ -77,8 +78,6 @@ With commands:
 | --- | --- |
 | `/worklog` | Shows or hides Worklog. |
 | `/worklog <name>` | Counts this session for `<name>`. For example: `/worklog PROJ-142`. |
-| `/worklog pause` | Pauses the timer of this session until your next message. It does nothing while Claude works. |
-
 ## Settings
 
 Open Worklog, then click the gear.
@@ -91,15 +90,16 @@ Open Worklog, then click the gear.
 | Show | Time and tokens | Shows the time, the tokens, or both. |
 | Language | English | English or French. |
 | Theme | Night | Simple, Night, Aurora or Ember. Desktop app only. |
-| Ask after a pause of | 1h | A shorter pause counts as work. After a longer pause, Worklog asks if it was work. |
+| Pauses: Count up to | 1h | A shorter pause counts as work. |
+| Pauses: Ask up to | 4h | For a longer pause, Worklog asks if it was work. A pause longer than this does not count. |
 
 ## Questions
 
 **Do subagents and Ultracode count?**
 Yes. The timer runs while they work, even when you do not type. Their tokens count too.
 
-**What if I forget to pause the timer?**
-Nothing to do. The timer stops by itself after 1 hour without activity.
+**Do I need to stop the timer when I leave?**
+No. The timer runs only while Claude works. Worklog looks at your pauses when you come back.
 
 **Does Worklog see my past work?**
 Yes. On the first start, Worklog reads your Claude Code history. For this, it needs Node.js. Without Node.js, Worklog counts from the day you install it.

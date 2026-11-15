@@ -50,6 +50,7 @@ export type Frise = {
 /** Les réglages du popover. */
 export type Reglages = {
   seuilPause: number
+  pauseMax: number
   activite: boolean
   langue: 'en' | 'fr'
   /** Ce que le popover montre : le temps et les tokens, ou l'un des deux. */

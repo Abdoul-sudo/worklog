@@ -9,15 +9,14 @@ const DUREE_MAX_TOUR = 12 * 60 * MINUTE
 // Chaque session vivante donne signe de vie toutes les 30 s ; au-delà de cette marge, elle est tenue pour morte
 // (fenêtre fermée sans fin de session notée).
 const MARGE_VIE = 2 * MINUTE
-// Une session est « en cours » quand Claude travaille, ou quand un message, une réponse ou une dépense de tokens date de
-// moins que ce délai. Le temps, lui, court plus longtemps (le seuil de pause) : on lit, on réfléchit.
-const ACTIF = 2 * MINUTE
-// Un silence plus long est un arrêt (la nuit, le week-end) : il n'est pas proposé à confirmer.
-const ECART_MAX = 4 * 60 * MINUTE
 
 /** Les réglages, modifiables dans la vue Réglages du popover. */
 export type Options = {
+  /** En minutes : une pause plus courte compte comme du travail, au retour. */
   seuilPause: number
+  /** En minutes : une pause plus longue que le seuil, et pas plus que ceci, devient une question ; au-delà, elle ne
+   * compte pas. */
+  pauseMax: number
   activite: boolean
   langue: Langue
   /** Ce que le popover montre : le temps et les tokens, ou l'un des deux. */
@@ -34,15 +33,16 @@ export const THEMES_IDS: readonly Theme[] = ['simple', 'nuit', 'aurore', 'braise
 
 export const OPTIONS_PAR_DEFAUT: Options = {
   seuilPause: 60,
+  pauseMax: 240,
   activite: true,
   langue: 'en',
   mesure: 'tout',
   theme: 'nuit',
 }
 
-/** Les choix du réglage « Demander après une pause de », en minutes. Une pause plus courte compte comme du travail. Une
- * pause plus longue devient une question, jusqu'à ECART_MAX. */
+/** Les choix des réglages des pauses, en minutes : « Compter jusqu'à » et « Demander jusqu'à ». */
 export const SEUILS = [15, 30, 60, 120]
+export const PAUSES_MAX = [60, 120, 240, 480]
 
 /** Le format des ID de tickets : une clé en majuscules, un tiret, puis un numéro, comme PROJ-142, ENG-42 ou FSY-I478.
  * Un numéro d'un seul chiffre ne suffit pas (UTF-8, GPT-4), et des sigles techniques courants sont écartés (ISO-8601,
@@ -56,6 +56,7 @@ export function lireOptions(brut: unknown): Options {
   const oui = (v: unknown, defaut: boolean) => (typeof v === 'boolean' ? v : defaut)
   return {
     seuilPause: SEUILS.find(m => m === r.seuilPause) ?? d.seuilPause,
+    pauseMax: PAUSES_MAX.find(m => m === r.pauseMax) ?? d.pauseMax,
     activite: oui(r.activite, d.activite),
     langue: LANGUES.find(l => l.id === r.langue)?.id ?? d.langue,
     mesure: MESURES.find(m => m === r.mesure) ?? d.mesure,
@@ -129,7 +130,7 @@ export type Bilan = {
   parSession: Map<string, Map<string, number>>
   /** La dernière activité de chaque item sur la période : la fin de son dernier temps, ou sa dernière dépense de tokens. */
   derniere: Map<string, number>
-  /** Les sessions en pause (bouton ou /worklog pause), une fois que Claude a fini son travail. */
+  /** Les sessions en pause (une pause notée au journal par une version passée), une fois que Claude a fini son travail. */
   enPause: Set<string>
 }
 
@@ -204,9 +205,10 @@ export function cleJour(t: number): string {
 /**
  * Découpe l'activité de chaque session en plages comptées et en écarts à confirmer.
  * `vivants` donne le dernier signe de vie connu de chaque session.
- * `actives` donne, pour chaque session en cours, son item : Claude y travaille, ou un message, une réponse ou une dépense
- * de tokens date de moins de deux minutes. Passer sur un item sans rien envoyer ne le met pas en cours.
- * `enPause` donne les sessions en pause (bouton ou /worklog pause), une fois que Claude a fini son travail.
+ * `actives` donne, pour chaque session où Claude travaille en ce moment, son item.
+ * Une pause encore ouverte (la session vit, Claude a fini, rien depuis) ne compte pas encore : elle est jugée au retour,
+ * au prochain message, ou quand la session se ferme.
+ * `enPause` donne les sessions en pause (une pause notée au journal par une version passée), une fois que Claude a fini son travail.
  */
 export function calculer(
   evenements: readonly Evenement[],
@@ -215,6 +217,7 @@ export function calculer(
   vivants: ReadonlyMap<string, number> = new Map(),
 ) {
   const seuil = options.seuilPause * MINUTE
+  const pauseMax = options.pauseMax * MINUTE
   const choix = new Map<string, Choix>()
   const sessions = new Map<string, EvenementActivite[]>()
   const consos: EvenementJetons[] = []
@@ -267,7 +270,7 @@ export function calculer(
     let debutTour: number | null = null
     // Début du travail des sous-agents : tant qu'ils tournent, Claude travaille aussi, même sans message.
     let debutAgents: number | null = null
-    // Après une pause, jusqu'au prochain message : seul le travail de Claude compte encore, jusqu'à sa fin.
+    // Après une pause notée au journal (versions passées), jusqu'au prochain message : seul le travail de Claude compte encore, jusqu'à sa fin.
     let arrete = false
     for (let i = 0; i < liste.length; i++) {
       const a = liste[i]!
@@ -293,13 +296,12 @@ export function calculer(
       const enCoursDepuis = (debut: number | null) => debut !== null && b?.relance !== true && fin - debut <= DUREE_MAX_TOUR
       const claudeTravaille = enCoursDepuis(debutTour) || enCoursDepuis(debutAgents)
       if (arrete && !claudeTravaille) continue
+      const ouverte = b === undefined && finDeVie >= maintenant
       // Un silence où les tokens n'ont pas cessé de partir plus longtemps que le seuil est du travail de Claude.
-      if (claudeTravaille || plusLongSilence(session, a.t, fin) <= seuil) {
+      if (claudeTravaille || (!ouverte && plusLongSilence(session, a.t, fin) <= seuil)) {
         plages.push(plage)
-        const derniereDepense = Math.max(-Infinity, ...(depenses.get(session) ?? []).filter(x => x <= maintenant))
-        const recente = a.e !== 'item' && Math.max(a.t, derniereDepense) >= maintenant - ACTIF
-        if (b === undefined && finDeVie >= maintenant && (claudeTravaille || recente)) actives.set(session, plage.item)
-      } else if (b !== undefined && fin - a.t <= ECART_MAX) {
+        if (ouverte) actives.set(session, plage.item)
+      } else if (b !== undefined && fin - a.t <= pauseMax) {
         const classe = choix.get(`${session}@${a.t}`)
         if (classe === 'travail') plages.push(plage)
         else if (classe === undefined) ecarts.push(plage)
