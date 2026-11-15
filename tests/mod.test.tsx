@@ -3,7 +3,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine, MockClock } from 'claude-code/testing'
 
 const h = (heure: number, minute = 0) => new Date(2026, 10, 12, heure, minute).getTime()
-const JOURNAL = 'C:/Users/test/.claude/temps/journal/2026-11-12/S1.jsonl'
+const JOURNAL = 'C:/Users/test/.claude/worklog/journal/2026-11-12/S1.jsonl'
 const PROMPT = { wait: false, origin: { kind: 'composer' } } as const
 const COMMANDE = { command: 'worklog', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 120 } } as const
 const FIN_DE_TOUR = { answer: '', durationMs: 1, isAborted: false, turnId: 't', reason: 'answer' } as const
@@ -373,27 +373,11 @@ test("dans le terminal, la frise prend la place qu'il y a, et la liste remplit s
   await puce.unmount()
 })
 
-test("l'ancienne commande /temps marche encore", async ($, on) => {
-  const { horloge } = monde(on)
-  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
-  await travailler($, horloge, 'FLO-I165', 10)
-  expect((await $.command.run({ ...COMMANDE, command: 'temps', args: 'jour' })).text).toContain('  FLO-I165   10 min')
-})
-
-test("taper /worklog ou /temps n'est pas une activité : le journal n'en garde aucun message", async ($, on) => {
+test("taper /worklog n'est pas une activité : le journal n'en garde aucun message", async ($, on) => {
   const { fichiers } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
-  for (const name of ['worklog', 'temps']) await $.prompt.submit({ ...PROMPT, text: `/${name}`, command: { name, args: '' } })
+  await $.prompt.submit({ ...PROMPT, text: '/worklog', command: { name: 'worklog', args: '' } })
   expect(fichiers.get(JOURNAL)!.trim().split('\n').filter(l => l.includes('"e":"message"'))).toEqual([])
-})
-
-test("les réglages gardés sous l'ancien nom, temps-item, sont repris une fois", async ($, on) => {
-  // Le monde en anglais n'a pas de réglages : ceux de l'ancien nom passent le popover en français.
-  const { fichiers } = monde(on, ['terminal'], {}, 'en')
-  const reglages = { seuilPause: 30, activite: true, question: true, langue: 'fr', mesure: 'temps', theme: 'braise' }
-  fichiers.set('C:/Users/test/.claude/plugins/store/temps-item_temps-item-abc.json', JSON.stringify({ options: reglages }))
-  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
-  expect((await $.command.run({ ...COMMANDE, args: 'nope' })).text).toStartWith("« nope » n'est ni une commande ni un ID d'item.")
 })
 
 test('la liste va par pages : chaque item reste joignable', async ($, on) => {

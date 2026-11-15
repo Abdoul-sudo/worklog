@@ -65,7 +65,7 @@ type Moteur = EngineInterface
 type Site = Parameters<Moteur['ui']['resolve']>[0] & { requestId: string }
 
 const PANNEAU = 'worklog'
-const DOSSIER_DONNEES = 'temps'
+const DOSSIER_DONNEES = 'worklog'
 const RAFRAICHISSEMENT_MS = 30_000
 /** Un champ vide se ferme seul après ce délai sans frappe. */
 const CHAMP_VIDE_MS = 6_000
@@ -120,7 +120,7 @@ const vue = atom({ plugin: 'worklog', key: 'vue' } as const, null, { shape: 'vue
 const frise = atom({ plugin: 'worklog', key: 'frise' } as const, null, { shape: 'frise-6' })
 const reglages = atom({ plugin: 'worklog', key: 'reglages' } as const, null, { shape: 'reglages-2' })
 
-let chemins: { journal: string; importe: string; projets: string; magasins: string } | null = null
+let chemins: { journal: string; importe: string; projets: string } | null = null
 let ecritures: Promise<unknown> = Promise.resolve()
 let tourCompte = true
 let heritageClear: { item: string; manuel: boolean } | null = null
@@ -169,28 +169,11 @@ async function dossiers($: Moteur) {
   if (chemins === null) {
     const maison = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME')) ?? ''
     const config = ((await $.env.get('CLAUDE_CONFIG_DIR')) ?? `${maison}/.claude`).replace(/\\/g, '/')
-    // Le dossier des données se règle (un dossier synchronisé, des données de démonstration) ; par défaut, ~/.claude/temps.
+    // Le dossier des données se règle (un dossier synchronisé, des données de démonstration) ; par défaut, ~/.claude/worklog.
     const donnees = ((await $.env.get('WORKLOG_DATA_DIR')) ?? `${config}/${DOSSIER_DONNEES}`).replace(/\\/g, '/')
-    chemins = { journal: `${donnees}/journal`, importe: `${donnees}/import`, projets: `${config}/projects`, magasins: `${config}/plugins/store` }
+    chemins = { journal: `${donnees}/journal`, importe: `${donnees}/import`, projets: `${config}/projects` }
   }
   return chemins
-}
-
-/** Une seule fois : reprend ce que le plugin gardait sous son ancien nom, temps-item (réglages, noms changés, items
- * retirés, items des sessions). Une valeur déjà gardée sous le nouveau nom reste. */
-async function reprendreAncienNom($: Moteur): Promise<void> {
-  if ((await $.store.get('ancienNomRepris')) !== undefined) return
-  try {
-    const { magasins } = await dossiers($)
-    const ancien = (await $.fs.exists(magasins)) ? (await $.fs.list(magasins)).find(f => /^temps-item_.*\.json$/.test(f.name)) : undefined
-    if (ancien !== undefined) {
-      const valeurs = JSON.parse(await $.fs.read(`${magasins}/${ancien.name}`)) as Record<string, unknown>
-      for (const [cle, valeur] of Object.entries(valeurs)) if ((await $.store.get(cle)) === undefined) await $.store.set(cle, valeur as never)
-    }
-  } catch {
-    // Rien de lisible à reprendre : le plugin part de ses valeurs par défaut.
-  }
-  await $.store.set('ancienNomRepris', true)
 }
 
 /** La langue et le thème des réglages, pour les textes et les dessins qui suivent. */
@@ -1531,11 +1514,8 @@ function questionSilence($: Moteur, e: Site, ecart: Ecart) {
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    await reprendreAncienNom($)
     await lireReglages($)
     await $.command.register({ name: 'worklog', description: t().commande.description, argumentHint: t().commande.indice, immediate: true })
-    // L'ancienne commande marche encore, sans apparaître dans le menu.
-    await $.command.register({ name: 'temps', description: t().commande.description, argumentHint: t().commande.indice, immediate: true })
     const s = await $.session.id()
     const deBranche = await itemDeNouvelleBranche($, MOTIF_ID)
     if (deBranche !== null && (await itemDe($, s)) === null) await definirItem($, s, deBranche, false)
@@ -1551,7 +1531,7 @@ export const register: Register = on => {
 
   on('prompt.submit', ($, e, next) => {
     // Ouvrir le popover n'est pas travailler : la commande ne compte pas comme un message.
-    if (e.command?.name === 'worklog' || e.command?.name === 'temps') return next(e)
+    if (e.command?.name === 'worklog') return next(e)
     tourCompte = !AUTOMATIQUES.includes(e.origin.kind)
     if (tourCompte) enFond(apresMessage($, e.text, e.isMeta !== true && ECRITS.includes(e.origin.kind)))
     if (e.origin.kind === 'composer') enFond(fermerChampVide($))
@@ -1576,8 +1556,6 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'worklog' }, async ($, e) => ({ text: await commande($, e.args.trim()) }))
-  on('command.run', { command: 'temps' }, async ($, e) => ({ text: await commande($, e.args.trim()) }))
-  on('command.describe', { command: 'temps' }, (_, e) => ({ description: e.description, isHidden: true }))
 
   // App desktop (clic sur la puce) et VS Code (/worklog panneau) : le popover est un panneau.
   on('ui.render', { component: 'Pane', requestId: PANNEAU }, async ($, e) => popover($, e, e.props.bodyColumns, e.props.scroll.bodyRows, true))
