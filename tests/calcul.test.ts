@@ -468,10 +468,7 @@ describe('fichiers et textes', () => {
         '  FLO-I165   1 h 00    245 k tokens',
         '  Total      1 h 00    245 k tokens',
         '',
-        'Écarts à confirmer, non comptés (7 derniers jours) :',
-        '  1. jeudi 12 novembre, FLO-I165, de 14 h 00 à 14 h 45 (45 min)',
-        'Pour les classer : /temps confirmer <numéros ou tout> <travail ou pause>',
-        'Exemple : /temps confirmer 1 travail',
+        '1 silence à classer : /temps silences',
       ].join('\n'),
     )
   })

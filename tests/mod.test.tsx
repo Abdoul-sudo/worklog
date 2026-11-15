@@ -127,8 +127,9 @@ test('un message avec un ID compte pour cet item ; la puce est sous la saisie et
 
   const lignes = fichiers.get(JOURNAL)!.trim().split('\n').map(l => JSON.parse(l) as { e: string; k: string | null })
   expect(lignes.map(l => `${l.e}:${l.k}`)).toEqual(['ouverture:null', 'message:FLO-I165', 'reponse:FLO-I165', 'jetons:FLO-I165'])
-  expect(statuts.at(-1)).toBe('⏱ FLO-I165 · 10 min')
-  expect((await $.command.run({ ...COMMANDE, args: '' })).text).toContain('  FLO-I165   10 min')
+  expect(statuts.at(-1)).toBe('⏱ FLO-I165 · 10 min · /temps')
+  // /temps jour : le texte du jour.
+  expect((await $.command.run({ ...COMMANDE, args: 'jour' })).text).toContain('  FLO-I165   10 min')
 
   for (const [surface, site] of [['terminal', LIGNE_AIDE], ['desktop', PIED]] as const) {
     const puce = await $.ui.mount({ ...site, surface })
@@ -147,6 +148,8 @@ test('un message avec un ID compte pour cet item ; la puce est sous la saisie et
     await bande.unmount()
   }
 
+  // VS Code n'a ni bande ni puce à cliquer : /temps y ouvre le panneau.
+  expect((await $.command.run({ ...COMMANDE, args: '' })).text).toBe('Panneau ouvert.')
   for (const surface of ['terminal', 'desktop', 'vscode'] as const) {
     const panneau = await $.ui.mount({ ...PANNEAU, surface })
     expect(await panneau.find({ key: 'autre' })).toBeDefined()
@@ -159,7 +162,7 @@ test("l'item vient de la branche Git ; un clic dans la liste passe sur un autre"
   etat.branche = 'feature/FSY-I9-export'
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
   await travailler($, horloge, 'on commence', 5)
-  expect((await $.command.run({ ...COMMANDE, args: '' })).text).toContain('FSY-I9')
+  expect((await $.command.run({ ...COMMANDE, args: 'jour' })).text).toContain('FSY-I9')
 
   etat.branche = 'feature/FLO-I7-fix'
   await travailler($, horloge, 'je continue', 1)
@@ -241,7 +244,7 @@ test('renommer depuis le popover : le crayon, ou un double-clic sur le nom', asy
   await bande.press({ key: 'crayon' })
   await bande.input({ key: 'renommer', text: 'FSY-I478' })
   await puceAffiche(puce, 'FSY-I478', '20 min')
-  expect((await $.command.run({ ...COMMANDE, args: '' })).text).toContain('  FSY-I478   20 min')
+  expect((await $.command.run({ ...COMMANDE, args: 'jour' })).text).toContain('  FSY-I478   20 min')
   // Ni masquer ni retirer : les lignes n'ont plus que ⇄ ou le crayon.
   expect(await bande.find({ key: 'retirer-FSY-I478' })).toBeUndefined()
   expect(await bande.find({ key: 'masquer-FSY-I478' })).toBeUndefined()
@@ -437,22 +440,31 @@ test('un long silence demande « Du travail ? », et la réponse compte', async 
   await bande.press({ key: 'ecart-oui' })
   expect(await bande.find({ type: 'Text', text: /sans activité/ })).toBeUndefined()
   await bande.unmount()
-  expect((await $.command.run({ ...COMMANDE, args: '' })).text).toContain('  FLO-I165   55 min')
+  expect((await $.command.run({ ...COMMANDE, args: 'jour' })).text).toContain('  FLO-I165   55 min')
 })
 
-test('les sous-commandes : item, pause, confirmer, mois, erreur', async ($, on) => {
+test('les sous-commandes : ouvrir, item, pause, silences, mois, erreur', async ($, on) => {
   const { horloge, fichiers } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+
+  // /temps seul ouvre le popover au-dessus de la saisie ; relancé, il le laisse ouvert.
+  for (let fois = 0; fois < 2; fois++) {
+    expect((await $.command.run({ ...COMMANDE, args: '' })).text).toBe('Ouvert au-dessus de la saisie.')
+    const bande = await $.ui.mount({ ...BANDE, surface: 'terminal' })
+    expect(await bande.find({ key: 'onglet-jour' })).toBeDefined()
+    await bande.unmount()
+  }
 
   expect((await $.command.run({ ...COMMANDE, args: 'FSY-I478' })).text).toBe('Item de cette session : FSY-I478.')
   await horloge.advance(50 * 60_000)
   await $.prompt.submit({ ...PROMPT, text: 'suite' })
   await horloge.settle()
-  expect((await $.command.run({ ...COMMANDE, args: 'confirmer' })).text).toContain(
+  expect((await $.command.run({ ...COMMANDE, args: 'jour' })).text).toContain('1 silence à classer : /temps silences')
+  expect((await $.command.run({ ...COMMANDE, args: 'silences' })).text).toContain(
     '  1. jeudi 12 novembre, FSY-I478, de 9 h 00 à 9 h 50 (50 min)',
   )
-  expect((await $.command.run({ ...COMMANDE, args: 'confirmer 1 pause' })).text).toBe('1 écart classé comme pause.')
-  expect((await $.command.run({ ...COMMANDE, args: 'confirmer' })).text).toBe('Aucun écart à confirmer sur les 7 derniers jours.')
+  expect((await $.command.run({ ...COMMANDE, args: 'silences 1 pause' })).text).toBe('1 silence classé comme pause.')
+  expect((await $.command.run({ ...COMMANDE, args: 'silences' })).text).toBe('Aucun silence à classer sur les 7 derniers jours.')
 
   await horloge.advance(5 * 60_000)
   expect((await $.command.run({ ...COMMANDE, args: 'stop' })).text).toContain('Compteur en pause')
@@ -476,5 +488,5 @@ test('quand des sous-agents travaillent deux heures, le temps compte et aucune q
   const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
   expect(await bande.find({ type: 'Text', text: /sans activité/ })).toBeUndefined()
   await bande.unmount()
-  expect((await $.command.run({ ...COMMANDE, args: '' })).text).toContain('  FLO-I165   2 h 02')
+  expect((await $.command.run({ ...COMMANDE, args: 'jour' })).text).toContain('  FLO-I165   2 h 02')
 })

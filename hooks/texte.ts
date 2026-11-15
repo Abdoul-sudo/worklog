@@ -19,14 +19,15 @@ export function listeEcarts(ecarts: readonly Ecart[]): string[] {
     recap.ecarts,
     ...ecarts.map((e, i) => recap.ecart(i + 1, formatJour(e.debut), e.item, formatHeure(e.debut), formatHeure(e.fin), dureeEcart(e))),
     recap.classer,
-    recap.exemple,
   ]
 }
 
-/** Le récapitulatif d'une période : par jour si `parJour`, puis le total par item. */
+/** Le récapitulatif d'une période : par jour si `parJour`, puis le total par item. Les silences à classer n'y sont que
+ * comptés : `/temps silences` les liste. */
 export function recap(titre: string, bilan: Bilan, ecarts: readonly Ecart[], parJour: boolean): string {
   const textes = t().recap
-  if (bilan.lignes.length === 0) return textes.aucun(titre)
+  const aClasser = ecarts.length > 0 ? ['', textes.aClasser(ecarts.length)] : []
+  if (bilan.lignes.length === 0) return [textes.aucun(titre), ...aClasser].join('\n')
   const lignes = [titre]
   if (parJour) {
     for (const j of bilan.jours) {
@@ -38,7 +39,7 @@ export function recap(titre: string, bilan: Bilan, ecarts: readonly Ecart[], par
   }
   lignes.push(...tableau(bilan.lignes, bilan.total, bilan.jetons))
   if (bilan.total > bilan.reel) lignes.push('', textes.reel(formatDuree(bilan.reel)))
-  if (ecarts.length > 0) lignes.push('', ...listeEcarts(ecarts))
+  lignes.push(...aClasser)
   return lignes.join('\n')
 }
 

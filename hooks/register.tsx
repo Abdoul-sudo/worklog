@@ -396,7 +396,8 @@ async function rafraichir($: Moteur): Promise<void> {
   await update($, reglages, () => options)
   // VS Code n'affiche ni la puce ni la bande : la ligne de statut les remplace.
   const dansVsCode = (await $.session.surfaces()).includes('vscode')
-  $.ui.status(dansVsCode ? libellePuce(item, etat.minutes, enPause) : undefined)
+  // VS Code : la ligne de statut, qui ne se clique pas, dit comment ouvrir le popover.
+  $.ui.status(dansVsCode ? `${libellePuce(item, etat.minutes, enPause)} · /temps` : undefined)
   if (await read($, deplie)) {
     await calculerVue($)
     await calculerFrise($)
@@ -513,9 +514,15 @@ async function repondre($: Moteur, ecart: Ecart, choix: Choix): Promise<void> {
 
 async function ouvrirOuFermer($: Moteur): Promise<void> {
   const ouvert = !(await read($, deplie))
-  await update($, deplie, () => ouvert)
   await update($, ui, etat => ({ ...etat, onglet: ouvert ? 'jour' : etat.onglet, decalage: 0, edition: null, page: 0 }))
-  if (ouvert) await rafraichir($)
+  // Le contenu est prêt avant que le popover n'apparaisse : il ne se dessine pas d'abord sans la frise, plus étroit.
+  if (ouvert) {
+    // La session d'abord (son item garde une ligne), puis la période et la frise.
+    await rafraichir($)
+    await calculerVue($)
+    await calculerFrise($)
+  }
+  await update($, deplie, () => ouvert)
 }
 
 /** Le panneau latéral : son propre fond, et la hauteur qu'il demande. */
@@ -574,8 +581,21 @@ async function commande($: Moteur, args: string): Promise<string> {
   }
 
   const textes = t().commande
+  // Le popover : un panneau dans VS Code, qui n'a ni bande ni puce à cliquer ; la bande au-dessus de la saisie ailleurs
+  // (un panneau en plus en ferait deux). Déjà ouvert, il reste ouvert.
+  const ouvrir = async () => {
+    const vscode = (await $.session.surfaces()).includes('vscode')
+    if (!(await read($, deplie))) await ouvrirOuFermer($)
+    if (vscode) await ouvrirPanneau($)
+    return vscode ? textes.panneau : textes.bande
+  }
   switch (mots[0]?.toLowerCase()) {
     case undefined:
+    case 'panneau':
+    case 'pane':
+      return ouvrir()
+    case 'jour':
+    case 'day':
       return resume('jour', false)
     case 'semaine':
     case 'week':
@@ -588,15 +608,9 @@ async function commande($: Moteur, args: string): Promise<string> {
       await noterActivite($, 'pause')
       await rafraichir($)
       return textes.pause
-    case 'confirmer':
-    case 'confirm':
+    case 'silences':
+    case 'gaps':
       return confirmer($, mots.slice(1), await septJours())
-    case 'panneau':
-    case 'pane':
-      await ouvrirPanneau($)
-      await update($, deplie, () => true)
-      await rafraichir($)
-      return textes.panneau
     case 'aide':
     case 'help':
       return aide()
