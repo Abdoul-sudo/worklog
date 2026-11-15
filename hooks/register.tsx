@@ -12,7 +12,6 @@ import {
   THEMES_IDS,
   type Corrections,
   type Evenement,
-  type Periode,
   type Retrait,
   MOTIF_ID,
   SANS_ITEM,
@@ -27,7 +26,6 @@ import {
   dernierEvenement,
   detecterItem,
   dureeEcart,
-  estUnItem,
   formatDuree,
   formatHeure,
   formatJetons,
@@ -58,7 +56,6 @@ import {
   TAILLE_ICONE,
 } from './dessins'
 import { LANGUES, choisirLangue, t } from './langue'
-import { aide, listeEcarts, recap } from './texte'
 
 type Moteur = EngineInterface
 // Un site de dessin : la surface, et l'instance (la bande ou le panneau) où donner le focus.
@@ -574,76 +571,31 @@ async function changerReglage($: Moteur, changement: Partial<Reglages>): Promise
   await rafraichir($)
 }
 
+/** /worklog : seul, ouvre ou ferme Worklog ; `stop` met la session en pause ; tout autre texte devient le nom de la
+ * session. */
 async function commande($: Moteur, args: string): Promise<string> {
-  const mots = args.split(/\s+/).filter(Boolean)
-  const maintenant = await $.clock.now()
   // Les textes suivent la langue des réglages.
   await lireReglages($)
-  const aujourdhui = debutJour(maintenant)
-  const septJours = async () => (await bilanDe($, decalerJours(aujourdhui, -6), jourSuivant(aujourdhui))).b.ecarts
-  const resume = async (periode: Periode, parJour: boolean) => {
-    const { debut, fin, titre } = bornes(periode, 0, maintenant)
-    return recap(titre, (await bilanDe($, debut, fin)).b, await septJours(), parJour)
-  }
-
   const textes = t().commande
-  // Le popover : un panneau dans VS Code, qui n'a ni bande ni puce à cliquer ; la bande au-dessus de la saisie ailleurs
-  // (un panneau en plus en ferait deux). Déjà ouvert, il reste ouvert.
-  const ouvrir = async () => {
-    const vscode = (await $.session.surfaces()).includes('vscode')
-    if (!(await read($, deplie))) await ouvrirOuFermer($)
-    if (vscode) await ouvrirPanneau($)
-    return vscode ? textes.panneau : textes.bande
+  const texte = args.trim()
+  if (texte === '') {
+    // VS Code n'a ni bande ni puce à cliquer : Worklog y ouvre un panneau.
+    if ((await $.session.surfaces()).includes('vscode')) {
+      if (!(await read($, deplie))) await ouvrirOuFermer($)
+      await ouvrirPanneau($)
+      return textes.panneau
+    }
+    await ouvrirOuFermer($)
+    return (await read($, deplie)) ? textes.bande : textes.ferme
   }
-  switch (mots[0]?.toLowerCase()) {
-    case undefined:
-    case 'panneau':
-    case 'pane':
-      return ouvrir()
-    case 'jour':
-    case 'day':
-      return resume('jour', false)
-    case 'semaine':
-    case 'week':
-      return resume('semaine', true)
-    case 'mois':
-    case 'month':
-      return resume('mois', false)
-    case 'stop':
-    case 'pause':
-      await noterActivite($, 'pause')
-      await rafraichir($)
-      return textes.pause
-    case 'silences':
-    case 'gaps':
-      return confirmer($, mots.slice(1), await septJours())
-    case 'aide':
-    case 'help':
-      return aide()
+  if (texte.toLowerCase() === 'stop') {
+    await noterActivite($, 'pause')
+    await rafraichir($)
+    return textes.pause
   }
-  if (mots.length === 1 && estUnItem(mots[0]!, MOTIF_ID)) {
-    await changerItem($, mots[0]!)
-    return textes.item(mots[0]!)
-  }
-  return `${textes.inconnu(args)}\n\n${aide()}`
-}
-
-async function confirmer($: Moteur, mots: string[], ecarts: Ecart[]): Promise<string> {
-  if (mots.length === 0) return listeEcarts(ecarts).join('\n')
-  const mot = mots.at(-1)?.toLowerCase()
-  const choix: Choix | null = mot === 'travail' || mot === 'work' ? 'travail' : mot === 'pause' || mot === 'break' ? 'pause' : null
-  const cibles = mots.slice(0, -1)
-  const tout = cibles[0] === 'tout' || cibles[0] === 'all'
-  const numeros = cibles.map(Number)
-  const valides = numeros.every(n => Number.isInteger(n) && n >= 1 && n <= ecarts.length)
-  if (choix === null || cibles.length === 0 || (!tout && !valides)) {
-    return [t().commande.confirmerAide, '', ...listeEcarts(ecarts)].join('\n')
-  }
-  const choisis = tout ? ecarts : [...new Set(numeros)].map(n => ecarts[n - 1]!)
-  for (const ecart of choisis) await classer($, ecart, choix)
-  await update($, question, () => null)
-  await rafraichir($)
-  return t().commande.classes(choisis.length, t().commande.choix[choix])
+  const nom = texte.slice(0, 60)
+  await changerItem($, nom)
+  return textes.item(nom)
 }
 
 /** Dans l'app desktop, le bouton du pied est dessiné par l'app : des espaces insécables autour du libellé lui donnent de

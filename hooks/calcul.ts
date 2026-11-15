@@ -145,10 +145,6 @@ export function detecterItem(texte: string, motif: string): string | null {
   return expression(motif, false)?.exec(texte)?.[0] ?? null
 }
 
-export function estUnItem(texte: string, motif: string): boolean {
-  return expression(motif, true)?.test(texte) === true
-}
-
 /** Le nom à afficher : suit les renommages, sans boucler. */
 export function nommer(item: string, renommages: Readonly<Record<string, string>>): string {
   let nom = item

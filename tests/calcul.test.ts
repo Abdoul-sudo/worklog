@@ -23,7 +23,6 @@ import {
 } from '../hooks/calcul'
 import { casesEntre, cellulesActivite, serie, svgActivite } from '../hooks/activite'
 import { couleurs } from '../hooks/dessins'
-import { recap } from '../hooks/texte'
 import { choisirLangue } from '../hooks/langue'
 
 // Ces tests lisent les textes en français ; ceux en anglais choisissent leur langue.
@@ -246,7 +245,6 @@ describe('items', () => {
     const b = bilan(evts, R, h(10, 30, 13), JOUR, jourSuivant(jourSuivant(JOUR)))
     expect(b.jours.map(j => [j.debut, j.total])).toEqual([[JOUR, 20], [jourSuivant(JOUR), 50]])
     expect(b.lignes).toEqual([{ item: 'FLO-I1', minutes: 70, enCours: false, jetons: 0 }])
-    expect(recap('Semaine', b, [], true)).toContain('Total\n  FLO-I1   1 h 10')
   })
 
   test('un changement de item dans la session coupe le temps au bon moment', async () => {
@@ -456,24 +454,15 @@ describe('fichiers et textes', () => {
     expect(nomDuGroupe('pas du json', 'local_a')).toBe(null)
   })
 
-  test('le récapitulatif du jour, avec les tokens', async () => {
+  test('les tokens du jour vont à leur item', async () => {
     const evts: Evenement[] = [
       ev(h(9), 'A', 'message', 'FLO-I165'),
       ev(h(10), 'A', 'reponse', 'FLO-I165'),
       { t: h(10), s: 'A', e: 'jetons', n: 245_000, k: 'FLO-I165' },
     ]
     const b = bilan(evts, R, h(11), JOUR, jourSuivant(JOUR))
-    const ecart = { item: 'FLO-I165', debut: h(14), fin: h(14, 45), session: 'A' }
-    expect(recap("Aujourd'hui", b, [ecart], false)).toBe(
-      [
-        "Aujourd'hui",
-        '',
-        '  FLO-I165   1 h 00    245 k tokens',
-        '  Total      1 h 00    245 k tokens',
-        '',
-        '1 silence à classer : /worklog silences',
-      ].join('\n'),
-    )
+    expect(b.lignes).toEqual([{ item: 'FLO-I165', minutes: 60, enCours: false, jetons: 245_000 }])
+    expect(b.jetons).toBe(245_000)
   })
 })
 
