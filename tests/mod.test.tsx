@@ -633,3 +633,19 @@ test('quand des sous-agents travaillent deux heures, le temps compte et aucune q
   await bande.unmount()
   expect(await ligneDe($, 'FLO-I165')).toContain('2 h 02')
 })
+
+test("quand un sous-agent a fini, la session n'est plus en cours et son temps s'arrête tout de suite", async ($, on) => {
+  const { horloge, etat } = monde(on)
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await travailler($, horloge, 'FLO-I165 : lance un agent', 1)
+  etat.agents = [{ id: 'a1', status: 'running' }]
+  await $.turn.start({ text: 'le brief', turnId: 'a1-t', agentId: 'a1' })
+  await horloge.advance(20 * 60_000)
+  await $.turn.complete({ ...FIN_DE_TOUR, turnId: 'a1-t', agentId: 'a1' })
+  etat.agents = [{ id: 'a1', status: 'completed' }]
+  await horloge.advance(2 * 60_000)
+  await horloge.settle()
+  const ligne = await ligneDe($, 'FLO-I165')
+  expect(ligne).toStartWith('○')
+  expect(ligne).toContain('21 min')
+})

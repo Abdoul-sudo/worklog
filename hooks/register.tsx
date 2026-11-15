@@ -125,9 +125,11 @@ let brancheVue: string | null = null
 let nomParDefaut: string | null = null
 // Dernier état connu des sous-agents de la session : null tant qu'il n'est pas lu.
 let agentsOccupes: boolean | null = null
-// Le dernier signe d'un agent au travail : un départ, un tour, un outil. Les agents d'un workflow (Ultracode) n'ont que
-// ces signes : la liste des agents ne les montre pas.
+// Le dernier signe d'un agent au travail : un tour, un outil. Les agents d'un workflow (Ultracode) n'ont que ces signes :
+// la liste des agents ne les montre pas.
 let derniereActiviteAgents = -Infinity
+// Les agents dont un tour a commencé sans finir encore : un sous-agent, ou un agent d'un workflow.
+const agentsEnTour = new Set<string>()
 /** Sans signe d'un agent pendant ce délai, ses agents ont fini. Un appel au modèle peut durer quelques minutes. */
 const SILENCE_AGENTS_MS = 5 * 60_000
 // Minutes des jours passés pour la frise, recalculées une fois par jour ou après une correction.
@@ -368,7 +370,8 @@ async function noterJetons($: Moteur, n: number): Promise<void> {
 async function suivreAgents($: Moteur): Promise<void> {
   const maintenant = await $.clock.now()
   const listes = (await $.agent.list()).some(a => a.status === 'running' || a.status === 'pending' || a.status === 'waiting')
-  const occupes = listes || maintenant - derniereActiviteAgents < SILENCE_AGENTS_MS
+  // Un tour d'agent sans fin notée ni signe depuis SILENCE_AGENTS_MS est tenu pour fini (un workflow arrêté, par exemple).
+  const occupes = listes || (agentsEnTour.size > 0 && maintenant - derniereActiviteAgents < SILENCE_AGENTS_MS)
   if (occupes === agentsOccupes || (agentsOccupes === null && !occupes)) {
     agentsOccupes = occupes
     return
@@ -383,6 +386,12 @@ async function suivreAgents($: Moteur): Promise<void> {
 async function marquerAgents($: Moteur): Promise<void> {
   derniereActiviteAgents = await $.clock.now()
   if (agentsOccupes !== true) await suivreAgents($)
+}
+
+/** Un agent est en plein tour : un tour commence, ou un outil part. */
+function marquerAgentEnTour($: Moteur, agent: string): void {
+  agentsEnTour.add(agent)
+  enFond(marquerAgents($))
 }
 
 /** Passe cette session sur un item, choisi à la main. */
@@ -1504,22 +1513,22 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // Les signes d'un agent au travail, ceux d'un workflow compris : son départ, ses tours, ses outils.
-  on('agent.spawn', ($, e, next) => {
-    enFond(marquerAgents($))
-    return next(e)
-  })
+  // Les signes d'un agent au travail, ceux d'un workflow compris : ses tours et ses outils. Un outil compte aussi comme
+  // un tour ouvert : après un rechargement des mods, le début du tour n'a pas été vu.
   on('turn.start', ($, e, next) => {
-    if (e.agentId !== undefined) enFond(marquerAgents($))
+    if (e.agentId !== undefined) marquerAgentEnTour($, e.agentId)
     return next(e)
   })
   on('tool.call', ($, e, next) => {
-    if (e.agentId !== undefined) enFond(marquerAgents($))
+    if (e.agentId !== undefined) marquerAgentEnTour($, e.agentId)
     return next(e)
   })
 
   on('turn.complete', ($, e, next) => {
-    if (e.agentId !== undefined) enFond(marquerAgents($))
+    if (e.agentId !== undefined) {
+      agentsEnTour.delete(e.agentId)
+      enFond(marquerAgents($).then(() => suivreAgents($)))
+    }
     if (e.agentId === undefined && tourCompte) enFond(noterActivite($, 'reponse').then(() => rafraichir($)))
     const u = e.usage
     if (u !== undefined) {
