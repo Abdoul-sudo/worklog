@@ -129,6 +129,8 @@ export type Bilan = {
   parSession: Map<string, Map<string, number>>
   /** La dernière activité de chaque item sur la période : la fin de son dernier temps, ou sa dernière dépense de tokens. */
   derniere: Map<string, number>
+  /** Les sessions arrêtées par /worklog stop, une fois que Claude a fini son travail. */
+  enPause: Set<string>
 }
 
 function expression(motif: string, entier: boolean): RegExp | null {
@@ -199,22 +201,12 @@ export function cleJour(t: number): string {
   return `${d.getFullYear()}-${deuxChiffres(d.getMonth() + 1)}-${deuxChiffres(d.getDate())}`
 }
 
-/** Le dernier événement d'activité d'une session, s'il y en a un. */
-export function dernierEvenement(evenements: readonly Evenement[], session: string): EvenementActivite | null {
-  let dernier: EvenementActivite | null = null
-  for (const ev of evenements) {
-    if (ev.e !== 'classement' && ev.e !== 'jetons' && ev.s === session && (dernier === null || ev.t >= dernier.t)) {
-      dernier = ev
-    }
-  }
-  return dernier
-}
-
 /**
  * Découpe l'activité de chaque session en plages comptées et en écarts à confirmer.
  * `vivants` donne le dernier signe de vie connu de chaque session.
  * `actives` donne, pour chaque session en cours, son item : Claude y travaille, ou un message, une réponse ou une dépense
  * de tokens date de moins de deux minutes. Passer sur un item sans rien envoyer ne le met pas en cours.
+ * `enPause` donne les sessions arrêtées par /worklog stop, une fois que Claude a fini son travail.
  */
 export function calculer(
   evenements: readonly Evenement[],
@@ -259,6 +251,7 @@ export function calculer(
   const plages: Ecart[] = []
   const ecarts: Ecart[] = []
   const actives = new Map<string, string>()
+  const enPause = new Set<string>()
   for (const [session, brute] of sessions) {
     // Ouvrir une session n'est pas travailler : l'ouverture ne compte pas, elle marque
     // seulement que le processus a redémarré (un tour resté ouvert avant est mort).
@@ -274,6 +267,8 @@ export function calculer(
     let debutTour: number | null = null
     // Début du travail des sous-agents : tant qu'ils tournent, Claude travaille aussi, même sans message.
     let debutAgents: number | null = null
+    // Après /worklog stop, jusqu'au prochain message : seul le travail de Claude compte encore, jusqu'à sa fin.
+    let arrete = false
     for (let i = 0; i < liste.length; i++) {
       const a = liste[i]!
       const b = liste[i + 1]
@@ -283,18 +278,21 @@ export function calculer(
       }
       if (a.e === 'message') {
         debutTour = debutTour !== null && a.t - debutTour <= DUREE_MAX_TOUR ? debutTour : a.t
-      } else if (a.e !== 'item' && a.e !== 'agents-debut' && a.e !== 'agents-fin') {
+        arrete = false
+      } else if (a.e !== 'item' && a.e !== 'agents-debut' && a.e !== 'agents-fin' && a.e !== 'pause') {
         debutTour = null
       }
       if (a.e === 'agents-debut') debutAgents ??= a.t
       if (a.e === 'agents-fin') debutAgents = null
-      if (a.e === 'pause' || a.e === 'fermeture') continue
+      if (a.e === 'pause') arrete = true
+      if (a.e === 'fermeture') continue
 
       const finDeVie = (vivants.get(session) ?? maintenant) + MARGE_VIE
       const fin = b?.t ?? Math.max(a.t, Math.min(maintenant, finDeVie))
       const plage: Ecart = { item: itemDe(a), debut: a.t, fin, session }
       const enCoursDepuis = (debut: number | null) => debut !== null && b?.relance !== true && fin - debut <= DUREE_MAX_TOUR
       const claudeTravaille = enCoursDepuis(debutTour) || enCoursDepuis(debutAgents)
+      if (arrete && !claudeTravaille) continue
       // Un silence où les tokens n'ont pas cessé de partir plus longtemps que le seuil est du travail de Claude.
       if (claudeTravaille || plusLongSilence(session, a.t, fin) <= seuil) {
         plages.push(plage)
@@ -307,9 +305,10 @@ export function calculer(
         else if (classe === undefined) ecarts.push(plage)
       }
     }
+    if (arrete && !actives.has(session)) enPause.add(session)
   }
   const jetons = consos.map(ev => ({ item: itemDe(ev), t: ev.t, n: ev.n, session: ev.s }))
-  return { plages, ecarts, actives, jetons }
+  return { plages, ecarts, actives, jetons, enPause }
 }
 
 type Segment = [number, number]
@@ -436,6 +435,7 @@ export function bilan(
     jetons: lignes.reduce((s, l) => s + l.jetons, 0),
     ecarts: aConfirmer,
     derniere,
+    enPause: calcul.enPause,
   }
 }
 

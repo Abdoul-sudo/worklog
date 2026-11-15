@@ -23,7 +23,6 @@ import {
   debutJour,
   depuis,
   decalerJours,
-  dernierEvenement,
   detecterItem,
   dureeEcart,
   formatDuree,
@@ -406,10 +405,10 @@ async function rafraichir($: Moteur): Promise<void> {
   await donnerSigneDeVie($)
   await suivreAgents($).catch(() => undefined)
   const jour = debutJour(maintenant)
-  const { b, evenements, options, corrections } = await bilanDe($, jour, jourSuivant(jour))
+  const { b, options, corrections } = await bilanDe($, jour, jourSuivant(jour))
   const brut = (await itemDe($, s)) ?? nomParDefaut
   const item = brut === null ? null : nommer(brut, corrections.renommages)
-  const enPause = dernierEvenement(evenements, s)?.e === 'pause'
+  const enPause = b.enPause.has(s)
   const etat: Session = { item, minutes: b.parSession.get(s)?.get(item ?? SANS_ITEM) ?? 0, enPause }
   await update($, session, () => etat)
   await update($, reglages, () => options)

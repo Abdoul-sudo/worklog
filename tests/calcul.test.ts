@@ -187,6 +187,34 @@ describe('écart court ou long', () => {
     expect(parItem).toEqual({ 'FLO-I1': 15 })
     expect(b.ecarts).toEqual([])
   })
+
+  test("après la pause, le travail de Claude compte encore jusqu'à sa fin, puis plus rien jusqu'au message suivant", async () => {
+    // La pause tombe pendant la réponse de Claude : la réponse compte jusqu'à 9 h 20, puis le compteur s'arrête.
+    const tour = [ev(h(9), 'A', 'message', 'FLO-I1'), ev(h(9, 10), 'A', 'pause', 'FLO-I1'), ev(h(9, 20), 'A', 'reponse', 'FLO-I1')]
+    const pendant = calculer(tour.slice(0, 2), R, h(9, 15))
+    expect(pendant.actives.get('A')).toBe('FLO-I1')
+    expect(pendant.enPause.has('A')).toBe(false)
+    const apres = minutesDuJour(tour, h(10, 30))
+    expect(apres.parItem).toEqual({ 'FLO-I1': 20 })
+    expect(apres.b.ecarts).toEqual([])
+    expect(apres.b.enPause.has('A')).toBe(true)
+
+    // La pause tombe pendant le travail des sous-agents (Ultracode) : leur temps compte jusqu'à leur fin.
+    const agents = [
+      ev(h(9), 'A', 'message', 'FLO-I1'),
+      ev(h(9, 1), 'A', 'reponse', 'FLO-I1'),
+      ev(h(9, 2), 'A', 'agents-debut', 'FLO-I1'),
+      ev(h(9, 30), 'A', 'pause', 'FLO-I1'),
+      ev(h(10, 30), 'A', 'agents-fin', 'FLO-I1'),
+    ]
+    const { b, parItem } = minutesDuJour(agents, h(11, 30))
+    expect(parItem).toEqual({ 'FLO-I1': 90 })
+    expect(b.ecarts).toEqual([])
+    expect(b.enPause.has('A')).toBe(true)
+
+    // Le message suivant relance le compteur.
+    expect(minutesDuJour([...agents, ev(h(11, 30), 'A', 'message', 'FLO-I1')], h(11, 40)).b.enPause.has('A')).toBe(false)
+  })
 })
 
 describe('sessions en parallèle', () => {
