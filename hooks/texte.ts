@@ -1,4 +1,4 @@
-// Textes de la commande /temps, faits pour être recopiés dans Zoho Sprints.
+// Textes de la commande /worklog, faits pour être recopiés dans un outil de suivi.
 import type { Ecart, Ligne } from '../types'
 import { type Bilan, SANS_ITEM, dureeEcart, formatDuree, formatHeure, formatJetons, formatJour, majuscule } from './calcul'
 import { t } from './langue'
@@ -23,7 +23,7 @@ export function listeEcarts(ecarts: readonly Ecart[]): string[] {
 }
 
 /** Le récapitulatif d'une période : par jour si `parJour`, puis le total par item. Les silences à classer n'y sont que
- * comptés : `/temps silences` les liste. */
+ * comptés : `/worklog silences` les liste. */
 export function recap(titre: string, bilan: Bilan, ecarts: readonly Ecart[], parJour: boolean): string {
   const textes = t().recap
   const aClasser = ecarts.length > 0 ? ['', textes.aClasser(ecarts.length)] : []

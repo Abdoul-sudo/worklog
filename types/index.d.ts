@@ -61,7 +61,7 @@ export type Reglages = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'temps-item': {
+    worklog: {
       session: Shaped<Session | null>
       question: Shaped<Ecart | null>
       deplie: boolean

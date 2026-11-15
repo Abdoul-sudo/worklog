@@ -5,32 +5,32 @@ import type { Engine, MockClock } from 'claude-code/testing'
 const h = (heure: number, minute = 0) => new Date(2026, 10, 12, heure, minute).getTime()
 const JOURNAL = 'C:/Users/test/.claude/temps/journal/2026-11-12/S1.jsonl'
 const PROMPT = { wait: false, origin: { kind: 'composer' } } as const
-const COMMANDE = { command: 'temps', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 120 } } as const
+const COMMANDE = { command: 'worklog', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 120 } } as const
 const FIN_DE_TOUR = { answer: '', durationMs: 1, isAborted: false, turnId: 't', reason: 'answer' } as const
 
 const PANNEAU = {
-  plugin: 'temps-item',
+  plugin: 'worklog',
   component: 'Pane',
-  requestId: 'temps-item',
+  requestId: 'worklog',
   props: { title: 'Temps par item', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },
 } as const
 
 const LIGNE_AIDE = {
-  plugin: 'temps-item',
+  plugin: 'worklog',
   component: 'PromptHint',
   requestId: 'prompt-hint',
   props: { isDraft: false, isWorking: false, hint: '? for shortcuts' },
 } as const
 
 const PIED = {
-  plugin: 'temps-item',
+  plugin: 'worklog',
   component: 'SessionMode',
   requestId: 'session-mode',
   props: { modes: ['Bypass permissions'] },
 } as const
 
 const BANDE = {
-  plugin: 'temps-item',
+  plugin: 'worklog',
   component: 'AbovePrompt',
   requestId: 'above-prompt',
   props: { hasSurvey: false, isCollapsed: false, isWorking: false, maxRows: 40, bodyColumns: 120, scroll: { offset: 0, bodyRows: 40 }, view: {} },
@@ -130,8 +130,8 @@ test('un message avec un ID compte pour cet item ; la puce est sous la saisie et
 
   const lignes = fichiers.get(JOURNAL)!.trim().split('\n').map(l => JSON.parse(l) as { e: string; k: string | null })
   expect(lignes.map(l => `${l.e}:${l.k}`)).toEqual(['ouverture:null', 'message:FLO-I165', 'reponse:FLO-I165', 'jetons:FLO-I165'])
-  expect(statuts.at(-1)).toBe('⏱ FLO-I165 · 10 min · /temps')
-  // /temps jour : le texte du jour.
+  expect(statuts.at(-1)).toBe('⏱ FLO-I165 · 10 min · /worklog')
+  // /worklog jour : le texte du jour.
   expect((await $.command.run({ ...COMMANDE, args: 'jour' })).text).toContain('  FLO-I165   10 min')
 
   for (const [surface, site] of [['terminal', LIGNE_AIDE], ['desktop', PIED]] as const) {
@@ -152,7 +152,7 @@ test('un message avec un ID compte pour cet item ; la puce est sous la saisie et
     await bande.unmount()
   }
 
-  // VS Code n'a ni bande ni puce à cliquer : /temps y ouvre le panneau.
+  // VS Code n'a ni bande ni puce à cliquer : /worklog y ouvre le panneau.
   expect((await $.command.run({ ...COMMANDE, args: '' })).text).toBe('Panneau ouvert.')
   for (const surface of ['terminal', 'desktop', 'vscode'] as const) {
     const panneau = await $.ui.mount({ ...PANNEAU, surface })
@@ -373,6 +373,22 @@ test("dans le terminal, la frise prend la place qu'il y a, et la liste remplit s
   await puce.unmount()
 })
 
+test("l'ancienne commande /temps marche encore", async ($, on) => {
+  const { horloge } = monde(on)
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await travailler($, horloge, 'FLO-I165', 10)
+  expect((await $.command.run({ ...COMMANDE, command: 'temps', args: 'jour' })).text).toContain('  FLO-I165   10 min')
+})
+
+test("les réglages gardés sous l'ancien nom, temps-item, sont repris une fois", async ($, on) => {
+  // Le monde en anglais n'a pas de réglages : ceux de l'ancien nom passent le popover en français.
+  const { fichiers } = monde(on, ['terminal'], {}, 'en')
+  const reglages = { seuilPause: 30, activite: true, question: true, langue: 'fr', mesure: 'temps', theme: 'braise' }
+  fichiers.set('C:/Users/test/.claude/plugins/store/temps-item_temps-item-abc.json', JSON.stringify({ options: reglages }))
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  expect((await $.command.run({ ...COMMANDE, args: 'nope' })).text).toStartWith("« nope » n'est ni une commande ni un ID d'item.")
+})
+
 test('la liste va par pages : chaque item reste joignable', async ($, on) => {
   const { horloge } = monde(on, ['desktop'])
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
@@ -516,7 +532,7 @@ test('les sous-commandes : ouvrir, item, pause, silences, mois, erreur', async (
   const { horloge, fichiers } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
 
-  // /temps seul ouvre le popover au-dessus de la saisie ; relancé, il le laisse ouvert.
+  // /worklog seul ouvre le popover au-dessus de la saisie ; relancé, il le laisse ouvert.
   for (let fois = 0; fois < 2; fois++) {
     expect((await $.command.run({ ...COMMANDE, args: '' })).text).toBe('Ouvert au-dessus de la saisie.')
     const bande = await $.ui.mount({ ...BANDE, surface: 'terminal' })
@@ -528,7 +544,7 @@ test('les sous-commandes : ouvrir, item, pause, silences, mois, erreur', async (
   await horloge.advance(50 * 60_000)
   await $.prompt.submit({ ...PROMPT, text: 'suite' })
   await horloge.settle()
-  expect((await $.command.run({ ...COMMANDE, args: 'jour' })).text).toContain('1 silence à classer : /temps silences')
+  expect((await $.command.run({ ...COMMANDE, args: 'jour' })).text).toContain('1 silence à classer : /worklog silences')
   expect((await $.command.run({ ...COMMANDE, args: 'silences' })).text).toContain(
     '  1. jeudi 12 novembre, FSY-I478, de 9 h 00 à 9 h 50 (50 min)',
   )

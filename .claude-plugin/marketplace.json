@@ -1,6 +1,6 @@
 {
-  "name": "temps-item",
-  "description": "Temps par item : compte le temps passé par item dans Claude Code",
+  "name": "worklog",
+  "description": "Worklog: the time and tokens you spend on each item in Claude Code",
   "owner": { "name": "Abdoul-sudo" },
-  "plugins": [{ "name": "temps-item", "source": "./" }]
+  "plugins": [{ "name": "worklog", "source": "./" }]
 }

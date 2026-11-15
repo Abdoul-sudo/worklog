@@ -468,7 +468,7 @@ describe('fichiers et textes', () => {
         '  FLO-I165   1 h 00    245 k tokens',
         '  Total      1 h 00    245 k tokens',
         '',
-        '1 silence à classer : /temps silences',
+        '1 silence à classer : /worklog silences',
       ].join('\n'),
     )
   })

@@ -1,9 +1,11 @@
 {
-  "name": "temps-item",
-  "displayName": "Temps par item",
-  "version": "2.1.0",
-  "description": "Compte le temps passé par item à partir de l'activité dans Claude Code",
+  "name": "worklog",
+  "displayName": "Worklog",
+  "version": "3.0.0",
+  "description": "Counts the time and tokens you spend on each item (ticket, branch, project) from your activity in Claude Code, with a yearly activity heatmap",
   "types": "./types/index.d.ts",
   "author": { "name": "Abdoul-sudo", "url": "https://github.com/Abdoul-sudo" },
-  "repository": "https://github.com/Abdoul-sudo/claude-temps-item"
+  "repository": "https://github.com/Abdoul-sudo/claude-worklog",
+  "license": "MIT",
+  "keywords": ["time-tracking", "worklog", "tokens", "heatmap", "mod"]
 }
