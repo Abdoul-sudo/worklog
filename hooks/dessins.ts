@@ -47,18 +47,12 @@ function cielNuit(): string {
   )
 }
 
-/** Aurore : deux voiles, sarcelle et violet, ondulent comme une aurore boréale. */
+/** Aurore : un voile sarcelle, fixe, en haut à gauche ; il ne bouge ni ne change de couleur. */
 function cielAurore(): string {
   return (
-    ouvrirCiel(
-      '.a{animation:a 34s ease-in-out infinite alternate}.b{animation:b 52s ease-in-out infinite alternate}' +
-        '@keyframes a{from{transform:translate(0,0) scale(1,1)}to{transform:translate(420px,30px) scale(1.25,.85)}}' +
-        '@keyframes b{from{transform:translate(0,0)}to{transform:translate(-380px,-20px)}}',
-      lueur('t', '#2DD4BF', 0.13) + lueur('v', '#8B5CF6', 0.11) + trame('#BFEFF0', 0.04),
-    ) +
+    ouvrirCiel('', lueur('t', '#2DD4BF', 0.13) + trame('#BFEFF0', 0.04)) +
     `<rect width="${CIEL.largeur}" height="${CIEL.hauteur}" fill="url(#p)"/>` +
-    '<ellipse class="a" cx="240" cy="40" rx="520" ry="150" fill="url(#t)"/>' +
-    '<ellipse class="b" cx="980" cy="120" rx="560" ry="170" fill="url(#v)"/></svg>'
+    '<ellipse cx="240" cy="40" rx="520" ry="150" fill="url(#t)"/></svg>'
   )
 }
 
@@ -127,7 +121,7 @@ export function svgApercu(theme: Theme, choisi: boolean): string {
     nuit: [8, 20, 32, 44, 56].flatMap(x => [8, 20, 32].map(y => `<circle cx="${x}" cy="${y}" r=".6" fill="${e.vide}" fill-opacity=".35"/>`)).join('') +
       `<ellipse cx="20" cy="10" rx="28" ry="12" fill="#6E8BFF" fill-opacity=".1"/>`,
     simple: '',
-    aurore: `<ellipse cx="18" cy="8" rx="30" ry="12" fill="#2DD4BF" fill-opacity=".15"/><ellipse cx="50" cy="12" rx="26" ry="11" fill="#8B5CF6" fill-opacity=".13"/>`,
+    aurore: `<ellipse cx="18" cy="8" rx="30" ry="12" fill="#2DD4BF" fill-opacity=".15"/>`,
     braise: `<ellipse cx="22" cy="40" rx="40" ry="16" fill="${ARGILE}" fill-opacity=".18"/><circle cx="14" cy="22" r=".9" fill="#FFB38A"/><circle cx="34" cy="16" r=".7" fill="#FFB38A"/><circle cx="52" cy="26" r=".8" fill="#FFB38A"/>`,
   }[theme]
   const cases = [0, 1, 2, 3].map(i => `<rect x="${37 + i * 6}" y="27" width="4.5" height="4.5" rx="1" fill="${i === 2 ? e.accent : e.vide}" fill-opacity="${i === 2 ? 1 : 0.18}"/>`).join('')
