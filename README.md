@@ -42,13 +42,13 @@ Worklog is a mod for [Claude Code](https://code.claude.com). It records your act
 ## Installation
 
 ```sh
-claude plugin marketplace add Abdoul-sudo/claude-worklog
+claude plugin marketplace add Abdoul-sudo/worklog
 claude plugin install worklog@worklog
 ```
 
 Then run `/reload-plugins`, or start a new session.
 
-In the desktop app, you can also click **+** next to the prompt, then **Plugins**. Add the marketplace `Abdoul-sudo/claude-worklog`, then install **worklog**.
+In the desktop app, you can also click **+** next to the prompt, then **Plugins**. Add the marketplace `Abdoul-sudo/worklog`, then install **worklog**.
 
 Worklog is also part of [Claude Modpack](https://github.com/Abdoul-sudo/claude-modpack), a set of mods that you install in one step.
 

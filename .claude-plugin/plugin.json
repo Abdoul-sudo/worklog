@@ -5,7 +5,7 @@
   "description": "Counts the time and tokens you spend on each item (ticket, branch, project) from your activity in Claude Code, with a yearly activity heatmap",
   "types": "./types/index.d.ts",
   "author": { "name": "Abdoul-sudo", "url": "https://github.com/Abdoul-sudo" },
-  "repository": "https://github.com/Abdoul-sudo/claude-worklog",
+  "repository": "https://github.com/Abdoul-sudo/worklog",
   "license": "MIT",
   "keywords": ["time-tracking", "worklog", "tokens", "heatmap", "mod"]
 }
