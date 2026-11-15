@@ -198,7 +198,6 @@ export function svgInterrupteur(actif: boolean): string {
   )
 }
 
-/** Les icônes du popover, au même trait que l'engrenage. */
 /** La croix qui ferme les réglages : à la place de l'engrenage, au trait du même poids. */
 export function svgFermer(couleur: string): string {
   return (
@@ -207,6 +206,7 @@ export function svgFermer(couleur: string): string {
   )
 }
 
+/** Les icônes du popover, au même trait que l'engrenage. */
 export const ICONES = {
   precedent: 'M7.5 2.5 4 6l3.5 3.5',
   suivant: 'M4.5 2.5 8 6l-3.5 3.5',
