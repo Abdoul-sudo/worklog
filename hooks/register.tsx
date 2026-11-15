@@ -528,8 +528,12 @@ async function apresMessage($: Moteur, texte: string, chercherItem: boolean): Pr
   const instant = await noterActivite($, 'message')
   await rafraichir($)
   const jour = debutJour(await $.clock.now())
-  const { b } = await bilanDe($, jour, jourSuivant(jour))
-  await update($, question, () => b.ecarts.find(x => x.session === s && x.fin === instant) ?? null)
+  const { b, evenements } = await bilanDe($, jour, jourSuivant(jour))
+  // La pause qui finit à ce message, ou juste avant lui quand on a d'abord nommé la session ou changé d'item. Une pause
+  // laissée sans réponse avant un message précédent ne revient pas.
+  const ecart = b.ecarts.filter(x => x.session === s && x.fin <= instant).at(-1)
+  const repondue = ecart !== undefined && evenements.some(ev => ev.s === s && ev.e === 'message' && ev.t >= ecart.fin && ev.t < instant)
+  await update($, question, () => (ecart === undefined || repondue ? null : ecart))
 }
 
 async function repondre($: Moteur, ecart: Ecart, choix: Choix): Promise<void> {

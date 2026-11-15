@@ -649,3 +649,17 @@ test("quand un sous-agent a fini, la session n'est plus en cours et son temps s'
   expect(ligne).toStartWith('○')
   expect(ligne).toContain('21 min')
 })
+
+test("après une longue pause, la question vient aussi quand on nomme la session avant d'écrire", async ($, on) => {
+  const { horloge } = monde(on)
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await travailler($, horloge, 'FLO-I165 : une tâche', 10)
+  await horloge.advance(2 * 60 * 60_000)
+  await $.command.run({ ...COMMANDE, args: 'FSY-I478' })
+  await horloge.advance(60_000)
+  await $.prompt.submit({ ...PROMPT, text: 'suite' })
+  await horloge.settle()
+  const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
+  expect((await bande.find({ type: 'Text', text: /sans activité/ }))?.text).toContain('2 h 00 sans activité sur FLO-I165')
+  await bande.unmount()
+})
