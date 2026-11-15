@@ -38,7 +38,7 @@ function cielNuit(): string {
   return (
     ouvrirCiel(
       '.g{animation:g 46s ease-in-out infinite alternate}@keyframes g{from{transform:translate(0,0)}to{transform:translate(520px,40px)}}',
-      trame('#C9D4FF', 0.12) + lueur('h', '#6E8BFF', 0.15),
+      trame('#C9D4FF', 0.09) + lueur('h', '#6E8BFF', 0.1),
     ) +
     `<rect width="${CIEL.largeur}" height="${CIEL.hauteur}" fill="url(#p)"/>` +
     '<ellipse class="g" cx="260" cy="90" rx="460" ry="190" fill="url(#h)"/></svg>'
@@ -52,7 +52,7 @@ function cielAurore(): string {
       '.a{animation:a 34s ease-in-out infinite alternate}.b{animation:b 52s ease-in-out infinite alternate}' +
         '@keyframes a{from{transform:translate(0,0) scale(1,1)}to{transform:translate(420px,30px) scale(1.25,.85)}}' +
         '@keyframes b{from{transform:translate(0,0)}to{transform:translate(-380px,-20px)}}',
-      lueur('t', '#2DD4BF', 0.2) + lueur('v', '#8B5CF6', 0.17) + trame('#BFEFF0', 0.05),
+      lueur('t', '#2DD4BF', 0.13) + lueur('v', '#8B5CF6', 0.11) + trame('#BFEFF0', 0.04),
     ) +
     `<rect width="${CIEL.largeur}" height="${CIEL.hauteur}" fill="url(#p)"/>` +
     '<ellipse class="a" cx="240" cy="40" rx="520" ry="150" fill="url(#t)"/>' +
@@ -82,7 +82,7 @@ function cielBraise(): string {
 /** Les thèmes du popover. Simple n'a ni fond propre ni mouvement : le gris de l'app et un cadre fin. */
 export const THEMES: Record<Theme, { encres: Encres; ciel: (() => string) | null }> = {
   nuit: {
-    encres: { fond: '#0E1426', bord: '#2C3759', texte: '#E6E9F2', vif: '#F7F8FC', gris: '#8A93B2', faible: '#5B6585', legende: '#6E7897', accent: ARGILE, vide: '#C9D4FF', ...BLANCS },
+    encres: { fond: '#090D1A', bord: '#242E4D', texte: '#E6E9F2', vif: '#F7F8FC', gris: '#8A93B2', faible: '#5B6585', legende: '#6E7897', accent: ARGILE, vide: '#C9D4FF', ...BLANCS },
     ciel: cielNuit,
   },
   simple: {
@@ -90,7 +90,7 @@ export const THEMES: Record<Theme, { encres: Encres; ciel: (() => string) | null
     ciel: null,
   },
   aurore: {
-    encres: { fond: '#06121A', bord: '#1B3A4A', texte: '#E2F1F2', vif: '#F4FBFB', gris: '#88A8B0', faible: '#587880', legende: '#6A8C94', accent: '#4FD1C5', vide: '#BFEFF0', ...BLANCS },
+    encres: { fond: '#040C12', bord: '#173241', texte: '#E2F1F2', vif: '#F4FBFB', gris: '#88A8B0', faible: '#587880', legende: '#6A8C94', accent: '#4FD1C5', vide: '#BFEFF0', ...BLANCS },
     ciel: cielAurore,
   },
   braise: {
@@ -123,9 +123,9 @@ export function svgApercu(theme: Theme, choisi: boolean): string {
   const fond = theme === 'simple' ? '#262626' : e.fond
   const decor = {
     nuit: [8, 20, 32, 44, 56].flatMap(x => [8, 20, 32].map(y => `<circle cx="${x}" cy="${y}" r=".6" fill="${e.vide}" fill-opacity=".35"/>`)).join('') +
-      `<ellipse cx="20" cy="10" rx="28" ry="12" fill="#6E8BFF" fill-opacity=".14"/>`,
+      `<ellipse cx="20" cy="10" rx="28" ry="12" fill="#6E8BFF" fill-opacity=".1"/>`,
     simple: '',
-    aurore: `<ellipse cx="18" cy="8" rx="30" ry="12" fill="#2DD4BF" fill-opacity=".22"/><ellipse cx="50" cy="12" rx="26" ry="11" fill="#8B5CF6" fill-opacity=".2"/>`,
+    aurore: `<ellipse cx="18" cy="8" rx="30" ry="12" fill="#2DD4BF" fill-opacity=".15"/><ellipse cx="50" cy="12" rx="26" ry="11" fill="#8B5CF6" fill-opacity=".13"/>`,
     braise: `<ellipse cx="22" cy="40" rx="40" ry="16" fill="${ARGILE}" fill-opacity=".18"/><circle cx="14" cy="22" r=".9" fill="#FFB38A"/><circle cx="34" cy="16" r=".7" fill="#FFB38A"/><circle cx="52" cy="26" r=".8" fill="#FFB38A"/>`,
   }[theme]
   const cases = [0, 1, 2, 3].map(i => `<rect x="${37 + i * 6}" y="27" width="4.5" height="4.5" rx="1" fill="${i === 2 ? e.accent : e.vide}" fill-opacity="${i === 2 ? 1 : 0.18}"/>`).join('')
