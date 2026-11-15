@@ -48,7 +48,7 @@ function monde(
   // Ces tests lisent les textes en français ; celui en anglais garde la langue par défaut.
   mock.store(on, { ...(langue === 'fr' ? { options: { langue: 'fr' } } : {}), ...magasin })
   mock.env(on, { USERPROFILE: 'C:\\Users\\test', ...env })
-  const etat = { session: 'S1', branche: 'main', agents: [] as { id: string; status: string }[] }
+  const etat = { session: 'S1', branche: 'main', agents: [] as { id: string; status: string }[], fonds: [] as (string | undefined)[] }
   const fichiers = new Map<string, string>()
   const toasts: string[] = []
   const statuts: (string | undefined)[] = []
@@ -80,7 +80,11 @@ function monde(
   on('session.repo', () => ({ value: null }))
   on('session.surfaces', () => ({ value: surfaces }))
   on('command.register', (_, e) => ({ value: { command: e.name } }))
-  on('ui.open', () => ({ value: { isPlaced: true } }))
+  // L'app n'accepte pour le fond d'un panneau qu'une couleur à six chiffres (ou un nom de thème) : on note ce qu'il reçoit.
+  on('ui.open', (_, e) => {
+    etat.fonds.push(e.backgroundColor)
+    return { value: { isPlaced: true } }
+  })
   // Sous le mod, le focus se pose sans rien dire.
   on('ui.focus', () => ({}))
   on('ui.toast', (_, e) => {
@@ -396,6 +400,22 @@ test("l'item de la session est toujours en tête : un nouvel item, ou celui sur 
   // Passer sur FLO-I1 le met en haut ; FLO-I9, sans temps ni tokens, n'a plus de ligne.
   await bande.press({ key: 'choisir-FLO-I1' })
   expect((await bande.findAll({ type: 'Text', text: /^FLO-I\d$/ })).map(x => x.text)).toEqual(['FLO-I1', 'FLO-I2'])
+  await puce.unmount()
+  await bande.unmount()
+})
+
+test('dans VS Code, le panneau s\'ouvre avec le fond du thème ; Simple, sans fond propre, garde celui de l\'app', async ($, on) => {
+  const { horloge, etat } = monde(on, ['vscode'], {}, 'fr', { options: { langue: 'fr', theme: 'simple' } })
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await travailler($, horloge, 'FLO-I1', 10)
+  expect((await $.command.run({ ...COMMANDE, args: 'panneau' })).text).toBe('Panneau ouvert.')
+  expect(etat.fonds.at(-1)).toBeUndefined()
+  const puce = await $.ui.mount({ ...PIED, surface: 'desktop' })
+  const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
+  await bande.press({ key: 'reglages' })
+  await bande.press({ key: 'theme-nuit' })
+  expect((await $.command.run({ ...COMMANDE, args: 'panneau' })).text).toBe('Panneau ouvert.')
+  expect(etat.fonds.at(-1)).toMatch(/^#[0-9A-F]{6}$/)
   await puce.unmount()
   await bande.unmount()
 })

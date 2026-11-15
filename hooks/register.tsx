@@ -44,6 +44,7 @@ import {
   ENCRE,
   couleurs,
   APERCU,
+  SANS_FOND,
   choisirTheme,
   svgApercu,
   svgChrono,
@@ -518,7 +519,8 @@ async function ouvrirOuFermer($: Moteur): Promise<void> {
 
 /** Le panneau latéral : son propre fond, et la hauteur qu'il demande. */
 async function ouvrirPanneau($: Moteur): Promise<void> {
-  await $.ui.open({ id: PANNEAU, title: t().titre, backgroundColor: ENCRE.fond, rows: RANGEES_PANNEAU })
+  // L'app refuse une couleur transparente à huit chiffres : sans fond propre, le panneau garde celui de l'app.
+  await $.ui.open({ id: PANNEAU, title: t().titre, rows: RANGEES_PANNEAU, ...(ENCRE.fond === SANS_FOND ? {} : { backgroundColor: ENCRE.fond }) })
 }
 
 async function choisirOnglet($: Moteur, onglet: Onglet, decalage: number): Promise<void> {

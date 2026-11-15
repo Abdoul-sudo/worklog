@@ -20,6 +20,8 @@ type Encres = {
 }
 
 const BLANCS = { survol: '#FFFFFF0A', filet: '#FFFFFF12', choisi: '#FFFFFF17', rail: '#FFFFFF08' }
+/** Pas de fond propre : le popover laisse voir celui de l'app (thème Simple). */
+export const SANS_FOND = '#00000000'
 const ARGILE = '#E0835F'
 
 /** Le fond de chaque thème : 1600 × 1200, ancré en haut à gauche, que le popover coupe. Ses mouvements sont lents et
@@ -86,7 +88,7 @@ export const THEMES: Record<Theme, { encres: Encres; ciel: (() => string) | null
     ciel: cielNuit,
   },
   simple: {
-    encres: { fond: '#00000000', bord: '#FFFFFF2E', texte: '#E4E4E4', vif: '#F5F5F5', gris: '#A3A3A3', faible: '#767676', legende: '#8C8C8C', accent: ARGILE, vide: '#FFFFFF', ...BLANCS },
+    encres: { fond: SANS_FOND, bord: '#FFFFFF2E', texte: '#E4E4E4', vif: '#F5F5F5', gris: '#A3A3A3', faible: '#767676', legende: '#8C8C8C', accent: ARGILE, vide: '#FFFFFF', ...BLANCS },
     ciel: null,
   },
   aurore: {
