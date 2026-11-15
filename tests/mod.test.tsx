@@ -288,7 +288,13 @@ test('les tokens, les onglets, les réglages et la frise', async ($, on) => {
     expect(await bande.find({ key: 'precedent' })).toBeUndefined()
 
     await bande.press({ key: 'reglages' })
-    expect(await bande.find({ key: 'seuil' })).toBeDefined()
+    // Dans le terminal, une liste déroulante ne s'ouvre qu'au clavier : chaque choix y est un bouton.
+    if (surface === 'terminal') {
+      await bande.press({ key: 'seuil-30' })
+      expect((await bande.find({ key: 'seuil-30' }))?.text).toBe('● 30')
+      expect((await bande.find({ key: 'seuil-45' }))?.text).toBe('○ 45')
+      await bande.press({ key: 'seuil-45' })
+    } else expect(await bande.find({ key: 'seuil' })).toBeDefined()
     // Les tokens s'affichent toujours : plus de réglage pour les cacher.
     expect(await bande.find({ key: 'reglage-jetons' })).toBeUndefined()
     // Les thèmes (là où la surface dessine) : un aperçu par thème ; un clic choisit le sien, en gras sous son aperçu.

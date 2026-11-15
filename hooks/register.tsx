@@ -718,7 +718,8 @@ function bouton(
 
 /** Une icône cliquable, grise. Sous le pointeur, elle blanchit sur un rond clair. Un caractère dans le terminal. */
 function icone($: Moteur, e: Site, cle: string, trace: keyof typeof ICONES, secours: string, presser: () => unknown) {
-  if (!riche(e)) return bouton($, e, cle, secours, 'gris', presser)
+  // Dans le terminal, le survol inverse le bouton : une marge de chaque côté en fait une pastille, pas un seul caractère.
+  if (!riche(e)) return bouton($, e, cle, ` ${secours} `, 'gris', presser)
   const { Box, Svg } = $.ui.resolve(e)
   const nom = t().icones[trace]
   const dessin = [
@@ -741,7 +742,10 @@ function boutonReglages($: Moteur, e: Site, etat: Interface) {
     avantReglages = { onglet: etat.onglet, decalage: etat.decalage }
     return choisirOnglet($, 'reglages', 0)
   }
-  if (!riche(e)) return bouton($, e, 'reglages', enReglages ? '✕' : '⚙\uFE0E', 'gris', basculer)
+  // Dans le terminal, le survol inverse le bouton : une marge de chaque côté en fait une pastille, comme les flèches.
+  // ≡ et × tiennent dans une case de la police du terminal ; ⚙ et ✕, pris dans une autre police, débordent et se
+  // décalent quand le survol les inverse.
+  if (!riche(e)) return bouton($, e, 'reglages', enReglages ? ' × ' : ' ≡ ', 'gris', basculer)
   // L'engrenage, ou la croix dans les réglages : gris comme les onglets, blanc au survol.
   const { Box, Svg } = $.ui.resolve(e)
   const dessin = enReglages ? svgFermer : svgEngrenage
@@ -759,7 +763,7 @@ function boutonReglages($: Moteur, e: Site, etat: Interface) {
 function fleches($: Moteur, e: Site, cle: string, aSuite: boolean, reculer: () => unknown, avancer: () => unknown) {
   const { Box } = $.ui.resolve(e)
   return (
-    <Box key={`fleches-${cle}`} flexDirection="row" alignItems="center" gap={riche(e) ? 'xs' : 1}>
+    <Box key={`fleches-${cle}`} flexDirection="row" alignItems="center" gap={riche(e) ? 'xs' : 0}>
       {icone($, e, cle === 'periode' ? 'precedent' : `${cle}-precedente`, 'precedent', '‹', reculer)}
       {aSuite ? icone($, e, cle === 'periode' ? 'suivant' : `${cle}-suivante`, 'suivant', '›', avancer) : flecheInerte($, e)}
     </Box>
@@ -773,7 +777,7 @@ function flecheInerte($: Moteur, e: Site) {
     return <Svg alt={t().alt.pasDeSuite} source={svgIcone(ICONES.suivant, ENCRE.faible)} width={12} height={12} />
   }
   const { Text } = $.ui.resolve(e)
-  return <Text dimColor>›</Text>
+  return <Text dimColor> › </Text>
 }
 
 /** La marque de l'en-tête : un chronomètre, là où la surface sait dessiner. */
@@ -1265,24 +1269,26 @@ function choixTheme($: Moteur, e: Site, options: Reglages) {
   )
 }
 
+/** Les réglages là où la surface dessine. */
 function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
+  if (!riche(e)) return null
   const { Box, Select, Text } = $.ui.resolve(e)
   const bascules: { cle: 'activite' | 'question'; libelle: string }[] = [
     { cle: 'activite', libelle: t().bascules.activite },
     { cle: 'question', libelle: t().bascules.question },
   ]
   // Une liste déroulante sur le fond plein du popover : la trame de points ne se voit pas au travers.
-  const surFond = (commande: RenderChildren) => (riche(e) ? <Box backgroundColor={ENCRE.fond}>{commande}</Box> : commande)
+  const surFond = (commande: RenderChildren) => <Box backgroundColor={ENCRE.fond}>{commande}</Box>
   const ligneReglage = (cle: string, contenu: RenderChildren, aDroite: RenderChildren) => (
-    <Box key={`ligne-reglage-${cle}`} flexDirection="row" justifyContent="space-between" alignItems="center" gap={2} paddingX={riche(e) ? 'sm' : 0}>
+    <Box key={`ligne-reglage-${cle}`} flexDirection="row" justifyContent="space-between" alignItems="center" gap={2} paddingX="sm">
       {contenu}
       {aDroite}
     </Box>
   )
   // Côte à côte, chaque colonne prend la moitié de la largeur ; une section rangée dans une colonne en prend toute la largeur.
   const section = (titre: string, lignes: RenderChildren, colonne = aCote) => (
-    <Box flexDirection="column" alignItems="stretch" gap={riche(e) ? 'xs' : 0} {...(colonne ? { flexGrow: 1, width: 0 } : {})}>
-      <Box paddingX={riche(e) ? 'sm' : 0}>
+    <Box flexDirection="column" alignItems="stretch" gap="xs" {...(colonne ? { flexGrow: 1, width: 0 } : {})}>
+      <Box paddingX="sm">
         <Text size="caption" {...encre(e, 'faible')}>
           {titre}
         </Text>
@@ -1292,7 +1298,6 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
   )
   const affichageLignes = bascules.map(b => {
     const basculer = () => changerReglage($, { [b.cle]: !options[b.cle] })
-    if (!riche(e)) return ligneReglage(b.cle, bouton($, e, `reglage-${b.cle}`, `${options[b.cle] ? '☑' : '☐'} ${b.libelle}`, 'texte', basculer), null)
     const { Svg } = $.ui.resolve(e)
     const interrupteur = <Svg alt={options[b.cle] ? t().alt.active : t().alt.desactive} source={svgInterrupteur(options[b.cle])} width={28} height={16} />
     return ligneReglage(b.cle, bouton($, e, `reglage-${b.cle}`, b.libelle, 'texte', basculer), cliquable($, e, `interrupteur-${b.cle}`, interrupteur, basculer))
@@ -1312,7 +1317,7 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
     ),
   )
   return (
-    <Box flexDirection={aCote ? 'row' : 'column'} alignItems="stretch" gap={aCote ? 4 : riche(e) ? 'md' : 0}>
+    <Box flexDirection={aCote ? 'row' : 'column'} alignItems="stretch" gap={aCote ? 4 : 'md'}>
       {section(t().sections.affichage, [
         ...affichageLignes,
         ligneReglage(
@@ -1344,15 +1349,58 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
           ),
         ),
       ])}
-      {riche(e) ? (
-        // Le thème en haut de la colonne de droite, qui n'a qu'une ligne : les réglages ne grandissent pas.
-        <Box flexDirection="column" alignItems="stretch" gap="md" {...(aCote ? { flexGrow: 1, width: 0 } : {})}>
-          {section(t().sections.theme, choixTheme($, e, options), false)}
-          {section(t().sections.comptage, comptage, false)}
+      {/* Le thème en haut de la colonne de droite, qui n'a qu'une ligne : les réglages ne grandissent pas. */}
+      <Box flexDirection="column" alignItems="stretch" gap="md" {...(aCote ? { flexGrow: 1, width: 0 } : {})}>
+        {section(t().sections.theme, choixTheme($, e, options), false)}
+        {section(t().sections.comptage, comptage, false)}
+      </Box>
+    </Box>
+  )
+}
+
+/** Les réglages dans le terminal, où une liste déroulante ne s'ouvre qu'au clavier : chaque réglage montre ses choix,
+ * à cliquer ; le choix actuel est plein (●) et clair. L'affichage et le comptage côte à côte quand la place le permet. */
+function vueReglagesTerminal($: Moteur, e: Site, options: Reglages, aCote: boolean) {
+  const { Box, Text } = $.ui.resolve(e)
+  const choix = <T extends string | number>(cle: string, valeurs: readonly T[], actuelle: T, libelle: (v: T) => string, choisir: (v: T) => unknown) => (
+    <Box key={`choix-${cle}`} flexDirection="row" gap={2}>
+      {valeurs.map(v => bouton($, e, `${cle}-${v}`, `${v === actuelle ? '●' : '○'} ${libelle(v)}`, v === actuelle ? 'vif' : 'gris', () => choisir(v)))}
+    </Box>
+  )
+  const caseACocher = (cle: 'activite' | 'question', libelle: string) =>
+    bouton($, e, `reglage-${cle}`, `${options[cle] ? '☑' : '☐'} ${libelle}`, 'texte', () => changerReglage($, { [cle]: !options[cle] }))
+  // Les noms des réglages à choix, sur une colonne de la largeur du plus long : leurs choix s'alignent.
+  const largeurNom = Math.max(t().mesure.length, t().langue.length) + 2
+  const reglage = (cle: string, nom: string, commande: RenderChildren) => (
+    <Box key={`ligne-reglage-${cle}`} flexDirection="row">
+      <Box width={largeurNom}>
+        <Text dimColor>{nom}</Text>
+      </Box>
+      {commande}
+    </Box>
+  )
+  const titre = (texte: string) => <Text {...encre(e, 'faible')}>{texte}</Text>
+  return (
+    <Box flexDirection={aCote ? 'row' : 'column'} gap={aCote ? 4 : 0}>
+      <Box flexDirection="column">
+        {titre(t().sections.affichage)}
+        {caseACocher('activite', t().bascules.activite)}
+        {caseACocher('question', t().bascules.question)}
+        {reglage('mesure', t().mesure, choix('mesure', MESURES, options.mesure, m => t().mesures[m], mesure => changerReglage($, { mesure })))}
+        {reglage(
+          'langue',
+          t().langue,
+          choix('langue', LANGUES.map(l => l.id), options.langue, id => LANGUES.find(l => l.id === id)?.nom ?? id, langue => changerReglage($, { langue })),
+        )}
+      </Box>
+      <Box flexDirection="column">
+        {titre(t().sections.comptage)}
+        <Text>{t().seuil}</Text>
+        <Box flexDirection="row" gap={2}>
+          {choix('seuil', SEUILS, options.seuilPause, m => String(m), seuilPause => changerReglage($, { seuilPause }))}
+          <Text dimColor>min</Text>
         </Box>
-      ) : (
-        section(t().sections.comptage, comptage)
-      )}
+      </Box>
     </Box>
   )
 }
@@ -1370,7 +1418,7 @@ async function popover($: Moteur, e: Site, colonnes: number, rangees: number, en
   const entete = enTete($, e, etat, contenu?.titre ?? '', colonnes < ETROIT)
   const corps =
     etat.onglet === 'reglages' ? (
-      vueReglages($, e, options, riche(e) && colonnes >= LARGE)
+      riche(e) ? vueReglages($, e, options, colonnes >= LARGE) : vueReglagesTerminal($, e, options, colonnes >= LARGE)
     ) : contenu === null ? (
       <Text size="footnote" {...encre(e, 'gris')}>
         {t().calcul}
