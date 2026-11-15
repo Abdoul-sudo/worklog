@@ -1,56 +1,82 @@
 # Worklog
 
-**Automatic time and token tracking for Claude Code, per project.**
+**See how much time and how many tokens each project takes. No timer to start.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Worklog is a mod for Claude Code. It counts the time and the tokens you spend on each project. You do not start or stop a timer.
+Worklog is a mod for Claude Code. It counts your time and your tokens automatically, project by project. You do not need to start or stop a timer.
 
 ![Worklog above the prompt](docs/screenshots/desktop.png)
 
-## Features
+## Quick start
 
-- **No timer.** Worklog counts while you work with Claude.
-- **Per project.** Each session counts for its project. You can give a session another name at any time.
-- **Ticket IDs.** When a message or a Git branch contains a ticket ID, such as `PROJ-142`, the session counts for that ticket.
-- **Time and tokens.** By day, week, month or year, or since you started.
-- **Activity heatmap.** Your whole year at a glance.
-- **Parallel sessions.** Each session counts. Two sessions on the same project are merged.
-- **Past work included.** Worklog reads your Claude Code history, so your past days show from the start.
-- **Desktop app and terminal.** Four themes. English and French.
+1. Install Worklog:
 
-## Install
+   ```sh
+   claude plugin marketplace add Abdoul-sudo/worklog
+   claude plugin install worklog@worklog
+   ```
 
-```sh
-claude plugin marketplace add Abdoul-sudo/worklog
-claude plugin install worklog@worklog
-```
+2. Restart Claude Code.
+3. Work as usual. A small chip at the bottom shows the project of the session and its time today: `⏱ mobile-app · 1h 12`.
+4. Click the chip to open Worklog. Click it again to close it.
 
-Then restart Claude Code, or run `/reload-plugins`.
+That is all. Worklog needs Claude Code 2.1.290 or later. It also comes with [Claude Modpack](https://github.com/Abdoul-sudo/claude-modpack).
 
-Worklog needs Claude Code 2.1.290 or later. Node.js is optional: Worklog uses it to read your past history.
+## How it works
 
-Worklog is also part of [Claude Modpack](https://github.com/Abdoul-sudo/claude-modpack).
+### When the timer runs
 
-## Use
+- The timer starts with your first message in a session. Opening a session does not count.
+- The timer runs while Claude works. This includes subagents, workflows and Ultracode, even when they work alone for hours.
+- The timer keeps running while you read or think. A pause shorter than 45 minutes counts as work.
 
-At the bottom of Claude Code, a small chip shows the current project and its time today, for example `⏱ mobile-app · 1h 12`. Click the chip to show or hide Worklog.
+### When the timer stops
+
+- **After 45 minutes without activity.** If you come back within 4 hours, Worklog asks if this time was work. Click **Count** to add it, or **Ignore** to leave it out.
+- **After 4 hours without activity.** This time does not count, and Worklog does not ask.
+- **When you type `/worklog stop`.** The timer starts again with your next message.
+- **When you quit Claude Code**, or 2 minutes after you close its window.
+
+You can change the 45 minutes in the settings.
+
+### What Worklog counts
+
+- **Time** per project, per day.
+- **Tokens** per project: the answers of Claude, the subagents and the cache reads.
+- **Parallel sessions.** When two sessions run at the same time, both count. The total of the day can then be more than the real time. Worklog shows the part in parallel.
+
+### The name of a session
+
+Each session counts for one name. Worklog chooses it in this order:
+
+1. The name that you give with `/worklog <name>`, or in the Worklog list.
+2. A ticket ID in your messages, such as `PROJ-142`.
+3. A ticket ID in the name of your Git branch, such as `feature/PROJ-142-login`.
+4. The name of the session group in the desktop app.
+5. The name of the project folder.
+
+The first ticket ID of a session also gets the time spent before it.
+
+## What you can do
 
 In Worklog:
 
-- Click **Day**, **Week**, **Month**, **Year** or **All** to change the period. Click **‹** or **›** to move in time.
-- Click **⇄** next to a name to count this session for it. In the terminal, click the name.
-- Click **+ Add item** to count this session for a new name.
-- Click **✎** next to the name of this session to rename it.
-- Click the gear to open the settings.
+| To | Do this |
+| --- | --- |
+| See another period | Click **Day**, **Week**, **Month**, **Year** or **All**. Click **‹** or **›** to go back or forward. |
+| Count this session for another name | Point to the name in the list, then click **⇄**. In the terminal, click the name. |
+| Count this session for a new name | Click **+ Add item**, type the name, then press Enter. |
+| Rename the current name | Click **✎** next to it. The new name also replaces the old one on past days. |
+| Change the settings | Click the gear. |
 
-### Commands
+With commands:
 
 | Command | What it does |
 | --- | --- |
 | `/worklog` | Shows or hides Worklog. |
 | `/worklog <name>` | Counts this session for `<name>`. For example: `/worklog PROJ-142`. |
-| `/worklog stop` | Pauses this session until your next message. |
+| `/worklog stop` | Stops the timer of this session until your next message. |
 
 ## Settings
 
@@ -58,21 +84,28 @@ Open Worklog, then click the gear.
 
 ![Worklog settings](docs/screenshots/settings.png)
 
-| Setting | Default |
-| --- | --- |
-| Show the activity heatmap | On |
-| Ask after a long idle time | On |
-| Show | Time and tokens |
-| Language | English |
-| Theme | Night |
-| Idle time counted as work | 45 min |
+| Setting | Default | What it does |
+| --- | --- | --- |
+| Show the activity heatmap | On | Shows one square per day of the year. |
+| Ask after a long idle time | On | Asks if a long pause was work. |
+| Show | Time and tokens | Shows the time, the tokens, or both. |
+| Language | English | English or French. |
+| Theme | Night | Simple, Night, Aurora or Ember. Desktop app only. |
+| Idle time counted as work | 45 min | A shorter pause counts as work. |
 
-## How time is counted
+## Questions
 
-- Time counts while you send messages and while Claude works, subagents included.
-- A pause shorter than 45 minutes counts. You can change this limit in the settings.
-- After a longer pause, Worklog asks if it was work. Click **Count** to add it.
-- When two sessions run at the same time, both count.
+**Do subagents and Ultracode count?**
+Yes. The timer runs while they work, even when you do not type. Their tokens count too.
+
+**What if I forget to stop the timer?**
+Nothing to do. The timer stops by itself after 45 minutes without activity.
+
+**Does Worklog see my past work?**
+Yes. On the first start, Worklog reads your Claude Code history. For this, it needs Node.js. Without Node.js, Worklog counts from the day you install it.
+
+**Can I use it in the terminal?**
+Yes. In the terminal, clicks work in fullscreen mode (`/tui fullscreen`).
 
 ## Privacy
 
@@ -82,8 +115,7 @@ To keep the data in another folder, set the environment variable `WORKLOG_DATA_D
 
 ## Limitations
 
-- Worklog only sees your work in Claude Code. Meetings and calls do not count.
-- In the terminal, clicks work only in fullscreen mode (`/tui fullscreen`).
+Worklog only sees your work in Claude Code. Meetings, calls and work in other tools do not count.
 
 ## License
 
