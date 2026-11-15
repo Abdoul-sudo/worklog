@@ -2,7 +2,7 @@
   "name": "worklog",
   "displayName": "Worklog",
   "version": "3.0.0",
-  "description": "Counts the time and tokens you spend on each item (ticket, branch, project) from your activity in Claude Code, with a yearly activity heatmap",
+  "description": "Automatic time and token tracking for Claude Code, per project, with a yearly activity heatmap",
   "types": "./types/index.d.ts",
   "author": { "name": "Abdoul-sudo", "url": "https://github.com/Abdoul-sudo" },
   "repository": "https://github.com/Abdoul-sudo/worklog",
