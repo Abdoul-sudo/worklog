@@ -125,6 +125,11 @@ let brancheVue: string | null = null
 let nomParDefaut: string | null = null
 // Dernier état connu des sous-agents de la session : null tant qu'il n'est pas lu.
 let agentsOccupes: boolean | null = null
+// Le dernier signe d'un agent au travail : un départ, un tour, un outil. Les agents d'un workflow (Ultracode) n'ont que
+// ces signes : la liste des agents ne les montre pas.
+let derniereActiviteAgents = -Infinity
+/** Sans signe d'un agent pendant ce délai, ses agents ont fini. Un appel au modèle peut durer quelques minutes. */
+const SILENCE_AGENTS_MS = 5 * 60_000
 // Minutes des jours passés pour la frise, recalculées une fois par jour ou après une correction.
 let cacheFrise: { cle: string; minutes: Map<string, number>; jetons: Map<string, number> } | null = null
 // Le dernier lancement de l'importation de l'historique, dans cette session.
@@ -343,9 +348,9 @@ async function itemDeNouvelleBranche($: Moteur, motif: string): Promise<string |
   return detecterItem(branche, motif)
 }
 
-async function noterActivite($: Moteur, e: Activite): Promise<number> {
+async function noterActivite($: Moteur, e: Activite, instant?: number): Promise<number> {
   const s = await $.session.id()
-  const t = await $.clock.now()
+  const t = instant ?? (await $.clock.now())
   nomParDefaut ??= await calculerNomParDefaut($)
   const d = nomParDefaut ?? undefined
   await noter($, { t, s, e, k: await itemDe($, s), ...(d === undefined ? {} : { d }) })
@@ -361,13 +366,23 @@ async function noterJetons($: Moteur, n: number): Promise<void> {
 
 /** Note quand des sous-agents (workflows, Ultracode) commencent ou cessent de travailler : ce temps compte. */
 async function suivreAgents($: Moteur): Promise<void> {
-  const occupes = (await $.agent.list()).some(a => a.status === 'running' || a.status === 'pending' || a.status === 'waiting')
+  const maintenant = await $.clock.now()
+  const listes = (await $.agent.list()).some(a => a.status === 'running' || a.status === 'pending' || a.status === 'waiting')
+  const occupes = listes || maintenant - derniereActiviteAgents < SILENCE_AGENTS_MS
   if (occupes === agentsOccupes || (agentsOccupes === null && !occupes)) {
     agentsOccupes = occupes
     return
   }
   agentsOccupes = occupes
-  await noterActivite($, occupes ? 'agents-debut' : 'agents-fin')
+  // Les agents d'un workflow ont fini à leur dernier signe, pas quand ce silence est remarqué.
+  const fin = !occupes && !listes && derniereActiviteAgents > -Infinity ? derniereActiviteAgents : undefined
+  await noterActivite($, occupes ? 'agents-debut' : 'agents-fin', fin)
+}
+
+/** Un agent travaille : un sous-agent, ou un agent d'un workflow. Le premier signe ouvre son temps tout de suite. */
+async function marquerAgents($: Moteur): Promise<void> {
+  derniereActiviteAgents = await $.clock.now()
+  if (agentsOccupes !== true) await suivreAgents($)
 }
 
 /** Passe cette session sur un item, choisi à la main. */
@@ -1490,7 +1505,22 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // Les signes d'un agent au travail, ceux d'un workflow compris : son départ, ses tours, ses outils.
+  on('agent.spawn', ($, e, next) => {
+    enFond(marquerAgents($))
+    return next(e)
+  })
+  on('turn.start', ($, e, next) => {
+    if (e.agentId !== undefined) enFond(marquerAgents($))
+    return next(e)
+  })
+  on('tool.call', ($, e, next) => {
+    if (e.agentId !== undefined) enFond(marquerAgents($))
+    return next(e)
+  })
+
   on('turn.complete', ($, e, next) => {
+    if (e.agentId !== undefined) enFond(marquerAgents($))
     if (e.agentId === undefined && tourCompte) enFond(noterActivite($, 'reponse').then(() => rafraichir($)))
     const u = e.usage
     if (u !== undefined) {

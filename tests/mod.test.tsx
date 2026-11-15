@@ -98,6 +98,7 @@ function monde(
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('prompt.submit', (_, e) => ({ text: e.text }))
   on('turn.complete', (_, e) => ({ text: e.answer }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
   return { horloge, fichiers, toasts, statuts, etat }
 }
 
@@ -555,6 +556,25 @@ test('/worklog ouvre et ferme, nomme la session, ou la met en pause', async ($, 
   await horloge.advance(5 * 60_000)
   expect((await $.command.run({ ...COMMANDE, args: 'stop' })).text).toContain('Compteur en pause')
   expect(fichiers.get(JOURNAL)!.trim().split('\n').at(-1)).toContain('"e":"pause"')
+})
+
+test("les agents d'un workflow (Ultracode), absents de la liste des agents, font compter le temps", async ($, on) => {
+  const { horloge } = monde(on)
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await travailler($, horloge, 'FLO-I165 : lance le workflow', 1)
+  // Deux heures sans message : seuls les tours des agents du workflow montrent qu'il travaille.
+  for (let i = 0; i < 30; i++) {
+    await horloge.advance(4 * 60_000)
+    await $.turn.start({ text: '', turnId: `w${i}`, agentId: 'workflow-1' })
+  }
+  await horloge.settle()
+  // Le workflow travaille encore : la ligne est active, et ses deux heures comptent.
+  const ligne = await ligneDe($, 'FLO-I165')
+  expect(ligne).toContain('●')
+  expect(ligne).toContain('2 h 01')
+  const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
+  expect(await bande.find({ type: 'Text', text: /sans activité/ })).toBeUndefined()
+  await bande.unmount()
 })
 
 test('quand des sous-agents travaillent deux heures, le temps compte et aucune question ne vient', async ($, on) => {
