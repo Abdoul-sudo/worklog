@@ -423,7 +423,9 @@ describe('fichiers et textes', () => {
     expect(OPTIONS_PAR_DEFAUT.langue).toBe('en')
     expect(lireOptions({ langue: 'fr' }).langue).toBe('fr')
     expect(lireOptions({ langue: 'de' }).langue).toBe('en')
-    expect(OPTIONS_PAR_DEFAUT.seuilPause).toBe(45)
+    expect(OPTIONS_PAR_DEFAUT.seuilPause).toBe(60)
+    // Une durée qui n'est plus un choix du réglage reprend la valeur par défaut.
+    expect(lireOptions({ seuilPause: 45 }).seuilPause).toBe(60)
     expect([OPTIONS_PAR_DEFAUT.theme, lireOptions({ theme: 'braise' }).theme, lireOptions({ theme: 'rose' }).theme]).toEqual(['nuit', 'braise', 'nuit'])
     expect(lireOptions({ seuilPause: 30, motif: '([', jetons: false, activite: 'oui' })).toEqual({ ...OPTIONS_PAR_DEFAUT, seuilPause: 30 })
   })

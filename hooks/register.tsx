@@ -507,7 +507,7 @@ async function calculerFrise($: Moteur): Promise<void> {
 
 async function apresMessage($: Moteur, texte: string, chercherItem: boolean): Promise<void> {
   const s = await $.session.id()
-  const options = await lireReglages($)
+  await lireReglages($)
   if (!(await estManuel($, s))) {
     const deBranche = await itemDeNouvelleBranche($, MOTIF_ID)
     const nouveau = (chercherItem ? detecterItem(texte, MOTIF_ID) : null) ?? deBranche
@@ -518,7 +518,6 @@ async function apresMessage($: Moteur, texte: string, chercherItem: boolean): Pr
   }
   const instant = await noterActivite($, 'message')
   await rafraichir($)
-  if (!options.question) return
   const jour = debutJour(await $.clock.now())
   const { b } = await bilanDe($, jour, jourSuivant(jour))
   await update($, question, () => b.ecarts.find(x => x.session === s && x.fin === instant) ?? null)
@@ -1253,10 +1252,7 @@ function choixTheme($: Moteur, e: Site, options: Reglages) {
 function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
   if (!riche(e)) return null
   const { Box, Select, Text } = $.ui.resolve(e)
-  const bascules: { cle: 'activite' | 'question'; libelle: string }[] = [
-    { cle: 'activite', libelle: t().bascules.activite },
-    { cle: 'question', libelle: t().bascules.question },
-  ]
+  const bascules: { cle: 'activite'; libelle: string }[] = [{ cle: 'activite', libelle: t().bascules.activite }]
   // Une liste déroulante sur le fond plein du popover : la trame de points ne se voit pas au travers.
   const surFond = (commande: RenderChildren) => <Box backgroundColor={ENCRE.fond}>{commande}</Box>
   const ligneReglage = (cle: string, contenu: RenderChildren, aDroite: RenderChildren) => (
@@ -1282,20 +1278,27 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
     const interrupteur = <Svg alt={options[b.cle] ? t().alt.active : t().alt.desactive} source={svgInterrupteur(options[b.cle])} width={28} height={16} />
     return ligneReglage(b.cle, bouton($, e, `reglage-${b.cle}`, b.libelle, 'texte', basculer), cliquable($, e, `interrupteur-${b.cle}`, interrupteur, basculer))
   })
-  const comptage = ligneReglage(
-    'seuil',
-    <Text size="footnote" {...encre(e, 'texte')}>
-      {t().seuil}
-    </Text>,
-    surFond(
-      <Select
-        key="seuil"
-        value={String(options.seuilPause)}
-        options={SEUILS.map(m => ({ value: String(m), label: `${m} min` }))}
-        onSelect={valeur => changerReglage($, { seuilPause: Number(valeur) })}
-      />,
+  const comptage = [
+    ligneReglage(
+      'seuil',
+      <Text size="footnote" {...encre(e, 'texte')}>
+        {t().seuil}
+      </Text>,
+      surFond(
+        <Select
+          key="seuil"
+          value={String(options.seuilPause)}
+          options={SEUILS.map(m => ({ value: String(m), label: t().seuilChoix(m) }))}
+          onSelect={valeur => changerReglage($, { seuilPause: Number(valeur) })}
+        />,
+      ),
     ),
-  )
+    <Box key="seuil-aide" paddingX="sm">
+      <Text size="caption" {...encre(e, 'faible')}>
+        {t().seuilAide}
+      </Text>
+    </Box>,
+  ]
   return (
     <Box flexDirection={aCote ? 'row' : 'column'} alignItems="stretch" gap={aCote ? 4 : 'md'}>
       {section(t().sections.affichage, [
@@ -1347,7 +1350,7 @@ function vueReglagesTerminal($: Moteur, e: Site, options: Reglages, aCote: boole
       {valeurs.map(v => bouton($, e, `${cle}-${v}`, `${v === actuelle ? '●' : '○'} ${libelle(v)}`, v === actuelle ? 'vif' : 'gris', () => choisir(v)))}
     </Box>
   )
-  const caseACocher = (cle: 'activite' | 'question', libelle: string) =>
+  const caseACocher = (cle: 'activite', libelle: string) =>
     bouton($, e, `reglage-${cle}`, `${options[cle] ? '☑' : '☐'} ${libelle}`, 'texte', () => changerReglage($, { [cle]: !options[cle] }))
   // Les noms des réglages à choix, sur une colonne de la largeur du plus long : leurs choix s'alignent.
   const largeurNom = Math.max(t().mesure.length, t().langue.length) + 2
@@ -1365,7 +1368,6 @@ function vueReglagesTerminal($: Moteur, e: Site, options: Reglages, aCote: boole
       <Box flexDirection="column">
         {titre(t().sections.affichage)}
         {caseACocher('activite', t().bascules.activite)}
-        {caseACocher('question', t().bascules.question)}
         {reglage('mesure', t().mesure, choix('mesure', MESURES, options.mesure, m => t().mesures[m], mesure => changerReglage($, { mesure })))}
         {reglage(
           'langue',
@@ -1376,10 +1378,8 @@ function vueReglagesTerminal($: Moteur, e: Site, options: Reglages, aCote: boole
       <Box flexDirection="column">
         {titre(t().sections.comptage)}
         <Text>{t().seuil}</Text>
-        <Box flexDirection="row" gap={2}>
-          {choix('seuil', SEUILS, options.seuilPause, m => String(m), seuilPause => changerReglage($, { seuilPause }))}
-          <Text dimColor>min</Text>
-        </Box>
+        {choix('seuil', SEUILS, options.seuilPause, t().seuilChoix, seuilPause => changerReglage($, { seuilPause }))}
+        <Text dimColor>{t().seuilAide}</Text>
       </Box>
     </Box>
   )

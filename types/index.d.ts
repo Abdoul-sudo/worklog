@@ -51,7 +51,6 @@ export type Frise = {
 export type Reglages = {
   seuilPause: number
   activite: boolean
-  question: boolean
   langue: 'en' | 'fr'
   /** Ce que le popover montre : le temps et les tokens, ou l'un des deux. */
   mesure: 'tout' | 'temps' | 'jetons'

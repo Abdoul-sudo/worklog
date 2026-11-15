@@ -29,16 +29,16 @@ That is all. Worklog needs Claude Code 2.1.290 or later.
 
 - The timer starts with your first message in a session. Opening a session does not count.
 - The timer runs while Claude works. This includes subagents, workflows and Ultracode, even when they work alone for hours.
-- The timer keeps running while you read or think. A pause shorter than 45 minutes counts as work.
+- The timer keeps running while you read or think. A pause shorter than 1 hour counts as work.
 
 ### When the timer stops
 
-- **After 45 minutes without activity.** If you come back within 4 hours, Worklog asks if this time was work. Click **Count** to add it, or **Ignore** to leave it out.
-- **After 4 hours without activity.** This time does not count, and Worklog does not ask.
+- **After 1 hour without activity.** When you come back, Worklog asks if this pause was work. Click **Count** to add it, or **Ignore** to leave it out.
+- **After 4 hours without activity**, for example a night. This time does not count, and Worklog does not ask.
 - **When you type `/worklog stop`.** The timer starts again with your next message.
 - **When you quit Claude Code**, or 2 minutes after you close its window.
 
-You can change the 45 minutes in the settings.
+You can change the 1 hour in the settings.
 
 ### What Worklog counts
 
@@ -87,11 +87,10 @@ Open Worklog, then click the gear.
 | Setting | Default | What it does |
 | --- | --- | --- |
 | Show the activity heatmap | On | Shows one square per day of the year. |
-| Ask after a long idle time | On | Asks if a long pause was work. |
 | Show | Time and tokens | Shows the time, the tokens, or both. |
 | Language | English | English or French. |
 | Theme | Night | Simple, Night, Aurora or Ember. Desktop app only. |
-| Idle time counted as work | 45 min | A shorter pause counts as work. |
+| Ask after a pause of | 1h | A shorter pause counts as work. After a longer pause, Worklog asks if it was work. |
 
 ## Questions
 
@@ -99,7 +98,7 @@ Open Worklog, then click the gear.
 Yes. The timer runs while they work, even when you do not type. Their tokens count too.
 
 **What if I forget to stop the timer?**
-Nothing to do. The timer stops by itself after 45 minutes without activity.
+Nothing to do. The timer stops by itself after 1 hour without activity.
 
 **Does Worklog see my past work?**
 Yes. On the first start, Worklog reads your Claude Code history. For this, it needs Node.js. Without Node.js, Worklog counts from the day you install it.

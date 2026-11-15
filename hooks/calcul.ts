@@ -19,7 +19,6 @@ const ECART_MAX = 4 * 60 * MINUTE
 export type Options = {
   seuilPause: number
   activite: boolean
-  question: boolean
   langue: Langue
   /** Ce que le popover montre : le temps et les tokens, ou l'un des deux. */
   mesure: Mesure
@@ -34,15 +33,16 @@ export type Theme = 'nuit' | 'simple' | 'aurore' | 'braise'
 export const THEMES_IDS: readonly Theme[] = ['simple', 'nuit', 'aurore', 'braise']
 
 export const OPTIONS_PAR_DEFAUT: Options = {
-  seuilPause: 45,
+  seuilPause: 60,
   activite: true,
-  question: true,
   langue: 'en',
   mesure: 'tout',
   theme: 'nuit',
 }
 
-export const SEUILS = [10, 15, 20, 30, 45, 60]
+/** Les choix du réglage « Demander après une pause de », en minutes. Une pause plus courte compte comme du travail. Une
+ * pause plus longue devient une question, jusqu'à ECART_MAX. */
+export const SEUILS = [15, 30, 60, 120]
 
 /** Le format des ID de tickets : une clé en majuscules, un tiret, puis un numéro, comme PROJ-142, ENG-42 ou FSY-I478.
  * Un numéro d'un seul chiffre ne suffit pas (UTF-8, GPT-4ques courants sont écartés (ISO-8601,
@@ -55,9 +55,8 @@ export function lireOptions(brut: unknown): Options {
   const d = OPTIONS_PAR_DEFAUT
   const oui = (v: unknown, defaut: boolean) => (typeof v === 'boolean' ? v : defaut)
   return {
-    seuilPause: typeof r.seuilPause === 'number' && r.seuilPause > 0 ? r.seuilPause : d.seuilPause,
+    seuilPause: SEUILS.find(m => m === r.seuilPause) ?? d.seuilPause,
     activite: oui(r.activite, d.activite),
-    question: oui(r.question, d.question),
     langue: LANGUES.find(l => l.id === r.langue)?.id ?? d.langue,
     mesure: MESURES.find(m => m === r.mesure) ?? d.mesure,
     theme: THEMES_IDS.find(x => x === r.theme) ?? d.theme,

@@ -306,9 +306,9 @@ test('les tokens, les onglets, les réglages et la frise', async ($, on) => {
     // Dans le terminal, une liste déroulante ne s'ouvre qu'au clavier : chaque choix y est un bouton.
     if (surface === 'terminal') {
       await bande.press({ key: 'seuil-30' })
-      expect((await bande.find({ key: 'seuil-30' }))?.text).toBe('● 30')
-      expect((await bande.find({ key: 'seuil-45' }))?.text).toBe('○ 45')
-      await bande.press({ key: 'seuil-45' })
+      expect((await bande.find({ key: 'seuil-30' }))?.text).toBe('● 30 min')
+      expect((await bande.find({ key: 'seuil-60' }))?.text).toBe('○ 1 h')
+      await bande.press({ key: 'seuil-60' })
     } else expect(await bande.find({ key: 'seuil' })).toBeDefined()
     // Les tokens s'affichent toujours : plus de réglage pour les cacher.
     expect(await bande.find({ key: 'reglage-jetons' })).toBeUndefined()
@@ -517,20 +517,20 @@ test('un long silence demande « Du travail ? », et la réponse compte', async 
   const { horloge } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
   await travailler($, horloge, 'FLO-I165 : on commence', 5)
-  await horloge.advance(50 * 60_000)
+  await horloge.advance(70 * 60_000)
   await $.prompt.submit({ ...PROMPT, text: 'je reviens' })
   await horloge.settle()
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const bande = await $.ui.mount({ ...BANDE, surface })
-    expect(await bande.find({ type: 'Text', text: /50 min sans activité sur FLO-I165/ })).toBeDefined()
+    expect(await bande.find({ type: 'Text', text: /1 h 10 sans activité sur FLO-I165/ })).toBeDefined()
     await bande.unmount()
   }
   const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
   await bande.press({ key: 'ecart-oui' })
   expect(await bande.find({ type: 'Text', text: /sans activité/ })).toBeUndefined()
   await bande.unmount()
-  expect(await ligneDe($, 'FLO-I165')).toContain('55 min')
+  expect(await ligneDe($, 'FLO-I165')).toContain('1 h 15')
 })
 
 test('/worklog ouvre et ferme, nomme la session, ou la met en pause', async ($, on) => {
