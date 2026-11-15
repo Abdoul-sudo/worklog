@@ -50,6 +50,7 @@ import {
   svgChrono,
   svgCiel,
   svgEngrenage,
+  svgFermer,
   svgInterrupteur,
   svgIcone,
   svgPastille,
@@ -722,15 +723,18 @@ function boutonReglages($: Moteur, e: Site, etat: Interface) {
     avantReglages = { onglet: etat.onglet, decalage: etat.decalage }
     return choisirOnglet($, 'reglages', 0)
   }
-  if (enReglages || !riche(e)) return bouton($, e, 'reglages', enReglages ? '✕' : '⚙\uFE0E', enReglages ? 'texte' : 'gris', basculer)
+  if (!riche(e)) return bouton($, e, 'reglages', enReglages ? '✕' : '⚙\uFE0E', 'gris', basculer)
+  // L'engrenage, ou la croix dans les réglages : gris comme les onglets, blanc au survol.
   const { Box, Svg } = $.ui.resolve(e)
-  const engrenage = [
-    <Svg alt={t().alt.reglages} source={svgEngrenage(ENCRE.gris)} width={15} height={15} />,
+  const dessin = enReglages ? svgFermer : svgEngrenage
+  const alt = enReglages ? t().alt.fermerReglages : t().alt.reglages
+  const trace = [
+    <Svg alt={alt} source={dessin(ENCRE.gris)} width={15} height={15} />,
     <Box position="absolute" top={0} left={0} display="none" hover={{ scope: 'reglages', display: 'flex' }}>
-      <Svg alt={t().alt.reglages} source={svgEngrenage(ENCRE.vif)} width={15} height={15} />
+      <Svg alt={alt} source={dessin(ENCRE.vif)} width={15} height={15} />
     </Box>,
   ]
-  return cliquable($, e, 'reglages', engrenage, basculer)
+  return cliquable($, e, 'reglages', trace, basculer)
 }
 
 /** Deux flèches côte à côte, ‹ et › ; la seconde, grisée, ne fait rien quand il n'y a pas de suite. */

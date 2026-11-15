@@ -59,6 +59,7 @@ const FR = {
   toastItem: (item: string) => `Temps compté pour ${item}`,
   alt: {
     reglages: 'Réglages',
+    fermerReglages: 'Fermer les réglages',
     enCours: 'Compté en ce moment',
     item: 'Item',
     activite: (n: number) => `Activité des ${n} dernières semaines`,
@@ -150,6 +151,7 @@ const EN: typeof FR = {
   toastItem: (item: string) => `Counting time for ${item}`,
   alt: {
     reglages: 'Settings',
+    fermerReglages: 'Close settings',
     enCours: 'Counting now',
     item: 'Item',
     activite: (n: number) => `Activity over the last ${n} weeks`,
