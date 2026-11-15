@@ -21,7 +21,7 @@ Worklog is a mod for Claude Code. It counts your time and your tokens automatica
 3. Work as usual. A small chip at the bottom shows the project of the session and its time today: `⏱ mobile-app · 1h 12`.
 4. Click the chip to open Worklog. Click it again to close it.
 
-That is all. Worklog needs Claude Code 2.1.290 or later. It also comes with [Claude Modpack](https://github.com/Abdoul-sudo/claude-modpack).
+That is all. Worklog needs Claude Code 2.1.290 or later.
 
 ## How it works
 
