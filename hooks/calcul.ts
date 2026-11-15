@@ -1,5 +1,6 @@
 // Logique pure du comptage : aucun appel à `$`, testée par tests/calcul.test.ts.
 import type { Ecart, Ligne, Plage } from '../types'
+import { type Langue, LANGUES, t as texte } from './langue'
 
 export const SANS_ITEM = 'sans nom'
 export const MINUTE = 60_000
@@ -8,28 +9,43 @@ const DUREE_MAX_TOUR = 12 * 60 * MINUTE
 // Chaque session vivante donne signe de vie toutes les 30 s ; au-delà de cette marge, elle est tenue pour morte
 // (fenêtre fermée sans fin de session notée).
 const MARGE_VIE = 2 * MINUTE
+// Une session est « en cours » quand Claude travaille, ou quand un message, une réponse ou une dépense de tokens date de
+// moins que ce délai. Le temps, lui, court plus longtemps (le seuil de pause) : on lit, on réfléchit.
+const ACTIF = 2 * MINUTE
 // Un silence plus long est un arrêt (la nuit, le week-end) : il n'est pas proposé à confirmer.
 const ECART_MAX = 4 * 60 * MINUTE
 
 /** Les réglages, modifiables dans la vue Réglages du popover. */
 export type Options = {
   seuilPause: number
-  motif: string
-  jetons: boolean
   activite: boolean
   question: boolean
+  langue: Langue
+  /** Ce que le popover montre : le temps et les tokens, ou l'un des deux. */
+  mesure: Mesure
+  theme: Theme
 }
+
+export type Mesure = 'tout' | 'temps' | 'jetons'
+export const MESURES: readonly Mesure[] = ['tout', 'temps', 'jetons']
+/** Les thèmes du popover ; leurs couleurs et leurs fonds sont dans dessins.ts. */
+export type Theme = 'nuit' | 'simple' | 'aurore' | 'braise'
+// Dans les réglages, dans cet ordre : le plus sobre d'abord.
+export const THEMES_IDS: readonly Theme[] = ['simple', 'nuit', 'aurore', 'braise']
 
 export const OPTIONS_PAR_DEFAUT: Options = {
   seuilPause: 45,
-  // Les ID des items Zoho Sprints : FLO-I165, FSY-I478, LBA-I12...
-  motif: '[A-Z]+-I\\d+',
-  jetons: true,
   activite: true,
   question: true,
+  langue: 'en',
+  mesure: 'tout',
+  theme: 'nuit',
 }
 
 export const SEUILS = [10, 15, 20, 30, 45, 60]
+
+/** Le format des ID : ceux des items Zoho Sprints, comme FLO-I165, FSY-I478 ou LBA-I12. */
+export const MOTIF_ID = '[A-Z]+-I\\d+'
 
 /** Les réglages enregistrés, chaque valeur invalide remplacée par sa valeur par défaut. */
 export function lireOptions(brut: unknown): Options {
@@ -38,10 +54,11 @@ export function lireOptions(brut: unknown): Options {
   const oui = (v: unknown, defaut: boolean) => (typeof v === 'boolean' ? v : defaut)
   return {
     seuilPause: typeof r.seuilPause === 'number' && r.seuilPause > 0 ? r.seuilPause : d.seuilPause,
-    motif: typeof r.motif === 'string' && expression(r.motif, false) !== null ? r.motif : d.motif,
-    jetons: oui(r.jetons, d.jetons),
     activite: oui(r.activite, d.activite),
     question: oui(r.question, d.question),
+    langue: LANGUES.find(l => l.id === r.langue)?.id ?? d.langue,
+    mesure: MESURES.find(m => m === r.mesure) ?? d.mesure,
+    theme: THEMES_IDS.find(x => x === r.theme) ?? d.theme,
   }
 }
 
@@ -50,10 +67,48 @@ export type Choix = 'travail' | 'pause'
 export type Activite = 'ouverture' | 'message' | 'reponse' | 'item' | 'pause' | 'fermeture' | 'agents-debut' | 'agents-fin'
 // `k` : l'item choisi ou trouvé (ID cité, branche Git, choix dans la liste).
 // `d` : le nom par défaut de la session (groupe de l'app desktop, sinon projet).
-type EvenementActivite = { t: number; s: string; e: Activite; k: string | null; d?: string }
+// `i` : l'événement vient de l'historique de Claude Code (scripts/importer.mjs), pas du journal tenu par le mod.
+type EvenementActivite = { t: number; s: string; e: Activite; k: string | null; d?: string; i?: 1 }
 type EvenementClassement = { t: number; s: string; e: 'classement'; session: string; debut: number; choix: Choix }
-type EvenementJetons = { t: number; s: string; e: 'jetons'; n: number; k: string | null; d?: string }
+type EvenementJetons = { t: number; s: string; e: 'jetons'; n: number; k: string | null; d?: string; i?: 1 }
 export type Evenement = EvenementActivite | EvenementClassement | EvenementJetons
+
+/**
+ * Réunit le journal du mod et l'historique importé de Claude Code.
+ * - Une session que le mod n'a pas suivie vient tout entière de l'historique ; elle n'est jamais en cours.
+ * - Une session suivie garde son journal ; l'historique ne comble que le temps d'avant, sous le nom de la session.
+ * - Les tokens viennent de l'historique (toutes les réponses, sous-agents compris, une fois chacune), comptés à l'item
+ *   que la session avait à ce moment. Ceux du journal ne comptent qu'après la dernière importation (`importeJusqua`).
+ */
+export function fusionner(evenements: readonly Evenement[], importeJusqua: number): Evenement[] {
+  const suivis = new Map<string, EvenementActivite[]>()
+  for (const ev of [...evenements].sort((a, b) => a.t - b.t)) {
+    if (ev.e === 'classement' || ev.e === 'jetons' || ev.i === 1) continue
+    const liste = suivis.get(ev.s)
+    if (liste === undefined) suivis.set(ev.s, [ev])
+    else liste.push(ev)
+  }
+  const aCeMoment = (s: string, t: number): EvenementActivite | undefined => {
+    const liste = suivis.get(s)
+    return liste === undefined ? undefined : (liste.filter(ev => ev.t <= t).at(-1) ?? liste[0])
+  }
+  // Une session venue de l'historique seul n'est jamais en cours : elle se ferme à son dernier moment.
+  const fins = new Map<string, number>()
+  for (const ev of evenements) if (ev.e !== 'classement' && ev.i === 1 && !suivis.has(ev.s)) fins.set(ev.s, Math.max(fins.get(ev.s) ?? 0, ev.t))
+  const fermetures = [...fins].map(([s, t]): Evenement => ({ t, s, e: 'fermeture', k: null, i: 1 }))
+  return [...evenements.flatMap((ev): Evenement[] => {
+    if (ev.e === 'classement') return [ev]
+    if (ev.i !== 1) return ev.e === 'jetons' && ev.t <= importeJusqua ? [] : [ev]
+    const liste = suivis.get(ev.s)
+    if (liste === undefined) return [ev]
+    const premier = liste[0]!
+    if (ev.e === 'jetons') {
+      const moment = ev.t < premier.t ? undefined : aCeMoment(ev.s, ev.t)
+      return [{ ...ev, ...(moment === undefined ? {} : { k: moment.k }), ...(premier.d === undefined ? {} : { d: premier.d }) }]
+    }
+    return ev.t < premier.t ? [{ ...ev, ...(premier.d === undefined ? {} : { d: premier.d }) }] : []
+  }), ...fermetures]
+}
 
 /** Un temps retiré à la main : celui de `item` entre `debut` et `fin`. */
 export type Retrait = { item: string; debut: number; fin: number }
@@ -62,7 +117,7 @@ export type Corrections = { renommages: Readonly<Record<string, string>>; retrai
 export const SANS_CORRECTION: Corrections = { renommages: {}, retraits: [] }
 
 export type Jour = { debut: number; lignes: Ligne[]; total: number; reel: number; jetons: number }
-/** `parSession` : les minutes de chaque session sur la période. */
+/** `parSession` : les minutes de chaque session sur la période, item par item. */
 export type Bilan = {
   jours: Jour[]
   lignes: Ligne[]
@@ -70,7 +125,9 @@ export type Bilan = {
   reel: number
   jetons: number
   ecarts: Ecart[]
-  parSession: Map<string, number>
+  parSession: Map<string, Map<string, number>>
+  /** La dernière activité de chaque item sur la période : la fin de son dernier temps, ou sa dernière dépense de tokens. */
+  derniere: Map<string, number>
 }
 
 function expression(motif: string, entier: boolean): RegExp | null {
@@ -88,10 +145,6 @@ export function detecterItem(texte: string, motif: string): string | null {
 
 export function estUnItem(texte: string, motif: string): boolean {
   return expression(motif, true)?.test(texte) === true
-}
-
-export function motifValide(motif: string): boolean {
-  return motif.trim() !== '' && expression(motif, false) !== null
 }
 
 /** Le nom à afficher : suit les renommages, sans boucler. */
@@ -163,7 +216,8 @@ export function dernierEvenement(evenements: readonly Evenement[], session: stri
 /**
  * Découpe l'activité de chaque session en plages comptées et en écarts à confirmer.
  * `vivants` donne le dernier signe de vie connu de chaque session.
- * `actives` donne, pour chaque session qui compte en ce moment, son item.
+ * `actives` donne, pour chaque session en cours, son item : Claude y travaille, ou un message, une réponse ou une dépense
+ * de tokens date de moins de deux minutes. Passer sur un item sans rien envoyer ne le met pas en cours.
  */
 export function calculer(
   evenements: readonly Evenement[],
@@ -182,13 +236,28 @@ export function calculer(
     else sessions.set(ev.s, [ev])
   }
 
-  // Le premier item trouvé dans la session reçoit aussi le temps passé avant lui ;
-  // sans item, le temps va au nom par défaut.
+  // Le premier item trouvé dans la session (message, branche Git) reçoit aussi le temps passé avant lui ;
+  // sans item, le temps va au nom par défaut. Un item choisi à la main ne compte qu'à partir du choix.
   const premiers = new Map<string, string>()
+  const choisis = new Set<string>()
   for (const ev of [...evenements].sort((a, b) => a.t - b.t)) {
-    if (ev.e !== 'classement' && ev.k !== null && !premiers.has(ev.s)) premiers.set(ev.s, ev.k)
+    if (ev.e === 'item') choisis.add(ev.s)
+    else if (ev.e !== 'classement' && ev.k !== null && !premiers.has(ev.s) && !choisis.has(ev.s)) premiers.set(ev.s, ev.k)
   }
   const itemDe = (ev: EvenementActivite | EvenementJetons) => ev.k ?? premiers.get(ev.s) ?? ev.d ?? SANS_ITEM
+
+  // Les instants où chaque session a dépensé des tokens : Claude ou ses sous-agents (workflows, Ultracode) travaillaient.
+  const depenses = new Map<string, number[]>()
+  for (const ev of consos) {
+    const liste = depenses.get(ev.s)
+    if (liste === undefined) depenses.set(ev.s, [ev.t])
+    else liste.push(ev.t)
+  }
+  /** Le plus long silence de [debut, fin] une fois comptées les dépenses de tokens de la session. */
+  const plusLongSilence = (session: string, debut: number, fin: number) => {
+    const points = [debut, ...(depenses.get(session) ?? []).filter(x => x > debut && x < fin), fin]
+    return Math.max(...points.slice(1).map((x, i) => x - points[i]!))
+  }
 
   const plages: Ecart[] = []
   const ecarts: Ecart[] = []
@@ -229,9 +298,12 @@ export function calculer(
       const plage: Ecart = { item: itemDe(a), debut: a.t, fin, session }
       const enCoursDepuis = (debut: number | null) => debut !== null && b?.relance !== true && fin - debut <= DUREE_MAX_TOUR
       const claudeTravaille = enCoursDepuis(debutTour) || enCoursDepuis(debutAgents)
-      if (claudeTravaille || fin - a.t <= seuil) {
+      // Un silence où les tokens n'ont pas cessé de partir plus longtemps que le seuil est du travail de Claude.
+      if (claudeTravaille || plusLongSilence(session, a.t, fin) <= seuil) {
         plages.push(plage)
-        if (b === undefined && finDeVie >= maintenant) actives.set(session, plage.item)
+        const derniereDepense = Math.max(-Infinity, ...(depenses.get(session) ?? []).filter(x => x <= maintenant))
+        const recente = a.e !== 'item' && Math.max(a.t, derniereDepense) >= maintenant - ACTIF
+        if (b === undefined && finDeVie >= maintenant && (claudeTravaille || recente)) actives.set(session, plage.item)
       } else if (b !== undefined && fin - a.t <= ECART_MAX) {
         const classe = choix.get(`${session}@${a.t}`)
         if (classe === 'travail') plages.push(plage)
@@ -280,7 +352,8 @@ function sansRetraits(plage: Ecart, retraits: readonly Retrait[]): Ecart[] {
 
 const parTemps = (a: Ligne, b: Ligne) => b.minutes - a.minutes || b.jetons - a.jetons || a.item.localeCompare(b.item)
 
-/** Temps et tokens par item et par jour sur [debut, fin[, bornes au début d'un jour. */
+/** Temps et tokens par item et par jour sur [debut, fin[, bornes au début d'un jour. `avecJetonsSeulement` : un item qui
+ * n'a dépensé aucun token sur la période n'a ni ligne ni temps compté (rien n'a été fait), sauf s'il est en cours. */
 export function bilan(
   evenements: readonly Evenement[],
   options: Options,
@@ -289,13 +362,19 @@ export function bilan(
   fin: number,
   vivants: ReadonlyMap<string, number> = new Map(),
   corrections: Corrections = SANS_CORRECTION,
+  avecJetonsSeulement = false,
 ): Bilan {
   const calcul = calculer(evenements, options, maintenant, vivants)
   const nom = (item: string) => nommer(item, corrections.renommages)
   const retire = (item: string, t: number) => corrections.retraits.some(r => r.item === item && t >= r.debut && t < r.fin)
-  const plages = calcul.plages.flatMap(p => sansRetraits({ ...p, item: nom(p.item) }, corrections.retraits))
-  const jetons = calcul.jetons.map(j => ({ ...j, item: nom(j.item) })).filter(j => !retire(j.item, j.t))
+  const toutes = calcul.plages.flatMap(p => sansRetraits({ ...p, item: nom(p.item) }, corrections.retraits))
+  const tousJetons = calcul.jetons.map(j => ({ ...j, item: nom(j.item) })).filter(j => !retire(j.item, j.t))
   const enCours = new Set([...calcul.actives.values()].map(nom))
+  // Le temps de chaque session (la puce) garde tout ; les lignes et les totaux laissent les items sans token.
+  const avecJetons = new Set(tousJetons.filter(j => j.n > 0 && j.t >= debut && j.t < fin).map(j => j.item))
+  const garde = (item: string) => !avecJetonsSeulement || avecJetons.has(item) || enCours.has(item)
+  const plages = toutes.filter(p => garde(p.item))
+  const jetons = tousJetons.filter(j => garde(j.item))
 
   const items = new Map<string, Segment[]>()
   for (const item of new Set([...plages.map(p => p.item), ...jetons.map(j => j.item)])) {
@@ -338,11 +417,19 @@ export function bilan(
     .filter(e => e.debut >= debut && e.debut < fin && !retire(e.item, e.debut))
     .filter(e => e.fin - e.debut - recouvrement(items.get(e.item) ?? [], e.debut, e.fin) >= MINUTE)
     .sort((a, b) => a.debut - b.debut)
-  const parSession = new Map<string, number>()
-  for (const session of new Set(plages.map(p => p.session))) {
-    const segments = unir(plages.filter(p => p.session === session))
-    parSession.set(session, Math.round(recouvrement(segments, debut, fin) / MINUTE))
+  const parSession = new Map<string, Map<string, number>>()
+  for (const p of toutes) {
+    const items = parSession.get(p.session) ?? new Map<string, number>()
+    if (!items.has(p.item)) {
+      const segments = unir(toutes.filter(q => q.session === p.session && q.item === p.item))
+      items.set(p.item, Math.round(recouvrement(segments, debut, fin) / MINUTE))
+    }
+    parSession.set(p.session, items)
   }
+  const derniere = new Map<string, number>()
+  const noterDerniere = (item: string, t: number) => derniere.set(item, Math.max(derniere.get(item) ?? -Infinity, t))
+  for (const p of plages) if (p.fin > debut && p.debut < fin) noterDerniere(p.item, Math.min(p.fin, fin))
+  for (const j of jetons) if (j.t >= debut && j.t < fin) noterDerniere(j.item, j.t)
   return {
     parSession,
     jours,
@@ -351,21 +438,23 @@ export function bilan(
     reel: jours.reduce((s, j) => s + j.reel, 0),
     jetons: lignes.reduce((s, l) => s + l.jetons, 0),
     ecarts: aConfirmer,
+    derniere,
   }
 }
 
 export function formatDuree(minutes: number): string {
-  if (minutes < 60) return `${minutes} min`
-  return `${Math.floor(minutes / 60)} h ${deuxChiffres(minutes % 60)}`
+  return texte().duree(Math.floor(minutes / 60), minutes % 60)
 }
 
-/** `850`, `12,4 k`, `245 k`, `1,2 M`. */
+/** `850`, `12,4 k`, `245 k`, `1,2 M`, `4,9 Md` ; en anglais `12.4k`, `4.9B`. */
 export function formatJetons(n: number): string {
-  const virgule = (x: number) => x.toFixed(1).replace('.', ',').replace(/,0$/, '')
+  const { nombre, unites } = texte()
   if (n < 1_000) return String(n)
-  if (n < 100_000) return `${virgule(n / 1_000)} k`
-  if (n < 1_000_000) return `${Math.round(n / 1_000)} k`
-  return `${virgule(n / 1_000_000)} M`
+  if (n < 100_000) return `${nombre(n / 1_000)}${unites.mille}`
+  if (n < 1_000_000) return `${Math.round(n / 1_000)}${unites.mille}`
+  if (n < 100_000_000) return `${nombre(n / 1_000_000)}${unites.million}`
+  if (n < 1_000_000_000) return `${Math.round(n / 1_000_000)}${unites.million}`
+  return `${nombre(n / 1_000_000_000)}${unites.milliard}`
 }
 
 export function dureeEcart(ecart: Plage): string {
@@ -374,40 +463,48 @@ export function dureeEcart(ecart: Plage): string {
 
 export function formatHeure(t: number): string {
   const d = new Date(t)
-  return `${d.getHours()} h ${deuxChiffres(d.getMinutes())}`
+  return texte().heure(d.getHours(), d.getMinutes())
 }
 
-const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi']
-const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
 export const majuscule = (texte: string) => texte.charAt(0).toUpperCase() + texte.slice(1)
 
 export function formatJour(t: number): string {
   const d = new Date(t)
-  const quantieme = d.getDate() === 1 ? '1er' : String(d.getDate())
-  return `${JOURS[d.getDay()]} ${quantieme} ${MOIS[d.getMonth()]}`
+  const { jours, mois, date } = texte()
+  return date(jours[d.getDay()]!, d.getDate(), mois[d.getMonth()]!)
 }
 
-export type Periode = 'jour' | 'semaine' | 'mois'
+/** Le titre de l'onglet Tout : « Depuis le 12 novembre », « Since Nov 12 ». */
+export function depuis(t: number): string {
+  const d = new Date(t)
+  return texte().depuis(d.getDate(), texte().mois[d.getMonth()]!)
+}
+
+export type Periode = 'jour' | 'semaine' | 'mois' | 'annee'
 
 /** Les bornes et le titre d'une période, `decalage` périodes avant celle de `maintenant`. */
 export function bornes(periode: Periode, decalage: number, maintenant: number): { debut: number; fin: number; titre: string } {
   if (periode === 'jour') {
     const debut = decalerJours(debutJour(maintenant), decalage)
-    const titre = decalage === 0 ? "Aujourd'hui" : decalage === -1 ? 'Hier' : majuscule(formatJour(debut))
+    const titre = decalage === 0 ? texte().aujourdhui : decalage === -1 ? texte().hier : majuscule(formatJour(debut))
     return { debut, fin: jourSuivant(debut), titre }
   }
   if (periode === 'semaine') {
     const debut = decalerJours(debutSemaine(maintenant), 7 * decalage)
     const d = new Date(debut)
     const titre =
-      decalage === 0 ? 'Cette semaine' : decalage === -1 ? 'La semaine dernière' : `Semaine du ${d.getDate()} ${MOIS[d.getMonth()]}`
+      decalage === 0 ? texte().cetteSemaine : decalage === -1 ? texte().semaineDerniere : texte().semaineDu(d.getDate(), texte().mois[d.getMonth()]!)
     return { debut, fin: decalerJours(debut, 7), titre }
   }
   const d = new Date(maintenant)
+  if (periode === 'annee') {
+    const annee = d.getFullYear() + decalage
+    return { debut: new Date(annee, 0, 1).getTime(), fin: new Date(annee + 1, 0, 1).getTime(), titre: String(annee) }
+  }
   const debut = new Date(d.getFullYear(), d.getMonth() + decalage, 1).getTime()
   const m = new Date(debut)
   const annee = m.getFullYear() === d.getFullYear() ? '' : ` ${m.getFullYear()}`
-  return { debut, fin: new Date(m.getFullYear(), m.getMonth() + 1, 1).getTime(), titre: `${majuscule(MOIS[m.getMonth()]!)}${annee}` }
+  return { debut, fin: new Date(m.getFullYear(), m.getMonth() + 1, 1).getTime(), titre: `${majuscule(texte().mois[m.getMonth()]!)}${annee}` }
 }
 
 /** Met `item` en tête des items récents, sans doublon, six au plus. */

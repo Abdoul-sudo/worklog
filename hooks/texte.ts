@@ -1,61 +1,47 @@
 // Textes de la commande /temps, faits pour être recopiés dans Zoho Sprints.
 import type { Ecart, Ligne } from '../types'
-import { type Bilan, dureeEcart, formatDuree, formatHeure, formatJetons, formatJour, majuscule } from './calcul'
+import { type Bilan, SANS_ITEM, dureeEcart, formatDuree, formatHeure, formatJetons, formatJour, majuscule } from './calcul'
+import { t } from './langue'
 
 function tableau(lignes: readonly Ligne[], total: number, jetons: number | null): string[] {
-  const largeur = Math.max('Total'.length, ...lignes.map(l => l.item.length))
-  const ligne = (nom: string, minutes: number, n: number, suite = '') =>
-    `  ${nom.padEnd(largeur)}  ${formatDuree(minutes).padStart(7)}${jetons === null ? '' : `  ${formatJetons(n).padStart(7)} tokens`}${suite}`
-  return [
-    ...lignes.map(l => ligne(l.item, l.minutes, l.jetons, l.enCours ? '  (en cours)' : '')),
-    ligne('Total', total, jetons ?? 0),
-  ]
+  const { recap } = t()
+  const nom = (item: string) => (item === SANS_ITEM ? t().sansNom : item)
+  const largeur = Math.max(recap.total.length, ...lignes.map(l => nom(l.item).length))
+  const ligne = (texte: string, minutes: number, n: number, suite = '') =>
+    `  ${texte.padEnd(largeur)}  ${formatDuree(minutes).padStart(7)}${jetons === null ? '' : `  ${formatJetons(n).padStart(7)} tokens`}${suite}`
+  return [...lignes.map(l => ligne(nom(l.item), l.minutes, l.jetons, l.enCours ? recap.enCours : '')), ligne(recap.total, total, jetons ?? 0)]
 }
 
 export function listeEcarts(ecarts: readonly Ecart[]): string[] {
-  if (ecarts.length === 0) return ['Aucun écart à confirmer sur les 7 derniers jours.']
+  const { recap } = t()
+  if (ecarts.length === 0) return [recap.aucunEcart]
   return [
-    'Écarts à confirmer, non comptés (7 derniers jours) :',
-    ...ecarts.map(
-      (e, i) => `  ${i + 1}. ${formatJour(e.debut)}, ${e.item}, de ${formatHeure(e.debut)} à ${formatHeure(e.fin)} (${dureeEcart(e)})`,
-    ),
-    'Pour les classer : /temps confirmer <numéros ou tout> <travail ou pause>',
-    'Exemple : /temps confirmer 1 travail',
+    recap.ecarts,
+    ...ecarts.map((e, i) => recap.ecart(i + 1, formatJour(e.debut), e.item, formatHeure(e.debut), formatHeure(e.fin), dureeEcart(e))),
+    recap.classer,
+    recap.exemple,
   ]
 }
 
 /** Le récapitulatif d'une période : par jour si `parJour`, puis le total par item. */
-export function recap(titre: string, bilan: Bilan, ecarts: readonly Ecart[], avecJetons: boolean, parJour: boolean): string {
-  if (bilan.lignes.length === 0) return `${titre} : aucun temps compté.`
+export function recap(titre: string, bilan: Bilan, ecarts: readonly Ecart[], parJour: boolean): string {
+  const textes = t().recap
+  if (bilan.lignes.length === 0) return textes.aucun(titre)
   const lignes = [titre]
   if (parJour) {
     for (const j of bilan.jours) {
-      lignes.push('', majuscule(formatJour(j.debut)), ...tableau(j.lignes, j.total, avecJetons ? j.jetons : null))
+      lignes.push('', majuscule(formatJour(j.debut)), ...tableau(j.lignes, j.total, j.jetons))
     }
-    lignes.push('', 'Total')
+    lignes.push('', textes.total)
   } else {
     lignes.push('')
   }
-  lignes.push(...tableau(bilan.lignes, bilan.total, avecJetons ? bilan.jetons : null))
-  if (bilan.total > bilan.reel) {
-    lignes.push('', `Temps réel : ${formatDuree(bilan.reel)}. Le total est plus grand, car des sessions ont tourné en parallèle.`)
-  }
+  lignes.push(...tableau(bilan.lignes, bilan.total, bilan.jetons))
+  if (bilan.total > bilan.reel) lignes.push('', textes.reel(formatDuree(bilan.reel)))
   if (ecarts.length > 0) lignes.push('', ...listeEcarts(ecarts))
   return lignes.join('\n')
 }
 
 export function aide(): string {
-  return [
-    'Commandes du temps par item :',
-    "  /temps                      le temps d'aujourd'hui",
-    '  /temps semaine              la semaine en cours, jour par jour',
-    '  /temps mois                 le mois en cours',
-    "  /temps FLO-I165             passe cette session sur l'item FLO-I165",
-    '  /temps stop                 met cette session en pause',
-    '  /temps confirmer            liste les silences à classer',
-    '  /temps confirmer 1 travail  classe le silence 1 (numéros ou tout, puis travail ou pause)',
-    '  /temps panneau              ouvre le panneau (utile dans VS Code)',
-    '',
-    'Réglages : cliquez sur la puce ⏱, puis sur ⚙.',
-  ].join('\n')
+  return t().aide.join('\n')
 }

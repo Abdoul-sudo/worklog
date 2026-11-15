@@ -5,7 +5,10 @@ import {
   type Evenement,
   OPTIONS_PAR_DEFAUT,
   bornes,
+  depuis,
   formatJetons,
+  fusionner,
+  MOTIF_ID,
   lireOptions,
   SANS_ITEM,
   bilan,
@@ -19,8 +22,13 @@ import {
   lireLignes,
   nomDuGroupe,
 } from '../hooks/calcul'
+import { casesEntre, serie, svgActivite } from '../hooks/activite'
+import { couleurs } from '../hooks/dessins'
 import { recap } from '../hooks/texte'
+import { choisirLangue } from '../hooks/langue'
 
+// Ces tests lisent les textes en français ; ceux en anglais choisissent leur langue.
+choisirLangue('fr')
 const R = { ...OPTIONS_PAR_DEFAUT, seuilPause: 20 }
 /** Une heure du 12 novembre 2026 (ou d'un autre jour de novembre), à l'heure locale. */
 const h = (heure: number, minute = 0, jour = 12) => new Date(2026, 10, jour, heure, minute).getTime()
@@ -86,9 +94,16 @@ describe('écart court ou long', () => {
   test("le compteur tourne jusqu'à maintenant tant que l'écart reste court", async () => {
     const evts = [ev(h(9), 'A', 'message', 'FLO-I1'), ev(h(9, 5), 'A', 'reponse', 'FLO-I1')]
     expect(minutesDuJour(evts, h(9, 15)).parItem).toEqual({ 'FLO-I1': 15 })
-    expect(calculer(evts, R, h(9, 15)).actives.get('A')).toBe('FLO-I1')
     expect(minutesDuJour(evts, h(9, 40)).parItem).toEqual({ 'FLO-I1': 5 })
-    expect(calculer(evts, R, h(9, 40)).actives.size).toBe(0)
+    // « En cours » est plus strict que le temps compté : deux minutes après la réponse, l'item ne l'est plus.
+    expect(calculer(evts, R, h(9, 6)).actives.get('A')).toBe('FLO-I1')
+    expect(calculer(evts, R, h(9, 15)).actives.size).toBe(0)
+    // Passer sur un autre item sans rien envoyer ne le met pas en cours.
+    expect(calculer([...evts, ev(h(9, 6), 'A', 'item', 'FSY-I2')], R, h(9, 6, 12) + 30_000).actives.size).toBe(0)
+    // Une session fermée n'est plus en cours, et son temps s'arrête.
+    const fermee = [...evts, ev(h(9, 6), 'A', 'fermeture', 'FLO-I1')]
+    expect(calculer(fermee, R, h(9, 6, 12) + 30_000).actives.size).toBe(0)
+    expect(minutesDuJour(fermee, h(9, 15)).parItem).toEqual({ 'FLO-I1': 6 })
   })
 
   test('une session ouverte sans message ne compte rien', async () => {
@@ -135,6 +150,31 @@ describe('écart court ou long', () => {
     expect(b.ecarts).toEqual([])
   })
 
+  test("des tokens dépensés pendant un silence (Ultracode, workflows) prouvent que Claude travaille : pas de question", async () => {
+    const jet = (t: number, n: number): Evenement => ({ t, s: 'A', e: 'jetons', n, k: null, i: 1 })
+    const { b, parItem } = minutesDuJour(
+      [
+        ev(h(9), 'A', 'message', 'FLO-I1'),
+        ev(h(9, 5), 'A', 'reponse', 'FLO-I1'),
+        ...[20, 35, 50, 65, 80, 95, 110].map(m => jet(h(9) + m * 60_000, 5000)),
+        ev(h(11), 'A', 'message', 'FLO-I1'),
+        ev(h(11, 5), 'A', 'reponse', 'FLO-I1'),
+      ],
+      h(11, 5),
+    )
+    expect(parItem).toEqual({ 'FLO-I1': 125 })
+    expect(b.ecarts).toEqual([])
+  })
+
+  test("un trou sans tokens au milieu d'un long silence reste un écart", async () => {
+    const jet = (t: number): Evenement => ({ t, s: 'A', e: 'jetons', n: 100, k: null, i: 1 })
+    const { b } = minutesDuJour(
+      [ev(h(9), 'A', 'message', 'FLO-I1'), ev(h(9, 5), 'A', 'reponse', 'FLO-I1'), jet(h(9, 20)), ev(h(11), 'A', 'message', 'FLO-I1')],
+      h(11),
+    )
+    expect(b.ecarts.length).toBe(1)
+  })
+
   test('la pause arrête le compteur, sans écart à confirmer', async () => {
     const { b, parItem } = minutesDuJour(
       [
@@ -168,7 +208,21 @@ describe('sessions en parallèle', () => {
     const { b, parItem } = minutesDuJour([...session('A', 'FLO-I1', h(9)), ...session('B', 'FLO-I1', h(9, 30))], h(11))
     expect(parItem).toEqual({ 'FLO-I1': 90 })
     expect(b.jours[0]?.total).toBe(90)
-    expect(b.parSession).toEqual(new Map([['A', 60], ['B', 60]]))
+    expect(b.parSession).toEqual(new Map([['A', new Map([['FLO-I1', 60]])], ['B', new Map([['FLO-I1', 60]])]]))
+  })
+
+  test("une session passée d'un item à l'autre : la puce ne compte que l'item affiché", async () => {
+    const { b, parItem } = minutesDuJour(
+      [
+        ev(h(9), 'A', 'message', 'FLO-I1'),
+        ev(h(10), 'A', 'reponse', 'FLO-I1'),
+        ev(h(10), 'A', 'message', 'FSY-I2'),
+        ev(h(10, 30), 'A', 'reponse', 'FSY-I2'),
+      ],
+      h(11),
+    )
+    expect(parItem).toEqual({ 'FLO-I1': 60, 'FSY-I2': 30 })
+    expect(b.parSession.get('A')).toEqual(new Map([['FLO-I1', 60], ['FSY-I2', 30]]))
   })
 
   test("un écart déjà couvert par l'autre session du même item n'est pas à confirmer", async () => {
@@ -193,7 +247,7 @@ describe('items', () => {
     const b = bilan(evts, R, h(10, 30, 13), JOUR, jourSuivant(jourSuivant(JOUR)))
     expect(b.jours.map(j => [j.debut, j.total])).toEqual([[JOUR, 20], [jourSuivant(JOUR), 50]])
     expect(b.lignes).toEqual([{ item: 'FLO-I1', minutes: 70, enCours: false, jetons: 0 }])
-    expect(recap('Semaine', b, [], false, true)).toContain('Total\n  FLO-I1   1 h 10')
+    expect(recap('Semaine', b, [], true)).toContain('Total\n  FLO-I1   1 h 10')
   })
 
   test('un changement de item dans la session coupe le temps au bon moment', async () => {
@@ -210,20 +264,20 @@ describe('items', () => {
   })
 
   test('un message sans ID compte pour « item ? »', async () => {
-    expect(detecterItem('corrige le bug du formulaire', R.motif)).toBe(null)
+    expect(detecterItem('corrige le bug du formulaire', MOTIF_ID)).toBe(null)
     const { parItem } = minutesDuJour([ev(h(9), 'A', 'message'), ev(h(9, 10), 'A', 'reponse')], h(9, 10))
     expect(parItem).toEqual({ [SANS_ITEM]: 10 })
   })
 
   test('la détection prend le premier ID Zoho du texte et respecte les bords de mot', async () => {
-    expect(detecterItem('voir FLO-I165.', R.motif)).toBe('FLO-I165')
-    expect(detecterItem('FSY-I478 puis FLO-I165', R.motif)).toBe('FSY-I478')
-    expect(detecterItem('fichier UTF-8 et norme ISO-8601', R.motif)).toBe(null)
-    expect(detecterItem('FLO-I165a', R.motif)).toBe(null)
+    expect(detecterItem('voir FLO-I165.', MOTIF_ID)).toBe('FLO-I165')
+    expect(detecterItem('FSY-I478 puis FLO-I165', MOTIF_ID)).toBe('FSY-I478')
+    expect(detecterItem('fichier UTF-8 et norme ISO-8601', MOTIF_ID)).toBe(null)
+    expect(detecterItem('FLO-I165a', MOTIF_ID)).toBe(null)
     expect(detecterItem('un motif cassé', '([')).toBe(null)
     expect(detecterItem('FSY-I478 puis FLO-I165', 'FLO-I\\d+|FSY-I\\d+')).toBe('FSY-I478')
-    expect(estUnItem('FLO-I165', R.motif)).toBe(true)
-    expect(estUnItem('semaine', R.motif)).toBe(false)
+    expect(estUnItem('FLO-I165', MOTIF_ID)).toBe(true)
+    expect(estUnItem('semaine', MOTIF_ID)).toBe(false)
   })
 
   test("sans item, le temps va au nom par défaut de la session, puis au premier item trouvé", async () => {
@@ -256,13 +310,121 @@ describe('items', () => {
     )
     expect(parItem).toEqual({ 'FSY-I478': 45, 'FLO-I165': 5 })
   })
+
+  test("un item choisi à la main compte à partir du choix : le temps d'avant reste au nom par défaut", async () => {
+    const d = (t: number, e: Activite, k: string | null): Evenement => ({ t, s: 'A', e, k, d: 'FSY' })
+    const { parItem } = minutesDuJour(
+      [
+        d(h(9), 'message', null),
+        d(h(11), 'reponse', null),
+        d(h(11), 'item', 'codepath'),
+        d(h(11, 1), 'item', 'FSY-I478'),
+        d(h(11, 2), 'message', 'FSY-I478'),
+        d(h(11, 12), 'reponse', 'FSY-I478'),
+      ],
+      h(11, 12),
+    )
+    expect(parItem).toEqual({ FSY: 120, codepath: 1, 'FSY-I478': 11 })
+  })
+})
+
+describe("l'historique importé", () => {
+  const imp = (t: number, s: string, e: 'message' | 'reponse', k: string | null = null): Evenement => ({ t, s, e, k, d: 'projet', i: 1 })
+  const jet = (t: number, s: string, n: number, importe: boolean, k: string | null = null): Evenement =>
+    importe ? { t, s, e: 'jetons', n, k, d: 'projet', i: 1 } : { t, s, e: 'jetons', n, k, d: 'FSY' }
+
+  test("une session que le mod n'a pas suivie vient tout entière de l'historique", async () => {
+    const evenements = [imp(h(9), 'A', 'message', 'FLO-I1'), imp(h(9, 20), 'A', 'reponse'), jet(h(9, 20), 'A', 500, true)]
+    expect(fusionner(evenements, 0)).toEqual([...evenements, { t: h(9, 20), s: 'A', e: 'fermeture', k: null, i: 1 }])
+    const { parItem } = minutesDuJour(fusionner(evenements, 0), h(10))
+    expect(parItem).toEqual({ 'FLO-I1': 20 })
+  })
+
+  test("une session de l'historique n'est jamais en cours : un message resté sans réponse ne court pas jusqu'à maintenant", async () => {
+    const { parItem } = minutesDuJour(fusionner([imp(h(9), 'A', 'message', 'FLO-I1'), imp(h(9, 30), 'B', 'message', 'FLO-I2'), imp(h(9, 40), 'B', 'reponse')], 0), h(18))
+    expect(parItem).toEqual({ 'FLO-I2': 10 })
+  })
+
+  test("une session suivie garde son journal ; l'historique ne comble que l'avant, sous le même nom", async () => {
+    const evenements = [
+      imp(h(8), 'A', 'message'),
+      imp(h(8, 30), 'A', 'reponse'),
+      { t: h(9), s: 'A', e: 'ouverture', k: null, d: 'FSY' } as Evenement,
+      imp(h(9, 5), 'A', 'message'),
+      { t: h(9, 5), s: 'A', e: 'message', k: null, d: 'FSY' } as Evenement,
+      { t: h(9, 20), s: 'A', e: 'reponse', k: null, d: 'FSY' } as Evenement,
+    ]
+    const fusion = fusionner(evenements, 0)
+    expect(fusion.filter(e => 'i' in e).map(e => [e.t, 'd' in e ? e.d : null])).toEqual([[h(8), 'FSY'], [h(8, 30), 'FSY']])
+    expect(minutesDuJour(fusion, h(10)).parItem).toEqual({ FSY: 45 })
+  })
+
+  test("les tokens viennent de l'historique, à l'item que la session avait à ce moment ; ceux du journal ne comptent qu'après l'import", async () => {
+    const evenements = [
+      { t: h(9), s: 'A', e: 'message', k: 'FSY-I1', d: 'FSY' } as Evenement,
+      { t: h(9, 30), s: 'A', e: 'item', k: 'FSY-I2', d: 'FSY' } as Evenement,
+      jet(h(9, 10), 'A', 100, true),
+      jet(h(9, 40), 'A', 200, true),
+      jet(h(9, 41), 'A', 200, false, 'FSY-I2'),
+      jet(h(10, 5), 'A', 50, false, 'FSY-I2'),
+    ]
+    const fusion = fusionner(evenements, h(10))
+    expect(fusion.filter(e => e.e === 'jetons').map(e => [e.t, e.e === 'jetons' ? e.k : null, e.e === 'jetons' ? e.n : 0])).toEqual([
+      [h(9, 10), 'FSY-I1', 100],
+      [h(9, 40), 'FSY-I2', 200],
+      [h(10, 5), 'FSY-I2', 50],
+    ])
+  })
+})
+
+describe('items sans tokens', () => {
+  test("sans un token sur la période, un item n'a ni ligne ni temps compté ; le temps de sa session n'en change pas", async () => {
+    const evenements = [
+      ev(h(9), 'A', 'message', 'FLO-I1'),
+      ev(h(10), 'A', 'reponse', 'FLO-I1'),
+      ev(h(9, 30), 'B', 'message', 'FSY-I2'),
+      ev(h(10, 30), 'B', 'reponse', 'FSY-I2'),
+      { t: h(9, 40), s: 'A', e: 'jetons', n: 700, k: 'FLO-I1' } as Evenement,
+      // Une dépense notée à zéro (historique importé) n'est pas une dépense.
+      { t: h(9, 50), s: 'B', e: 'jetons', n: 0, k: 'FSY-I2' } as Evenement,
+    ]
+    const b = bilan(evenements, R, h(11), JOUR, jourSuivant(JOUR), new Map(), undefined, true)
+    expect(b.lignes.map(l => l.item)).toEqual(['FLO-I1'])
+    expect([b.total, b.reel, b.jetons]).toEqual([60, 60, 700])
+    expect(b.parSession.get('B')).toEqual(new Map([['FSY-I2', 60]]))
+    expect(b.derniere.get('FLO-I1')).toBe(h(10))
+    // En cours, un item sans token garde sa ligne.
+    const enCours = bilan(evenements, R, h(10, 31), JOUR, jourSuivant(JOUR), new Map(), undefined, true)
+    expect(enCours.lignes.map(l => l.item).sort()).toEqual(['FLO-I1', 'FSY-I2'])
+  })
+})
+
+describe('en anglais', () => {
+  test('les durées, les tokens, les jours et les titres', async () => {
+    choisirLangue('en')
+    try {
+      expect([45, 134, 8833].map(formatDuree)).toEqual(['45 min', '2h 14', '147h 13'])
+      expect([12_400, 1_200_000, 4_898_300_000].map(formatJetons)).toEqual(['12.4k', '1.2M', '4.9B'])
+      expect(bornes('jour', 0, h(12)).titre).toBe('Today')
+      expect(bornes('jour', -2, h(12)).titre).toBe('Tuesday, Nov 10')
+      expect(bornes('semaine', -2, h(12)).titre).toBe('Week of Oct 26')
+      expect(bornes('mois', -11, h(12)).titre).toBe('December 2025')
+      expect(depuis(h(9, 0, 1))).toBe('Since Nov 1')
+    } finally {
+      choisirLangue('fr')
+    }
+  })
 })
 
 describe('fichiers et textes', () => {
   test('les réglages invalides prennent la valeur par défaut', async () => {
     expect(lireOptions(undefined)).toEqual(OPTIONS_PAR_DEFAUT)
+    expect(OPTIONS_PAR_DEFAUT.langue).toBe('en')
+    expect(lireOptions({ langue: 'fr' }).langue).toBe('fr')
+    expect(lireOptions({ langue: 'de' }).langue).toBe('en')
     expect(OPTIONS_PAR_DEFAUT.seuilPause).toBe(45)
-    expect(lireOptions({ seuilPause: 30, motif: '([', jetons: false, activite: 'oui' })).toEqual({ ...OPTIONS_PAR_DEFAUT, seuilPause: 30, jetons: false })
+    expect([OPTIONS_PAR_DEFAUT.theme, lireOptions({ theme: 'braise' }).theme, lireOptions({ theme: 'rose' }).theme]).toEqual(['nuit', 'braise', 'nuit'])
+    expect(lireOptions({ seuilPause: 30, motif: '([', jetons: false, activite: 'oui' })).toEqual({ ...OPTIONS_PAR_DEFAUT, seuilPause: 30 })
   })
 
   test('une ligne de journal abîmée est ignorée', async () => {
@@ -299,7 +461,7 @@ describe('fichiers et textes', () => {
     ]
     const b = bilan(evts, R, h(11), JOUR, jourSuivant(JOUR))
     const ecart = { item: 'FLO-I165', debut: h(14), fin: h(14, 45), session: 'A' }
-    expect(recap("Aujourd'hui", b, [ecart], true, false)).toBe(
+    expect(recap("Aujourd'hui", b, [ecart], false)).toBe(
       [
         "Aujourd'hui",
         '',
@@ -343,6 +505,62 @@ describe('corrections, tokens et périodes', () => {
     expect(b.lignes.map(l => [l.item, l.minutes, l.jetons])).toEqual([['FLO-I1', 30, 500], ['FSY', 15, 1000]])
   })
 
+  test("la série compte les jours de travail d'affilée ; un week-end sans travail ne la coupe pas", async () => {
+    const jour = (j: number, minutes: number) => ({ t: new Date(2026, 10, j).getTime(), minutes })
+    // Du lundi 2 au jeudi 12 novembre : travail tous les jours ouvrés sauf le mardi 3, rien le week-end.
+    const liste = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(j => jour(j, j === 3 || j === 7 || j === 8 ? 0 : 60))
+    expect(serie(liste)).toBe(7)
+    // Aujourd'hui sans travail encore : la série d'hier tient toujours.
+    expect(serie([...liste.slice(0, -1), jour(12, 0)])).toBe(6)
+    expect(serie([jour(12, 0)])).toBe(0)
+    // Les jours à venir de la semaine ne comptent pas : la série part d'aujourd'hui.
+    expect(serie([...liste, { t: new Date(2026, 10, 13).getTime(), minutes: -2 }])).toBe(7)
+  })
+
+  test("seuls les items comptés en ce moment ont une couleur, chacune différente", async () => {
+    const l = (item: string, enCours: boolean) => ({ item, enCours })
+    const teintes = couleurs([l('A', false), l('B', true), l('sans nom', true), l('C', true), l('D', false)])
+    expect(teintes[0]).toBe(teintes[4])
+    expect(new Set([teintes[1], teintes[3], teintes[0]]).size).toBe(3)
+    expect(teintes[2]).toBe(teintes[0])
+  })
+
+  test("l'année : du 1er janvier au 1er janvier suivant, titrée par son numéro", async () => {
+    expect(bornes('annee', 0, h(12))).toEqual({ debut: new Date(2026, 0, 1).getTime(), fin: new Date(2027, 0, 1).getTime(), titre: '2026' })
+    expect(bornes('annee', -1, h(12)).titre).toBe('2025')
+  })
+
+  test("la frise d'une année part du lundi de sa première semaine ; les jours d'avant ne sont pas dessinés", async () => {
+    const debut = new Date(2026, 0, 1).getTime() // un jeudi
+    const liste = casesEntre(debut, new Date(2026, 0, 11).getTime(), new Map([['2026-01-02', 30]]))
+    expect(liste.length).toBe(14)
+    expect(new Date(liste[0]!.t).getDay()).toBe(1)
+    expect(liste.slice(0, 3).map(c => c.minutes)).toEqual([-1, -1, -1])
+    expect(liste[4]!.minutes).toBe(30)
+    // Les jours après aujourd'hui (une année en cours) sont à venir : -2.
+    const avenir = casesEntre(debut, new Date(2026, 0, 11).getTime(), new Map(), new Date(2026, 0, 5).getTime())
+    expect(avenir.slice(-6).map(c => c.minutes)).toEqual([-2, -2, -2, -2, -2, -2])
+    expect(avenir[7]!.minutes).toBe(0)
+  })
+
+  test("au survol, une case donne aussi les tokens du jour ; en mode Tokens, sa couleur les suit", async () => {
+    const debut = new Date(2026, 0, 5).getTime() // un lundi
+    const fin = new Date(2026, 0, 6).getTime()
+    const liste = casesEntre(debut, fin, new Map([['2026-01-05', 30], ['2026-01-06', 30]]), Infinity, new Map([['2026-01-05', 1_500_000], ['2026-01-06', 15_000]]))
+    expect(liste.map(c => c.jetons)).toEqual([1_500_000, 15_000])
+    const { source } = svgActivite(liste, null, null)
+    expect(source).toContain('30 min · 1,5 M tokens')
+    // Même temps, tokens très différents : par temps, les deux cases ont la même intensité ; par tokens, non.
+    const opacites = (svg: string) => [...svg.matchAll(/fill-opacity="([\d.]+)"><title>/g)].map(m => m[1])
+    expect(new Set(opacites(source)).size).toBe(1)
+    expect(new Set(opacites(svgActivite(liste, null, null, true).source)).size).toBe(2)
+  })
+
+  test("le titre de l'onglet Tout part du premier jour du journal", async () => {
+    expect(depuis(h(9, 0, 12))).toBe('Depuis le 12 novembre')
+    expect(depuis(new Date(2026, 11, 1).getTime())).toBe('Depuis le 1er décembre')
+  })
+
   test('les bornes et les titres des périodes', async () => {
     expect(bornes('jour', 0, h(15))).toEqual({ debut: JOUR, fin: jourSuivant(JOUR), titre: "Aujourd'hui" })
     expect(bornes('jour', -1, h(15)).titre).toBe('Hier')
@@ -355,6 +573,6 @@ describe('corrections, tokens et périodes', () => {
   })
 
   test('le format des tokens', async () => {
-    expect([850, 12_400, 245_000, 1_200_000, 3_000_000].map(formatJetons)).toEqual(['850', '12,4 k', '245 k', '1,2 M', '3 M'])
+    expect([850, 12_400, 245_000, 1_200_000, 3_000_000, 245_000_000, 4_898_300_000].map(formatJetons)).toEqual(['850', '12,4 k', '245 k', '1,2 M', '3 M', '245 M', '4,9 Md'])
   })
 })
