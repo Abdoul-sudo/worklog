@@ -8,7 +8,7 @@ export const MINUTE = 60_000
 const DUREE_MAX_TOUR = 12 * 60 * MINUTE
 // Chaque session vivante donne signe de vie toutes les 30 s ; au-delà de cette marge, elle est tenue pour morte
 // (fenêtre fermée sans fin de session notée).
-const MARGE_VIE = 2 * MINUTE
+export const MARGE_VIE = 2 * MINUTE
 
 /** Les réglages, modifiables dans la vue Réglages du popover. */
 export type Options = {

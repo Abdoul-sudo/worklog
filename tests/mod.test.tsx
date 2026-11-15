@@ -663,3 +663,17 @@ test("après une longue pause, la question vient aussi quand on nomme la session
   expect((await bande.find({ type: 'Text', text: /sans activité/ }))?.text).toContain('2 h 00 sans activité sur FLO-I165')
   await bande.unmount()
 })
+
+test("recharger les mods pendant une longue réponse ne coupe pas son temps", async ($, on) => {
+  const { horloge } = monde(on)
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await $.prompt.submit({ ...PROMPT, text: 'FLO-I165 : une longue tâche' })
+  await horloge.advance(30 * 60_000)
+  await horloge.settle()
+  // /reload-plugins : le moteur relance session.start dans le même processus, encore vivant.
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await horloge.advance(60 * 60_000)
+  await $.turn.complete({ ...FIN_DE_TOUR, usage: { model: 'm', input_tokens: 1_000, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } })
+  await horloge.settle()
+  expect(await ligneDe($, 'FLO-I165')).toContain('1 h 30')
+})

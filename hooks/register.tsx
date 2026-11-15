@@ -13,6 +13,7 @@ import {
   type Corrections,
   type Evenement,
   type Retrait,
+  MARGE_VIE,
   MOTIF_ID,
   SANS_ITEM,
   SEUILS,
@@ -219,6 +220,17 @@ function noter($: Moteur, ev: Evenement): Promise<void> {
 }
 
 /** Signe de vie de la session : la date du fichier `.vivant`, réécrit à chaque rafraîchissement. */
+/** Vrai si cette session a donné signe de vie il y a peu : ses mods se rechargent, son processus n'a pas redémarré. */
+async function vivaitDeja($: Moteur): Promise<boolean> {
+  const { journal } = await dossiers($)
+  const maintenant = await $.clock.now()
+  const dossier = `${journal}/${cleJour(maintenant)}`
+  if (!(await $.fs.exists(dossier))) return false
+  const nom = `${await $.session.id()}.vivant`
+  const signe = (await $.fs.list(dossier)).find(f => f.name === nom)
+  return signe !== undefined && maintenant - signe.mtimeMs < MARGE_VIE
+}
+
 async function donnerSigneDeVie($: Moteur): Promise<void> {
   const { journal } = await dossiers($)
   await $.fs.write(`${journal}/${cleJour(await $.clock.now())}/${await $.session.id()}.vivant`, '')
@@ -1498,7 +1510,8 @@ export const register: Register = on => {
     const s = await $.session.id()
     const deBranche = await itemDeNouvelleBranche($, MOTIF_ID)
     if (deBranche !== null && (await itemDe($, s)) === null) await definirItem($, s, deBranche, false)
-    await noterActivite($, 'ouverture')
+    // Après /reload-plugins, ce hook revient dans un processus vivant : ce n'est pas une ouverture.
+    if (!(await vivaitDeja($).catch(() => false))) await noterActivite($, 'ouverture')
     enFond(rafraichir($))
     enFond(importerHistorique($))
     $.clock.every(RAFRAICHISSEMENT_MS, () => {
