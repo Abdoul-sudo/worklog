@@ -40,11 +40,11 @@ export type Vue = {
  * montre l'onglet, mise en avant dans la frise. */
 export type Frise = {
   cases: { t: number; minutes: number; jetons?: number }[]
-  total: number
   aujourdhui: boolean
   periode: { debut: number; fin: number } | null
-  /** Les cases suivent les tokens, et non le temps (réglage « Afficher : Tokens »). */
-  parJetons: boolean
+  /** Le réglage « Afficher » : avec « Tokens », les cases suivent les tokens, et non le temps ; l'infobulle d'une case ne
+   * donne que ce qui est affiché. */
+  mesure: Reglages['mesure']
 }
 
 /** Les réglages du popover. */

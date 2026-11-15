@@ -3,6 +3,7 @@
 import { cleJour, debutJour, debutSemaine, decalerJours, formatDuree, formatJetons, formatJour, majuscule } from './calcul'
 import { ENCRE, aUnCiel } from './dessins'
 import { t } from './langue'
+import type { Reglages } from '../types'
 
 export type Case = { t: number; minutes: number; jetons?: number }
 
@@ -51,6 +52,16 @@ export function niveau(minutes: number): 0 | 1 | 2 | 3 | 4 {
   return 4
 }
 
+/** Le niveau de chaque case. Par tokens : quatre niveaux, du jour le plus dépensier de la frise au plus sobre. */
+function niveaux(liste: readonly Case[], parJetons: boolean): (c: Case) => 0 | 1 | 2 | 3 | 4 {
+  if (!parJetons) return c => niveau(c.minutes)
+  const max = Math.max(1, ...liste.map(c => c.jetons ?? 0))
+  return c => {
+    const n = c.jetons ?? 0
+    return n <= 0 ? 0 : (Math.min(4, Math.ceil((4 * n) / max)) as 1 | 2 | 3 | 4)
+  }
+}
+
 const OPACITES = [0.1, 0.32, 0.55, 0.78, 1]
 
 /** La frise en SVG, pour le fond sombre du popover (app desktop et VS Code). Une infobulle donne la date et le temps ;
@@ -61,7 +72,7 @@ export function svgActivite(
   liste: readonly Case[],
   aujourdhui: number | null,
   periode: { debut: number; fin: number } | null,
-  parJetons = false,
+  mesure: Reglages['mesure'] = 'tout',
 ): { source: string; largeur: number; hauteur: number } {
   const annuelle = liste.length > 27 * 7
   const cote = annuelle ? 7 : 10
@@ -70,15 +81,15 @@ export function svgActivite(
   const colonnes = Math.ceil(liste.length / 7)
   const largeur = colonnes * pas - (pas - cote)
   const hauteur = haut + 7 * pas - (pas - cote)
-  // Un fond plein sous les cases quand le thème a une trame : elle ne se voit pas au travers.
-  const parts: string[] = aUnCiel() ? [`<rect x="0" y="${haut}" width="${largeur}" height="${hauteur - haut}" fill="${ENCRE.fond}"/>`] : []
+  const parts: string[] = []
   // La période de l'onglet : un jour se cercle ; plus long, une bande claire couvre ses colonnes.
   const dansPeriode = (c: Case) => periode !== null && c.t >= periode.debut && c.t < periode.fin
   const unJour = periode !== null && periode.fin - periode.debut <= 25 * 3600_000
   const colonnesPeriode = liste.flatMap((c, i) => (dansPeriode(c) ? [Math.floor(i / 7)] : []))
-  if (!unJour && colonnesPeriode.length > 0) {
-    const de = Math.min(...colonnesPeriode)
-    const a = Math.max(...colonnesPeriode)
+  const de = Math.min(...colonnesPeriode)
+  const a = Math.max(...colonnesPeriode)
+  const bande = !unJour && colonnesPeriode.length > 0
+  if (bande) {
     parts.push(
       `<rect x="${de * pas - 2}" y="${haut - 2}" width="${(a - de + 1) * pas + 2}" height="${7 * pas + 2}" rx="3" fill="${ENCRE.vif}" fill-opacity=".07"/>`,
     )
@@ -105,49 +116,110 @@ export function svgActivite(
     const ancre = auBord ? ` x="${largeur}" text-anchor="end"` : ` x="${x}"`
     parts.push(`<text${ancre} y="10" font-size="10.5" fill="${ENCRE.legende}" font-family="system-ui,sans-serif">${t().moisCourts[mois]}</text>`)
   }
-  const maxJetons = Math.max(1, ...liste.map(c => c.jetons ?? 0))
-  const niveauJetons = (n: number) => (n <= 0 ? 0 : (Math.min(4, Math.ceil((4 * n) / maxJetons)) as 1 | 2 | 3 | 4))
+  const niveauDe = niveaux(liste, mesure === 'jetons')
+  // Sur un thème à trame, une case a sa couleur pleine, déjà mêlée au fond (ou à la bande de la période) : la trame ne
+  // passe pas au travers, et les jours hors de la frise restent vides.
+  const fondBande = melanger(ENCRE.vif, ENCRE.fond, 0.07)
   liste.forEach((c, i) => {
     const colonne = Math.floor(i / 7)
     const ligne = i % 7
     if (c.minutes === -1) return
     const avenir = c.minutes === -2
-    // Par tokens : quatre niveaux, du jour le plus dépensier de la frise au plus sobre.
-    const n = avenir ? 0 : parJetons ? niveauJetons(c.jetons ?? 0) : niveau(c.minutes)
+    const n = avenir ? 0 : niveauDe(c)
     const couleur = n === 0 ? ENCRE.vide : ENCRE.accent
     const estAujourdhui = aujourdhui !== null && c.t === aujourdhui
-    const cercle = estAujourdhui || (unJour && dansPeriode(c)) ? ' stroke="${ENCRE.vif}" stroke-opacity=".6"' : ''
+    const cercle = estAujourdhui || (unJour && dansPeriode(c)) ? ` stroke="${ENCRE.vif}" stroke-opacity=".6"` : ''
     // Aujourd'hui sans son temps : le dessin ne change ainsi qu'au changement de niveau, pas à chaque minute.
-    const jetons = (c.jetons ?? 0) > 0 ? ` · ${t().tokens(formatJetons(c.jetons!))}` : ''
-    const infobulle = estAujourdhui ? t().aujourdhui : `${majuscule(formatJour(c.t))} · ${c.minutes > 0 ? formatDuree(c.minutes) : t().rien}${jetons}`
+    const temps = c.minutes > 0 ? formatDuree(c.minutes) : t().rien
+    const jetons = (c.jetons ?? 0) > 0 ? t().tokens(formatJetons(c.jetons!)) : null
+    const valeur = mesure === 'temps' ? temps : mesure === 'jetons' ? (jetons ?? t().rien) : jetons === null ? temps : `${temps} · ${jetons}`
+    const infobulle = estAujourdhui ? t().aujourdhui : `${majuscule(formatJour(c.t))} · ${valeur}`
+    const opacite = avenir ? 0.035 : OPACITES[n]!
+    // Un jour à venir reste presque transparent : la frise ne montre pas de cases sombres après aujourd'hui.
+    const dessous = !aUnCiel() || avenir ? null : bande && colonne >= de && colonne <= a ? fondBande : ENCRE.fond
+    const peinture = dessous === null ? `fill="${couleur}" fill-opacity="${opacite}"` : `fill="${melanger(couleur, dessous, opacite)}"`
     parts.push(
-      `<rect x="${colonne * pas}" y="${haut + ligne * pas}" width="${cote}" height="${cote}" rx="${annuelle ? 1.5 : 2.5}" fill="${couleur}" fill-opacity="${avenir ? 0.035 : OPACITES[n]}"${cercle}>${avenir ? '' : `<title>${infobulle}</title>`}</rect>`,
+      `<rect x="${colonne * pas}" y="${haut + ligne * pas}" width="${cote}" height="${cote}" rx="${annuelle ? 1.5 : 2.5}" ${peinture}${cercle}>${avenir ? '' : `<title>${infobulle}</title>`}</rect>`,
     )
   })
   const source = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${largeur} ${hauteur}" width="${largeur}" height="${hauteur}" preserveAspectRatio="xMinYMin meet">${parts.join('')}</svg>`
   return { source, largeur, hauteur }
 }
 
-const COULEURS_TERMINAL = [0x4a4a4a, 0x7a4a3a, 0xa85a42, 0xc8684b, 0xe07a5a]
+/** La couleur pleine de `dessus` posée à `opacite` sur `dessous` (deux couleurs #RRGGBB). */
+function melanger(dessus: string, dessous: string, opacite: number): string {
+  const canal = (couleur: string, i: number) => parseInt(couleur.slice(i, i + 2), 16)
+  return `#${[1, 3, 5].map(i => Math.round(canal(dessus, i) * opacite + canal(dessous, i) * (1 - opacite)).toString(16).padStart(2, '0')).join('')}`
+}
+
+const COULEURS_TERMINAL = [0x3a3a3a, 0x7a4a3a, 0xa85a42, 0xc8684b, 0xe07a5a]
 const DEFAUT = 0x01000000
 
-/** La frise pour le terminal : 7 lignes de `■`, une colonne de caractère sur deux, en base64 pour un Raster. */
-export function cellulesActivite(toutes: readonly Case[]): { cellules: string; colonnes: number; lignes: number } {
-  // Le terminal garde les 26 dernières semaines : une année ne tient pas à côté de la liste.
-  const liste = toutes.slice(-26 * 7)
-  const semaines = Math.ceil(liste.length / 7)
-  const colonnes = semaines * 2 - 1
-  const mots = new Uint32Array(colonnes * 7 * 3)
-  for (let ligne = 0; ligne < 7; ligne++) {
-    for (let colonne = 0; colonne < colonnes; colonne++) {
-      const i = (ligne * colonnes + colonne) * 3
-      const c = colonne % 2 === 0 ? liste[(colonne / 2) * 7 + ligne] : undefined
-      mots[i] = c === undefined || c.minutes < 0 ? 0x20 : 0x25a0
-      mots[i + 1] = c === undefined ? DEFAUT : COULEURS_TERMINAL[niveau(c.minutes)]!
-      mots[i + 2] = DEFAUT
+/** Le dessin de la frise dans le terminal. En cases : un ■ par jour, une colonne par semaine, sept lignes, comme sur
+ * GitHub. Serré, pour une bande trop basse : deux jours par caractère, l'un au-dessus de l'autre (▀ et sa couleur de
+ * fond), sur quatre lignes. */
+export type DessinTerminal = 'cases' | 'serre'
+
+/** La frise pour le terminal, en base64 pour un Raster, et `mois`, la ligne des mois à écrire au-dessus. Au plus
+ * `semainesMax` colonnes : quand l'année ne tient pas, les semaines jusqu'à celle du dernier jour passé. */
+export function cellulesActivite(
+  toutes: readonly Case[],
+  mesure: Reglages['mesure'] = 'tout',
+  dessin: DessinTerminal = 'cases',
+  semainesMax = Infinity,
+): { cellules: string; colonnes: number; lignes: number; mois: string } {
+  let liste = toutes
+  if (Math.ceil(toutes.length / 7) > semainesMax) {
+    let dernier = toutes.length - 1
+    while (dernier > 0 && toutes[dernier]!.minutes < 0) dernier--
+    const fin = Math.floor(dernier / 7) + 1
+    liste = toutes.slice(Math.max(0, fin - semainesMax) * 7, fin * 7)
+  }
+  const colonnes = Math.ceil(liste.length / 7)
+  const lignes = dessin === 'cases' ? 7 : 4
+  const niveauDe = niveaux(liste, mesure === 'jetons')
+  // Les jours hors de l'année et ceux à venir restent vides.
+  const couleur = (c: Case | undefined) => (c === undefined || c.minutes < 0 ? null : COULEURS_TERMINAL[niveauDe(c)]!)
+  const mots = new Uint32Array(colonnes * lignes * 3)
+  for (let ligne = 0; ligne < lignes; ligne++) {
+    for (let semaine = 0; semaine < colonnes; semaine++) {
+      const i = (ligne * colonnes + semaine) * 3
+      if (dessin === 'cases') {
+        const jour = couleur(liste[semaine * 7 + ligne])
+        mots[i] = jour === null ? 0x20 : 0x25a0
+        mots[i + 1] = jour ?? DEFAUT
+        mots[i + 2] = DEFAUT
+        continue
+      }
+      const haut = couleur(liste[semaine * 7 + ligne * 2])
+      const bas = ligne * 2 + 1 > 6 ? null : couleur(liste[semaine * 7 + ligne * 2 + 1])
+      // ▀ peint le jour du haut, le fond celui du bas ; ▄ seul quand il n'y a que celui du bas.
+      mots[i] = haut !== null ? 0x2580 : bas !== null ? 0x2584 : 0x20
+      mots[i + 1] = haut ?? bas ?? DEFAUT
+      mots[i + 2] = haut !== null && bas !== null ? bas : DEFAUT
     }
   }
-  return { cellules: base64(new Uint8Array(mots.buffer)), colonnes, lignes: 7 }
+  return { cellules: base64(new Uint8Array(mots.buffer)), colonnes, lignes, mois: ligneMois(liste, colonnes) }
+}
+
+/** Le nom de chaque mois au-dessus de la semaine où il commence, un espace au moins entre deux noms. Le premier mois,
+ * souvent tronqué, cède sa place au suivant s'ils se touchent ; le dernier, trop près du bord droit, s'aligne sur ce
+ * bord s'il y a la place. */
+function ligneMois(liste: readonly Case[], semaines: number): string {
+  const ECART = 1
+  const etiquettes: { x: number; nom: string }[] = []
+  for (let semaine = 0; semaine < semaines; semaine++) {
+    const mois = new Date(liste[semaine * 7]!.t).getMonth()
+    if (semaine === 0 || mois !== new Date(liste[(semaine - 1) * 7]!.t).getMonth()) etiquettes.push({ x: semaine, nom: t().moisTerminal[mois]! })
+  }
+  if (etiquettes.length > 1 && etiquettes[1]!.x - etiquettes[0]!.x < etiquettes[0]!.nom.length + ECART) etiquettes.shift()
+  let ligne = ''
+  for (const etiquette of etiquettes) {
+    const x = Math.min(etiquette.x, semaines - etiquette.nom.length)
+    if (ligne !== '' && x < ligne.length + ECART) continue
+    ligne = ligne.padEnd(x) + etiquette.nom
+  }
+  return ligne
 }
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'

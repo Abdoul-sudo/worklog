@@ -102,12 +102,15 @@ function monde(
 }
 
 type Dessin = {
+  surface: RenderSurface
   find(cible: { key?: string; type?: string; text?: RegExp }): Promise<{ text?: string } | undefined>
 }
 
 /** La puce affiche ce nom et ce temps. */
 async function puceAffiche(ui: Dessin, nom: string, temps: string) {
-  expect((await ui.find({ key: 'puce' }))?.text?.trim()).toBe(`⏱ ${nom} · ${temps}`)
+  // Le terminal dessine ⏱ sur deux colonnes sans les compter : il y prend ◷, d'une seule colonne.
+  const signe = ui.surface === 'terminal' ? '◷' : '⏱'
+  expect((await ui.find({ key: 'puce' }))?.text?.trim()).toBe(`${signe} ${nom} · ${temps}`)
 }
 
 /** Ouvre une session et y passe `minutes` sur un message qui cite `texte`. */
@@ -141,7 +144,8 @@ test('un message avec un ID compte pour cet item ; la puce est sous la saisie et
     // Le nom : le libellé du bouton dans le terminal, un texte sous un bouton vide dans l'app desktop.
     const nom = await bande.find(surface === 'terminal' ? { key: 'choisir-FLO-I165' } : { type: 'Text', text: /^FLO-I165$/ })
     expect(nom?.text?.trim()).toBe('FLO-I165')
-    expect(await bande.find({ key: 'crayon' })).toBeDefined()
+    // Le crayon vient au survol dans l'app desktop ; le terminal n'a pas de survol : le nom y est le bouton.
+    expect(await bande.find({ key: 'crayon' })).toEqual(surface === 'desktop' ? expect.anything() : undefined)
     await puce.press({ key: 'puce' })
     expect(await bande.find({ key: 'onglet-jour' })).toBeUndefined()
     await puce.unmount()
@@ -304,6 +308,64 @@ test('les tokens, les onglets, les réglages et la frise', async ($, on) => {
   }
 })
 
+type Noeud = { type?: string; props?: Record<string, unknown>; children?: Noeud[] }
+/** La boîte qui contient directement l'élément de clé `cle`. */
+function parentDe(n: Noeud, cle: string): Noeud | undefined {
+  for (const enfant of n.children ?? []) {
+    if (enfant.props?.key === cle) return n
+    const trouve = parentDe(enfant, cle)
+    if (trouve !== undefined) return trouve
+  }
+  return undefined
+}
+
+test('« Afficher : Tokens » : les stats restent groupées, et les tokens prennent la place du temps', async ($, on) => {
+  const { horloge } = monde(on, ['desktop'])
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await travailler($, horloge, 'FLO-I1', 10)
+  const puce = await $.ui.mount({ ...PIED, surface: 'desktop' })
+  const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
+  await puce.press({ key: 'puce' })
+  await bande.press({ key: 'reglages' })
+  await bande.select({ key: 'mesure', value: 'jetons' })
+  await bande.press({ key: 'reglages' })
+  expect(await bande.find({ type: 'Text', text: /^Temps$/ })).toBeUndefined()
+  // Deux stats sur trois : elles restent côte à côte, sans grand vide entre elles.
+  const stats = parentDe((await bande.drawn()) as Noeud, 'stat-jetons')
+  expect(stats?.props).toMatchObject({ flexDirection: 'row' })
+  expect(stats?.props?.justifyContent).toBeUndefined()
+  // Dans la ligne, les tokens ont la taille et l'encre du temps.
+  expect(await bande.find({ type: 'Text', text: /^1 k tokens$/ })).toMatchObject({ props: { size: 'footnote' } })
+  // La croix des réglages : grise, comme l'engrenage.
+  await bande.press({ key: 'reglages' })
+  expect(await bande.find({ type: 'Text', text: /^✕$/ })).toBeUndefined()
+  await puce.unmount()
+  await bande.unmount()
+})
+
+test("dans le terminal, la frise prend la place qu'il y a, et la liste remplit sa hauteur", async ($, on) => {
+  const { horloge } = monde(on)
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  for (let i = 1; i <= 8; i++) await travailler($, horloge, `FLO-I${i}`, 9 - i)
+  const puce = await $.ui.mount({ ...LIGNE_AIDE, surface: 'terminal' })
+  await puce.press({ key: 'puce' })
+  const bande = async (props: { maxRows?: number; bodyColumns?: number }) => {
+    const dessin = await $.ui.mount({ ...BANDE, props: { ...BANDE.props, ...props }, surface: 'terminal' })
+    const raster = (await dessin.find({ key: 'frise-cases' }))?.props
+    const pages = (await dessin.find({ type: 'Text', text: /sur 8$/ }))?.text
+    await dessin.unmount()
+    return { raster, pages }
+  }
+  // Large et haute : toute l'année en cases, sept lignes ; la liste en montre six, la hauteur de la frise.
+  expect(await bande({})).toMatchObject({ raster: { rows: 7, columns: 53 }, pages: '1–6 sur 8' })
+  // Basse : la frise serrée sur quatre lignes, trois lignes de liste.
+  expect(await bande({ maxRows: 8 })).toMatchObject({ raster: { rows: 4 }, pages: '1–3 sur 8' })
+  // Étroite : les semaines qui tiennent ; trop étroite : pas de frise, deux lignes de liste.
+  expect(await bande({ bodyColumns: 80 })).toMatchObject({ raster: { columns: 22 } })
+  expect(await bande({ bodyColumns: 60 })).toMatchObject({ raster: undefined, pages: '1–2 sur 8' })
+  await puce.unmount()
+})
+
 test('la liste va par pages : chaque item reste joignable', async ($, on) => {
   const { horloge } = monde(on, ['desktop'])
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
@@ -314,12 +376,12 @@ test('la liste va par pages : chaque item reste joignable', async ($, on) => {
   // Rien d'autre dans la bande : la pile espacée ne tient que la carte, sans écart dessous.
   const pile = (await panneau.drawn()) as { children: { children?: unknown[] }[] }
   expect(pile.children[0]!.children).toHaveLength(1)
-  expect(await panneau.find({ type: 'Text', text: /^1–6 sur 8$/ })).toBeDefined()
+  expect(await panneau.find({ type: 'Text', text: /^1–4 sur 8$/ })).toBeDefined()
   await panneau.press({ key: 'page-suivante' })
-  expect(await panneau.find({ type: 'Text', text: /^7–8 sur 8$/ })).toBeDefined()
+  expect(await panneau.find({ type: 'Text', text: /^5–8 sur 8$/ })).toBeDefined()
   expect(await panneau.find({ type: 'Text', text: /^FLO-I1$/ })).toBeDefined()
   await panneau.press({ key: 'page-precedente' })
-  expect(await panneau.find({ type: 'Text', text: /^1–6 sur 8$/ })).toBeDefined()
+  expect(await panneau.find({ type: 'Text', text: /^1–4 sur 8$/ })).toBeDefined()
   await puce.unmount()
   await panneau.unmount()
 })

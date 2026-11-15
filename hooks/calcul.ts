@@ -513,9 +513,11 @@ export function ajouterRecent(recents: readonly string[], item: string): string[
 }
 
 /** Le texte de la puce : `⏱ FSY-I478 · 2 h 14`, ou `⏱ 2 h 14` sans nom. */
-export function libellePuce(item: string | null, minutes: number, enPause: boolean): string {
+export function libellePuce(item: string | null, minutes: number, enPause: boolean, terminal = false): string {
   const nom = item === null ? '' : `${item} · `
-  return `${enPause ? '⏸' : '⏱'} ${nom}${formatDuree(minutes)}`
+  // Le terminal dessine ⏱ et ⏸ sur deux colonnes sans les compter : ils mordraient sur le nom.
+  const signe = terminal ? (enPause ? '‖' : '◷') : enPause ? '⏸' : '⏱'
+  return `${signe} ${nom}${formatDuree(minutes)}`
 }
 
 /** Le nom du groupe de l'app desktop où se trouve la session `hote`, lu dans la config de l'app. */

@@ -22,7 +22,7 @@ import {
   lireLignes,
   nomDuGroupe,
 } from '../hooks/calcul'
-import { casesEntre, serie, svgActivite } from '../hooks/activite'
+import { casesEntre, cellulesActivite, serie, svgActivite } from '../hooks/activite'
 import { couleurs } from '../hooks/dessins'
 import { recap } from '../hooks/texte'
 import { choisirLangue } from '../hooks/langue'
@@ -547,10 +547,43 @@ describe('corrections, tokens et périodes', () => {
     expect(liste.map(c => c.jetons)).toEqual([1_500_000, 15_000])
     const { source } = svgActivite(liste, null, null)
     expect(source).toContain('30 min · 1,5 M tokens')
+    // L'infobulle ne donne que ce que montre le réglage « Afficher ».
+    expect(svgActivite(liste, null, null, 'temps').source).toContain('<title>Lundi 5 janvier · 30 min</title>')
+    expect(svgActivite(liste, null, null, 'jetons').source).toContain('<title>Lundi 5 janvier · 1,5 M tokens</title>')
     // Même temps, tokens très différents : par temps, les deux cases ont la même intensité ; par tokens, non.
-    const opacites = (svg: string) => [...svg.matchAll(/fill-opacity="([\d.]+)"><title>/g)].map(m => m[1])
-    expect(new Set(opacites(source)).size).toBe(1)
-    expect(new Set(opacites(svgActivite(liste, null, null, true).source)).size).toBe(2)
+    const peintures = (svg: string) => [...svg.matchAll(/ rx="[\d.]+" ([^>]*)><title>/g)].map(m => m[1])
+    expect(new Set(peintures(source)).size).toBe(1)
+    expect(new Set(peintures(svgActivite(liste, null, null, 'jetons').source)).size).toBe(2)
+  })
+
+  test("les jours hors de l'année restent vides ; aujourd'hui est cerclé", async () => {
+    const aujourdhui = new Date(2026, 10, 15).getTime()
+    const liste = casesEntre(new Date(2026, 0, 1).getTime(), new Date(2026, 11, 31).getTime(), new Map(), aujourdhui)
+    const { source } = svgActivite(liste, aujourdhui, null)
+    // Une case par jour de l'année, rien sous les jours d'avant le 1er janvier : pas de fond plein sous toute la frise.
+    expect([...source.matchAll(/<rect /g)].length).toBe(liste.filter(c => c.minutes !== -1).length)
+    expect(source).toMatch(/stroke="#[0-9A-F]{6}" stroke-opacity=".6"><title>Aujourd'hui<\/title>/)
+  })
+
+  test("dans le terminal, la frise montre toute l'année en cases, les mois au-dessus", async () => {
+    const aujourdhui = new Date(2026, 10, 15).getTime() // un dimanche
+    const liste = casesEntre(new Date(2026, 0, 1).getTime(), new Date(2026, 11, 31).getTime(), new Map([['2026-01-01', 90]]), aujourdhui)
+    const annee = cellulesActivite(liste)
+    expect([annee.colonnes, annee.lignes]).toEqual([53, 7])
+    // Une lettre par mois en français : un mois ne fait que quatre ou cinq colonnes.
+    expect(annee.mois.trim().split(/\s+/)).toEqual(['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'])
+    const mots = new Uint32Array(Uint8Array.from(atob(annee.cellules), c => c.charCodeAt(0)).buffer)
+    const cellule = (ligne: number, semaine: number) => [...mots.slice((ligne * 53 + semaine) * 3, (ligne * 53 + semaine) * 3 + 2)]
+    // Le lundi 29 décembre 2025, avant l'année : vide. Le jeudi 1er janvier, 1 h 30 : une case du deuxième niveau. Le
+    // lundi 16 novembre, à venir : vide.
+    expect(cellule(0, 0)[0]).toBe(0x20)
+    expect(cellule(3, 0)).toEqual([0x25a0, 0xa85a42])
+    expect(cellule(0, 46)[0]).toBe(0x20)
+    // Serrée pour une bande basse : quatre lignes. Étroite : les semaines jusqu'à celle d'aujourd'hui.
+    expect(cellulesActivite(liste, 'tout', 'serre').lignes).toBe(4)
+    const etroite = cellulesActivite(liste, 'tout', 'cases', 20)
+    expect(etroite.colonnes).toBe(20)
+    expect(etroite.mois.length).toBeLessThanOrEqual(20)
   })
 
   test("le titre de l'onglet Tout part du premier jour du journal", async () => {
