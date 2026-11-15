@@ -1550,7 +1550,8 @@ export const register: Register = on => {
   })
 
   on('prompt.submit', ($, e, next) => {
-    if (e.command?.name === 'temps') return next(e)
+    // Ouvrir le popover n'est pas travailler : la commande ne compte pas comme un message.
+    if (e.command?.name === 'worklog' || e.command?.name === 'temps') return next(e)
     tourCompte = !AUTOMATIQUES.includes(e.origin.kind)
     if (tourCompte) enFond(apresMessage($, e.text, e.isMeta !== true && ECRITS.includes(e.origin.kind)))
     if (e.origin.kind === 'composer') enFond(fermerChampVide($))

@@ -380,6 +380,13 @@ test("l'ancienne commande /temps marche encore", async ($, on) => {
   expect((await $.command.run({ ...COMMANDE, command: 'temps', args: 'jour' })).text).toContain('  FLO-I165   10 min')
 })
 
+test("taper /worklog ou /temps n'est pas une activité : le journal n'en garde aucun message", async ($, on) => {
+  const { fichiers } = monde(on)
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  for (const name of ['worklog', 'temps']) await $.prompt.submit({ ...PROMPT, text: `/${name}`, command: { name, args: '' } })
+  expect(fichiers.get(JOURNAL)!.trim().split('\n').filter(l => l.includes('"e":"message"'))).toEqual([])
+})
+
 test("les réglages gardés sous l'ancien nom, temps-item, sont repris une fois", async ($, on) => {
   // Le monde en anglais n'a pas de réglages : ceux de l'ancien nom passent le popover en français.
   const { fichiers } = monde(on, ['terminal'], {}, 'en')
