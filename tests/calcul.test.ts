@@ -15,7 +15,6 @@ import {
   calculer,
   debutJour,
   detecterItem,
-  estUnItem,
   formatDuree,
   jourSuivant,
   libellePuce,
@@ -269,15 +268,19 @@ describe('items', () => {
     expect(parItem).toEqual({ [SANS_ITEM]: 10 })
   })
 
-  test('la détection prend le premier ID Zoho du texte et respecte les bords de mot', async () => {
+  test('la détection prend le premier ID de ticket du texte et respecte les bords de mot', async () => {
     expect(detecterItem('voir FLO-I165.', MOTIF_ID)).toBe('FLO-I165')
     expect(detecterItem('FSY-I478 puis FLO-I165', MOTIF_ID)).toBe('FSY-I478')
-    expect(detecterItem('fichier UTF-8 et norme ISO-8601', MOTIF_ID)).toBe(null)
+    expect(detecterItem('fix PROJ-142 today', MOTIF_ID)).toBe('PROJ-142')
+    expect(detecterItem('see ENG-42', MOTIF_ID)).toBe('ENG-42')
     expect(detecterItem('FLO-I165a', MOTIF_ID)).toBe(null)
     expect(detecterItem('un motif cassé', '([')).toBe(null)
     expect(detecterItem('FSY-I478 puis FLO-I165', 'FLO-I\\d+|FSY-I\\d+')).toBe('FSY-I478')
-    expect(estUnItem('FLO-I165', MOTIF_ID)).toBe(true)
-    expect(estUnItem('semaine', MOTIF_ID)).toBe(false)
+  })
+
+  test('des sigles techniques ne sont pas des tickets', async () => {
+    for (const texte of ['fichier UTF-8 et norme ISO-8601', 'SHA-256, AES-256 et RSA-2048', 'GPT-4 puis GPT-5', 'RFC-7231 et CVE-2024', 'PROJ-1'])
+      expect(detecterItem(texte, MOTIF_ID)).toBe(null)
   })
 
   test("sans item, le temps va au nom par défaut de la session, puis au premier item trouvé", async () => {

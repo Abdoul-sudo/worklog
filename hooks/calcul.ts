@@ -44,8 +44,10 @@ export const OPTIONS_PAR_DEFAUT: Options = {
 
 export const SEUILS = [10, 15, 20, 30, 45, 60]
 
-/** Le format des ID : ceux des items Zoho Sprints, comme FLO-I165, FSY-I478 ou LBA-I12. */
-export const MOTIF_ID = '[A-Z]+-I\\d+'
+/** Le format des ID de tickets : une clé en majuscules, un tiret, puis un numéro, comme PROJ-142, ENG-42 ou FSY-I478.
+ * Un numéro d'un seul chiffre ne suffit pas (UTF-8, GPT-4ques courants sont écartés (ISO-8601,
+ * SHA-256, RFC-7231) : ce ne sont pas des tickets. */
+export const MOTIF_ID = '(?!(?:UTF|ISO|SHA|RFC|CVE|ES|AES|RSA|IEEE|ECMA|PEP|SQL|GPT|HTTP|TLS|SSL|COVID)-)[A-Z][A-Z0-9]{1,9}-(?:I\\d+|\\d{2,})'
 
 /** Les réglages enregistrés, chaque valeur invalide remplacée par sa valeur par défaut. */
 export function lireOptions(brut: unknown): Options {
