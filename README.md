@@ -1,132 +1,149 @@
-# ⏱ Temps par item
+# Worklog
 
-Le temps passé sur chaque item, compté tout seul dans Claude Code.
+**Know where your time and tokens go, item by item, without a timer.**
 
-Vous travaillez normalement. Le soir, ouvrez la puce `⏱` ou tapez `/temps`, et recopiez les durées dans Zoho Sprints.
+Worklog is a mod for [Claude Code](https://code.claude.com). It counts the time and the tokens you spend on each item (a ticket, a branch, a project) from your activity in Claude Code. You work as usual. At the end of the day, open Worklog and copy the durations into your tracker.
 
-## Points forts
+![Worklog in the Claude desktop app](docs/screenshots/desktop.png)
 
-- **Rien à lancer.** Chaque message compte. Pas de minuteur à démarrer ou à arrêter.
-- **Trouve l'item tout seul.** Dans vos messages (`FSY-I478`), puis dans la branche Git (`feature/FSY-I478-export`). Sans ID : le groupe de la session dans l'app desktop, ou le nom du projet.
-- **Jour, semaine, mois.** Le total et le détail par item, avec les périodes passées.
-- **Tokens par item.** Ce que chaque item a consommé.
-- **Frise d'activité.** Vos 26 dernières semaines, comme sur GitHub.
-- **Sessions en parallèle.** Chaque session compte. Deux sessions sur le même item sont regroupées.
-- **L'IA qui travaille seule compte.** Sous-agents, workflows, Ultracode : pas de question « Du travail ? » après deux heures de travail autonome.
-- **Projets perso aussi.** Sans ID, le temps va au groupe ou au projet. Vous pouvez aussi taper un nom libre.
+## Features
 
-## Installation
+- **No timer.** Each message counts. You start and stop nothing.
+- **Finds the item for you.** First in your messages (`FSY-I478`), then in the Git branch (`feature/FSY-I478-export`). Without an ID, the session uses its group in the desktop app, or the project name.
+- **Time and tokens per item.** For the day, the week, the month, the year, or since you started. Arrows go back to past periods.
+- **Yearly activity heatmap.** One square per day, from January to December, as on GitHub.
+- **Parallel sessions.** Each session counts. Two sessions on the same item are grouped.
+- **Autonomous work counts.** Subagents, workflows and Ultracode count while they run, even for hours.
+- **Your past history too.** Worklog reads the history of Claude Code, so your first popover already shows your past days.
+- **Everywhere.** The terminal, the desktop app and VS Code. English and French.
+- **Four themes.** Simple, Night, Aurora and Ember, in the desktop app.
+
+![Worklog in the terminal](docs/screenshots/terminal.png)
+
+## Install
 
 ```sh
-claude plugin marketplace add Abdoul-sudo/claude-temps-item
-claude plugin install temps-item@temps-item
+claude plugin marketplace add Abdoul-sudo/claude-worklog
+claude plugin install worklog@worklog
 ```
 
-C'est tout. Le mod tourne dans le terminal, dans l'app desktop et dans VS Code.
+Then run `/reload-plugins`, or start a new session.
 
-> [!NOTE]
-> Le dépôt est privé. Il faut un accès au dépôt, et Git doit pouvoir lire GitHub sur votre ordinateur (`gh auth login`, puis `gh auth setup-git`).
+You can also install Worklog with other useful mods in one step, with [claude-modpack](https://github.com/Abdoul-sudo/claude-modpack).
 
 <details>
-<summary>Sans terminal</summary>
+<summary>Install without the terminal</summary>
 
-- **App desktop :** **+** à côté de la saisie, puis **Plugins**. Ajoutez la marketplace `Abdoul-sudo/claude-temps-item`, puis le plugin `temps-item`.
-- **VS Code :** tapez `/plugins`, onglet **Marketplaces**. Ajoutez `Abdoul-sudo/claude-temps-item`, puis installez `temps-item`.
+- **Desktop app:** click **+** next to the prompt, then **Plugins**. Add the marketplace `Abdoul-sudo/claude-worklog`, then install `worklog`.
+- **VS Code:** type `/plugins`, then open the **Marketplaces** tab. Add `Abdoul-sudo/claude-worklog`, then install `worklog`.
 
 </details>
 
-## Utilisation
+## Use
 
-**Au quotidien, vous ne faites rien.** La puce `⏱ FSY-I478 · 1 h 12`, en bas de l'écran, donne l'item de la session et son temps du jour.
+**Day to day, you do nothing.** A chip at the bottom shows the item of the session and its time for today: `⏱ FSY-I478 · 1h 12`. Click the chip to open Worklog. Click it again to close it.
 
-Cliquez sur la puce pour ouvrir le popover. Cliquez à nouveau pour le fermer.
-
-| Pour… | Faites… |
+| To… | Do this |
 | --- | --- |
-| Passer cette session sur un autre item | Cliquez sur son nom dans la liste. |
-| Un item absent de la liste | **+ Autre item**, tapez l'ID ou un nom, puis Entrée. |
-| Renommer l'item de la session | Cliquez sur ✎ à côté de son nom. Le nouveau nom s'applique partout, passé compris. |
-| Retirer un temps qui ne compte pas | Cliquez sur × au bout de la ligne. **Annuler** le remet. |
-| Voir la semaine ou le mois | Onglets **Semaine** et **Mois**. Les flèches ‹ › changent de période. |
-| Cacher ce qui ne vous sert pas | Cliquez sur ⚙. |
+| Move this session to another item | Point to the item in the list, then click ⇄. In the terminal, click its name. |
+| Use an item that is not in the list | Click **+ Add item**, type the ID or a name, then press Enter. |
+| Rename the item of the session | Click ✎ next to its name. The new name applies everywhere, past days included. |
+| See another period | Click **Day**, **Week**, **Month**, **Year** or **All**. The arrows ‹ › go back and forward. |
+| Change the settings | Click the gear. |
 
-Un item choisi à la main reste en place : ni un message ni la branche Git ne le changent.
+An item that you choose by hand stays: a message or the Git branch does not change it.
 
-Après un long silence, une ligne demande « Du travail ? ». **Oui** compte ce temps, **Non** le laisse de côté.
+After a long idle time, a line asks if this time was work. **Yes** counts it. **No** leaves it out.
 
-### Réglages
+### Where Worklog shows
 
-Cliquez sur ⚙ dans le popover.
+| Surface | Chip | Worklog |
+| --- | --- | --- |
+| Desktop app | At the bottom right, before the session mode | Above the prompt |
+| Terminal | On the line under the prompt | Above the prompt |
+| VS Code | In the status line | In a side pane: type `/worklog` |
 
-| Réglage | Par défaut |
+### Settings
+
+Open Worklog, then click the gear.
+
+![Worklog settings](docs/screenshots/settings.png)
+
+| Setting | Default |
 | --- | --- |
-| Tokens par item | affichés |
-| Frise d'activité | affichée |
-| « Du travail ? » après un long silence | activé |
-| Silence compté comme travail | jusqu'à 45 min |
-| Format des ID (expression régulière) | `[A-Z]+-I\d+`, les ID Zoho comme `FSY-I478` |
+| Show the activity heatmap | On |
+| Ask after a long idle time | On |
+| Show | Time and tokens (or only one of them) |
+| Language | English (or Français) |
+| Theme (desktop app) | Night |
+| Idle time counted as work | Up to 45 min |
 
-### Commandes
+### Commands
 
-| Commande | Effet |
+| Command | What it does |
 | --- | --- |
-| `/temps` | Le temps du jour, par item. |
-| `/temps semaine` | La semaine en cours, jour par jour. |
-| `/temps mois` | Le mois en cours. |
-| `/temps FSY-I478` | Passe cette session sur cet item. |
-| `/temps stop` | Met cette session en pause jusqu'au prochain message. |
-| `/temps confirmer` | Liste les silences à classer. |
-| `/temps panneau` | Ouvre le popover dans un panneau (utile dans VS Code). |
+| `/worklog` | Opens Worklog. |
+| `/worklog day` | Today, as text. |
+| `/worklog week` | This week, day by day, as text. |
+| `/worklog month` | This month, as text. |
+| `/worklog FSY-I478` | Moves this session to this item. |
+| `/worklog stop` | Pauses this session until your next message. |
+| `/worklog gaps` | Lists the idle gaps to sort. `/worklog gaps 1 work` counts gap 1. |
 
 ```
-Aujourd'hui
+Today
 
-  FSY-I478   2 h 14    3,1 M tokens  (en cours)
-  FLO-I165   1 h 05    1,1 M tokens
-  Total      3 h 19    4,2 M tokens
+  FSY-I478   2h 14    3.1M tokens  (active)
+  FLO-I165   1h 05    1.1M tokens
+  Total      3h 19    4.2M tokens
 ```
 
-## Comment le temps est compté
+## How the time is counted
 
 <details>
-<summary>Les règles</summary>
+<summary>The rules</summary>
 
-- Le temps part du premier message de la session. Ouvrir une session ne compte pas.
-- Pendant que Claude travaille, tout compte : vos tours, et aussi les sous-agents, workflows et Ultracode qui tournent seuls, même pendant des heures.
-- Un silence de moins de 45 min compte. Un silence plus long ne compte pas, sauf si vous répondez « Oui ».
-- Le premier ID trouvé dans une session reçoit aussi le temps passé avant lui.
-- L'item reste celui de la session, même le lendemain.
-- La puce donne le temps de la session. La liste donne le temps par item, toutes sessions confondues.
-- Deux sessions sur deux items comptent chacune : le total du jour peut dépasser le temps réel. Le popover le signale (« dont 40 min en parallèle »).
-- Les tokens sont ceux des réponses de Claude : sessions, sous-sessions et sous-agents, lecture du cache comprise. Chaque réponse compte une fois.
-- `/stats` donne d'autres chiffres : il ne compte pas les sous-agents, il compte certaines réponses plusieurs fois, et il coupe les jours à minuit UTC.
-- Si vous fermez une fenêtre sans quitter Claude Code, le compteur s'arrête au plus 2 min après.
+- The time starts with the first message of the session. To open a session does not count.
+- While Claude works, all the time counts: your turns, and also the subagents, workflows and Ultracode that run alone.
+- An idle time shorter than 45 min counts. A longer idle time does not count, unless you answer **Yes**.
+- The first ID found in a session also gets the time before it.
+- The item stays with the session, also on the next day.
+- The chip shows the time of the session. The list shows the time per item, for all the sessions.
+- Two sessions on two items count both. The total of the day can be more than the real time. Worklog shows it ("incl. 40 min in parallel").
+- The tokens are the tokens of the answers of Claude: sessions, subagents and cache reads included. Each answer counts one time.
+- `/stats` shows other numbers: it does not count the subagents, and it ends the days at midnight UTC.
+- If you close a window without quitting Claude Code, the count stops after 2 min at most.
 
 </details>
 
-Les données restent sur votre ordinateur, dans `~/.claude/temps/journal/`.
+Your data stays on your computer, in `~/.claude/temps/`. To keep it in another folder, set the environment variable `WORKLOG_DATA_DIR`.
 
-## Limites
+## Limits
 
-- Le mod compte l'activité dans Claude Code seulement. Une réunion ou un appel ne compte pas.
-- Les ID doivent être en majuscules : `fsy-i478` n'est pas reconnu.
-- Dans l'app desktop, la puce est en bas à droite, devant le mode de la session : c'est le seul endroit du bas qu'un mod peut utiliser.
-- Dans le terminal, les clics demandent le mode plein écran (`/tui fullscreen`).
-- VS Code n'affiche pas la puce : vous y voyez une ligne de statut, et `/temps panneau` ouvre le popover.
-- Le nom du groupe vient de la config de l'app desktop. Si l'app change ce format, le mod prend le nom du projet.
-- Demande Claude Code 2.1.290 ou plus, et l'extension VS Code 2.1.299 ou plus.
+- Worklog counts your activity in Claude Code only. A meeting or a call does not count.
+- Worklog finds IDs in the Zoho Sprints format, in capitals: `FSY-I478`. For other items, click **+ Add item** and type a name.
+- To read your past history, Worklog needs Node.js. Without Node.js, it counts from the day you install it.
+- In the terminal, clicks need the fullscreen mode (`/tui fullscreen`).
+- Worklog needs Claude Code 2.1.290 or later, and the VS Code extension 2.1.299 or later.
 
-## Développement
+## Development
 
 ```sh
 claude plugin test .
 claude plugin validate .
 ```
 
-| Fichier | Rôle |
+| File | Role |
 | --- | --- |
-| `hooks/calcul.ts` | Le calcul du temps et des tokens, sans effet de bord. |
-| `hooks/activite.ts` | La frise d'activité (SVG et terminal). |
-| `hooks/texte.ts` | Les textes de `/temps`. |
-| `hooks/register.tsx` | Les hooks, la commande, la puce, le popover et les réglages. |
-| `tests/` | Les tests. |
+| `hooks/calcul.ts` | Counts the time and the tokens. No side effects. |
+| `hooks/activite.ts` | The activity heatmap, in SVG and in the terminal. |
+| `hooks/dessins.ts` | The themes and the icons. |
+| `hooks/texte.ts` | The texts of `/worklog day`, `week` and `month`. |
+| `hooks/langue.ts` | The English and French texts. |
+| `hooks/register.tsx` | The hooks, the command, the chip, the popover and the settings. |
+| `scripts/importer.mjs` | Reads the history of Claude Code. |
+| `tests/` | The tests. |
+
+## License
+
+[MIT](LICENSE)
