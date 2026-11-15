@@ -119,6 +119,8 @@ const reglages = atom({ plugin: 'worklog', key: 'reglages' } as const, null, { s
 let chemins: { journal: string; importe: string; projets: string } | null = null
 let ecritures: Promise<unknown> = Promise.resolve()
 let tourCompte = true
+// Claude répond : entre le début d'un tour de la boucle principale et sa fin.
+let tourEnCours = false
 let heritageClear: { item: string; manuel: boolean } | null = null
 let brancheVue: string | null = null
 let nomParDefaut: string | null = null
@@ -602,6 +604,9 @@ async function commande($: Moteur, args: string): Promise<string> {
     return (await read($, deplie)) ? textes.bande : textes.ferme
   }
   if (texte.toLowerCase() === 'stop') {
+    // Pendant que Claude ou ses agents travaillent, le temps et les tokens réels comptent : rien à arrêter.
+    await suivreAgents($).catch(() => undefined)
+    if (tourEnCours || agentsOccupes === true) return textes.travaille
     await noterActivite($, 'pause')
     await rafraichir($)
     return textes.pause
@@ -1511,6 +1516,7 @@ export const register: Register = on => {
   })
   on('turn.start', ($, e, next) => {
     if (e.agentId !== undefined) enFond(marquerAgents($))
+    else tourEnCours = true
     return next(e)
   })
   on('tool.call', ($, e, next) => {
@@ -1520,6 +1526,7 @@ export const register: Register = on => {
 
   on('turn.complete', ($, e, next) => {
     if (e.agentId !== undefined) enFond(marquerAgents($))
+    else tourEnCours = false
     if (e.agentId === undefined && tourCompte) enFond(noterActivite($, 'reponse').then(() => rafraichir($)))
     const u = e.usage
     if (u !== undefined) {

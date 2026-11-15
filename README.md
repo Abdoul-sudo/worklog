@@ -35,7 +35,7 @@ That is all. Worklog needs Claude Code 2.1.290 or later.
 
 - **After 1 hour without activity.** When you come back, Worklog asks if this pause was work. Click **Count** to add it, or **Ignore** to leave it out.
 - **After 4 hours without activity**, for example a night. This time does not count, and Worklog does not ask.
-- **When you type `/worklog stop`.** If Claude is still working, its work counts until it ends. The timer starts again with your next message.
+- **When you type `/worklog stop`.** Use it when Claude is done but the timer still runs, for example when you leave. While Claude works, `/worklog stop` does nothing: the real time and tokens count. The timer resumes with your next message.
 - **When you quit Claude Code**, or 2 minutes after you close its window.
 
 You can change the 1 hour in the settings.
@@ -76,7 +76,7 @@ With commands:
 | --- | --- |
 | `/worklog` | Shows or hides Worklog. |
 | `/worklog <name>` | Counts this session for `<name>`. For example: `/worklog PROJ-142`. |
-| `/worklog stop` | Stops the timer of this session until your next message. If Claude is still working, its work counts until it ends. |
+| `/worklog stop` | Stops the timer of this session until your next message. It does nothing while Claude works. |
 
 ## Settings
 

@@ -75,7 +75,8 @@ const FR = {
   commande: {
     description: 'Worklog : afficher ou masquer. /worklog <nom> nomme la session, /worklog stop la met en pause',
     indice: '[<nom> | stop]',
-    pause: "Compteur en pause pour cette session. Si Claude travaille encore, ce travail compte jusqu'à sa fin. Le compteur repart à votre prochain message.",
+    pause: 'Compteur en pause pour cette session. Il reprend à votre prochain message.',
+    travaille: 'Claude travaille encore : le temps et les tokens continuent de compter. /worklog stop marche quand Claude a fini.',
     panneau: 'Panneau ouvert.',
     bande: 'Ouvert au-dessus de la saisie.',
     ferme: 'Fermé.',
@@ -143,7 +144,8 @@ const EN: typeof FR = {
   commande: {
     description: 'Worklog: show or hide. /worklog <name> names this session, /worklog stop pauses it',
     indice: '[<name> | stop]',
-    pause: 'Counter paused for this session. If Claude is still working, that work counts until it ends. The counter resumes with your next message.',
+    pause: 'Counter paused for this session. It resumes with your next message.',
+    travaille: 'Claude is still working, so time and tokens keep counting. /worklog stop works once Claude is done.',
     panneau: 'Pane opened.',
     bande: 'Opened above the prompt.',
     ferme: 'Closed.',
