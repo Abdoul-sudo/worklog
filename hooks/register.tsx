@@ -36,7 +36,6 @@ import {
   libellePuce,
   lireLignes,
   lireOptions,
-  majuscule,
   nomDuGroupe,
   nommer,
 } from './calcul'
@@ -137,13 +136,14 @@ let importLance = -Infinity
  * pied. */
 const LIGNES_BANDE = 4
 const RANGEES_HORS_LISTE = 18
-/** Les colonnes d'une ligne dans le terminal, en caractères. */
-const TERMINAL = { nom: 24, jetons: 13, temps: 8 }
-/** La frise du terminal, à côté de la liste : l'écart entre elles, la colonne des jours (« Lun »), la hauteur de bande
- * qu'il faut pour ses sept lignes de cases (cadre, en-tête, mois compris), et sa largeur minimale, un trimestre. */
-const FRISE_TERMINAL = { ecart: 3, jours: 4, hauteurCases: 11, semainesMin: 13 }
-/** Les colonnes d'une ligne, en cellules : le nom, puis tokens et temps juste à côté, loin de la pagination. */
-const COLONNES = { nom: 24, jetons: 11, temps: 7 }
+/** La colonne du nom dans le terminal, en caractères ; tokens et temps prennent la largeur de leur plus long texte. */
+const TERMINAL = { nom: 24 }
+/** La frise du terminal, à côté de la liste : l'écart entre elles, la hauteur de bande qu'il faut pour ses sept lignes
+ * de cases (cadre, en-tête, mois compris), et sa largeur minimale, un trimestre. */
+const FRISE_TERMINAL = { ecart: 3, hauteurCases: 11, semainesMin: 13 }
+/** Les colonnes d'une ligne, en cellules : le nom, puis les tokens ; le temps juste à côté prend la largeur de son plus
+ * long texte, environ une cellule par caractère. */
+const COLONNES = { nom: 24, jetons: 11 }
 /** Les paliers de largeur, en cellules. Dès MOYEN : la frise à côté des stats, la liste sur deux colonnes ; en dessous,
  * la frise sous les stats, la liste sur une. Dès LARGE : les réglages côte à côte, et une liste d'une seule colonne garde
  * un nom de largeur fixe. Partout, la frise rétrécit quand la place manque. */
@@ -860,7 +860,21 @@ function ordonner(toutes: Ligne[], actuel: string | null, derniere: Readonly<Rec
 /** Une ligne : pastille (qui bat si l'item est en cours), nom, tokens et temps (selon le réglage « Afficher »). Au survol,
  * juste après le nom : ⇄ pour passer sur l'item (exprès, pour qu'un clic distrait ne déplace pas le temps), ou le crayon
  * pour renommer l'item de la session (un double-clic sur son nom aussi). */
-function ligne($: Moteur, e: Site, l: Ligne, couleur: string, actuel: string | null, etat: Interface, nomFixe: boolean, mesure: Mesure) {
+/** Les textes des chiffres d'une ligne, un tiret quand il n'y a rien : leur longueur fait la largeur des colonnes. */
+const texteJetons = (l: Ligne) => (l.jetons > 0 ? t().tokens(formatJetons(l.jetons)) : '—')
+const texteTemps = (l: Ligne) => (l.minutes > 0 ? formatDuree(l.minutes) : '—')
+
+function ligne(
+  $: Moteur,
+  e: Site,
+  l: Ligne,
+  couleur: string,
+  actuel: string | null,
+  etat: Interface,
+  nomFixe: boolean,
+  mesure: Mesure,
+  largeurs: { jetons: number; temps: number },
+) {
   const { Box, Input, Text } = $.ui.resolve(e)
   const estActuel = l.item === actuel
   const sansNom = l.item === SANS_ITEM
@@ -897,7 +911,7 @@ function ligne($: Moteur, e: Site, l: Ligne, couleur: string, actuel: string | n
   const temps =
     l.minutes > 0 ? (
       <Text size="footnote" tabular {...encre(e, l.enCours ? 'vif' : 'texte')}>
-        {formatDuree(l.minutes)}
+        {texteTemps(l)}
       </Text>
     ) : (
       <Text size="footnote" {...encre(e, 'faible')}>
@@ -909,7 +923,7 @@ function ligne($: Moteur, e: Site, l: Ligne, couleur: string, actuel: string | n
   const jetons =
     l.jetons > 0 ? (
       <Text size={seulsJetons ? 'footnote' : 'caption'} tabular {...encre(e, seulsJetons ? (l.enCours ? 'vif' : 'texte') : 'faible')}>
-        {t().tokens(formatJetons(l.jetons))}
+        {texteJetons(l)}
       </Text>
     ) : (
       seulsJetons && (
@@ -927,16 +941,16 @@ function ligne($: Moteur, e: Site, l: Ligne, couleur: string, actuel: string | n
       <Box key={groupe} flexDirection="row" alignItems="center" gap={1}>
         {pastille($, e, couleur, l.enCours)}
         <Box width={TERMINAL.nom}>{enRenommage ? nom : bouton($, e, `choisir-${l.item}`, court, ton, presser)}</Box>
-        {mesure !== 'temps' && (
-          <Box width={TERMINAL.jetons} justifyContent="flex-end">
-            {jetons}
-          </Box>
-        )}
-        {mesure !== 'jetons' && (
-          <Box width={TERMINAL.temps} justifyContent="flex-end">
-            {temps}
-          </Box>
-        )}
+        <Box flexDirection="row" gap={2}>
+          {mesure !== 'temps' && (
+            <Box width={largeurs.jetons} justifyContent="flex-end">
+              {jetons}
+            </Box>
+          )}
+          {mesure !== 'jetons' && (
+            <Box width={largeurs.temps}>{temps}</Box>
+          )}
+        </Box>
       </Box>
     )
   }
@@ -960,7 +974,7 @@ function ligne($: Moteur, e: Site, l: Ligne, couleur: string, actuel: string | n
           </Box>
         )}
         {mesure !== 'jetons' && (
-          <Box width={COLONNES.temps} flexDirection="row" justifyContent="flex-end">
+          <Box width={largeurs.temps} flexDirection="row">
             {temps}
           </Box>
         )}
@@ -975,24 +989,10 @@ function dessinFrise($: Moteur, e: Site, activite: Frise, place: PlaceFrise | nu
     if (place === null) return null
     const { Box, Raster, Text } = $.ui.resolve(e)
     const { cellules, colonnes, lignes, mois } = cellulesActivite(activite.cases, activite.mesure, place.dessin, place.semaines)
-    const retrait = place.jours ? FRISE_TERMINAL.jours : 0
-    // En cases, comme sur GitHub : lundi, mercredi et vendredi sont nommés à gauche.
-    const jours = [1, 2, 3, 4, 5, 6, 0].map((jour, i) => (i % 2 === 0 && i < 6 ? majuscule(t().jours[jour]!.slice(0, 3)) : ' '))
     return (
       <Box key="frise" flexDirection="column">
-        <Text dimColor>{' '.repeat(retrait) + mois}</Text>
-        <Box flexDirection="row">
-          {place.jours && (
-            <Box flexDirection="column" width={retrait}>
-              {jours.map((jour, i) => (
-                <Text key={`jour-${i}`} dimColor>
-                  {jour}
-                </Text>
-              ))}
-            </Box>
-          )}
-          <Raster key="frise-cases" cells={cellules} columns={colonnes} rows={lignes} />
-        </Box>
+        <Text dimColor>{mois}</Text>
+        <Raster key="frise-cases" cells={cellules} columns={colonnes} rows={lignes} />
       </Box>
     )
   }
@@ -1026,16 +1026,14 @@ function vueFrise($: Moteur, e: Site, activite: Frise, place: PlaceFrise | null)
 
 /** La place de la frise dans le terminal, à côté de la liste (`liste`, sa largeur) : toute l'année quand elle tient,
  * sinon les semaines les plus récentes ; en cases quand la bande a la hauteur, serrée sinon. Null sous un trimestre. */
-type PlaceFrise = { dessin: DessinTerminal; semaines: number; jours: boolean; liste: number }
-function placeFriseTerminal(colonnes: number, rangees: number, mesure: Mesure, activite: Frise): PlaceFrise | null {
-  const liste = 2 + TERMINAL.nom + (mesure !== 'temps' ? 1 + TERMINAL.jetons : 0) + (mesure !== 'jetons' ? 1 + TERMINAL.temps : 0)
+type PlaceFrise = { dessin: DessinTerminal; semaines: number; liste: number }
+function placeFriseTerminal(colonnes: number, rangees: number, liste: number, activite: Frise): PlaceFrise | null {
   // Le cadre et ses marges prennent six colonnes.
   const place = colonnes - 6 - liste - FRISE_TERMINAL.ecart
   if (place < FRISE_TERMINAL.semainesMin) return null
   const annee = Math.ceil(activite.cases.length / 7)
   const dessin: DessinTerminal = rangees >= FRISE_TERMINAL.hauteurCases ? 'cases' : 'serre'
-  const jours = dessin === 'cases' && place >= annee + FRISE_TERMINAL.jours
-  return { dessin, semaines: Math.min(annee, place), jours, liste }
+  return { dessin, semaines: Math.min(annee, place), liste }
 }
 
 /** Le résumé d'une période. Là où la surface sait dessiner : l'anneau et le total en haut, la frise d'activité à côté,
@@ -1059,10 +1057,29 @@ function resume(
   const { Box, Input, Text } = $.ui.resolve(e)
   const { etat, contenu, options, activite } = d
   const serre = e.surface === 'terminal'
-  const placeFrise = serre && options.activite && activite !== null ? placeFriseTerminal(d.colonnes, d.rangees, options.mesure, activite) : null
+  // Les colonnes de tokens et de temps prennent la largeur de leur plus long texte, sur toutes les pages. Les tokens sont
+  // alignés à droite, le temps à gauche : l'écart entre eux est le même sur chaque ligne, et petit.
+  const largeurs = {
+    jetons: Math.max(1, ...contenu.lignes.map(l => texteJetons(l).length)),
+    temps: Math.max(1, ...contenu.lignes.map(l => texteTemps(l).length)),
+  }
+  // Dans le terminal, la largeur de la liste : une ligne (pastille, nom, chiffres), ou les stats si elles sont plus longues.
+  const chiffres = [options.mesure !== 'temps' && largeurs.jetons, options.mesure !== 'jetons' && largeurs.temps].filter(n => n !== false)
+  const largeurLigne = 3 + TERMINAL.nom + chiffres.reduce((a, b) => a + b, 0) + 2 * (chiffres.length - 1)
+  // La série compte jusqu'à aujourd'hui : une année passée n'en a pas.
+  const jours = activite === null || !activite.aujourdhui ? null : serie(activite.cases)
+  // Les stats du terminal sur une ligne (« Temps 2 h 29 · Tokens 203 M · Série 5 jours ») : la bande y est basse.
+  const statsLigne = [
+    options.mesure !== 'jetons' && [t().stats.temps, formatDuree(contenu.total)],
+    options.mesure !== 'temps' && [t().stats.jetons, contenu.jetons > 0 ? formatJetons(contenu.jetons) : '—'],
+    jours !== null && options.activite && [t().stats.serie, t().joursSerie(jours)],
+  ].filter((s): s is string[] => s !== false)
+  const largeurStats = statsLigne.map(([nom, valeur]) => `${nom} ${valeur}`).join(' · ').length
+  const placeFrise =
+    serre && options.activite && activite !== null ? placeFriseTerminal(d.colonnes, d.rangees, Math.max(largeurLigne, largeurStats), activite) : null
   // Dans la bande du terminal, la liste prend la hauteur de la frise d'à côté : ses lignes et celle des mois, moins les
-  // stats et le pied.
-  const parPage = placeFrise !== null && !d.enPanneau ? (placeFrise.dessin === 'cases' ? 7 : 4) - 1 : d.parPage
+  // stats, la ligne vide sous elles et le pied.
+  const parPage = placeFrise !== null && !d.enPanneau ? (placeFrise.dessin === 'cases' ? 7 : 4) - 2 : d.parPage
   const enParallele = contenu.total - contenu.reel
   const teintes = couleurs(contenu.lignes)
   const ordre = ordonner(contenu.lignes, d.actuel, contenu.derniere)
@@ -1074,10 +1091,10 @@ function resume(
   const colonnesListe = deuxColonnes ? [visibles.slice(0, Math.ceil(parPage / 2)), visibles.slice(Math.ceil(parPage / 2))] : [visibles]
   const rang = (l: Ligne) =>
     // Une seule colonne sur une grande largeur : le nom a une largeur fixe, pour garder les chiffres près de lui.
-    ligne($, e, l, teintes[contenu.lignes.indexOf(l)]!, d.actuel, etat, !deuxColonnes && d.colonnes >= LARGE, options.mesure)
+    ligne($, e, l, teintes[contenu.lignes.indexOf(l)]!, d.actuel, etat, !deuxColonnes && d.colonnes >= LARGE, options.mesure, largeurs)
   const retrait = serre ? 0 : ('sm' as const)
   const parallele = enParallele > 0 ? t().parallele(formatDuree(enParallele)) : ''
-  // Les stats du terminal sur une ligne (« Temps 2 h 29 · Tokens 203 M · Série 5 jours ») : la bande y est basse.
+  // Une stat du terminal : son nom en gris, sa valeur en gras.
   const statTerminal = (nom: string, valeur: string) => (
     <Box key={nom} flexDirection="row" gap={1}>
       <Text dimColor>{nom}</Text>
@@ -1086,8 +1103,6 @@ function resume(
       </Text>
     </Box>
   )
-  // La série compte jusqu'à aujourd'hui : une année passée n'en a pas.
-  const jours = activite === null || !activite.aujourdhui ? null : serie(activite.cases)
   // Empilées au-dessus de la frise, les stats tiennent chacune sur une ligne (le nom, puis la valeur) : la bande ne défile
   // pas.
   const empilees = riche(e) && d.colonnes < MOYEN
@@ -1219,15 +1234,11 @@ function resume(
       </Box>
     )
   }
-  const enLigne = [
-    options.mesure !== 'jetons' && statTerminal(t().stats.temps, formatDuree(contenu.total)),
-    options.mesure !== 'temps' && statTerminal(t().stats.jetons, contenu.jetons > 0 ? formatJetons(contenu.jetons) : '—'),
-    jours !== null && options.activite && statTerminal(t().stats.serie, t().joursSerie(jours)),
-  ].filter(c => c !== false)
+  const enLigne = statsLigne.map(([nom, valeur]) => statTerminal(nom!, valeur!))
   const gauche = (
     // À côté de la frise, la liste a sa largeur fixe : la frise sait la place qui lui reste.
     <Box flexDirection="column" alignItems="stretch" {...(placeFrise !== null ? { width: placeFrise.liste } : {})}>
-      <Box flexDirection="row" gap={1}>
+      <Box flexDirection="row" gap={1} marginBottom={1}>
         {enLigne.flatMap((s, i) => (i === 0 ? [s] : [<Text key={`point-${i}`} dimColor>·</Text>, s]))}
       </Box>
       {liste}

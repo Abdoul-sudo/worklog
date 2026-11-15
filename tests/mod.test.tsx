@@ -362,12 +362,13 @@ test("dans le terminal, la frise prend la place qu'il y a, et la liste remplit s
     await dessin.unmount()
     return { raster, pages }
   }
-  // Large et haute : toute l'année en cases, sept lignes ; la liste en montre six, la hauteur de la frise.
-  expect(await bande({})).toMatchObject({ raster: { rows: 7, columns: 53 }, pages: '1–6 sur 8' })
-  // Basse : la frise serrée sur quatre lignes, trois lignes de liste.
-  expect(await bande({ maxRows: 8 })).toMatchObject({ raster: { rows: 4 }, pages: '1–3 sur 8' })
-  // Étroite : les semaines qui tiennent ; trop étroite : pas de frise, deux lignes de liste.
-  expect(await bande({ bodyColumns: 80 })).toMatchObject({ raster: { columns: 22 } })
+  // Large et haute : toute l'année en cases, sept lignes ; la liste en montre cinq, la hauteur de la frise.
+  expect(await bande({})).toMatchObject({ raster: { rows: 7, columns: 53 }, pages: '1–5 sur 8' })
+  // Basse : la frise serrée sur quatre lignes, deux lignes de liste.
+  expect(await bande({ maxRows: 8 })).toMatchObject({ raster: { rows: 4 }, pages: '1–2 sur 8' })
+  // Étroite : les semaines qui tiennent à côté de la liste (pastille, nom, « 1 k tokens », « 8 min ») ; trop étroite :
+  // pas de frise, deux lignes de liste.
+  expect(await bande({ bodyColumns: 80 })).toMatchObject({ raster: { columns: 27 } })
   expect(await bande({ bodyColumns: 60 })).toMatchObject({ raster: undefined, pages: '1–2 sur 8' })
   await puce.unmount()
 })
