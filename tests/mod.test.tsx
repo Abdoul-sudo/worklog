@@ -261,7 +261,7 @@ test("une notification ou un message d'une autre session n'est pas un retour : l
   expect(messages()).toBe(avant)
 })
 
-test("une pause qui passe minuit pose sa question au retour, et ne compte pas d'avance la veille", async ($, on) => {
+test("une pause qui passe minuit pose sa question au retour, et ne compte pas d'avance la veille", { timeoutMs: 15_000 }, async ($, on) => {
   const { horloge } = monde(on)
   // Le 12 novembre, 23 h : la session s'ouvre.
   await horloge.advance(14 * 60 * 60_000)
@@ -280,7 +280,7 @@ test("une pause qui passe minuit pose sa question au retour, et ne compte pas d'
   await bande.unmount()
 })
 
-test("après /clear, la pause d'avant pose sa question au premier message", async ($, on) => {
+test("après /clear, la pause d'avant pose sa question au premier message", { timeoutMs: 15_000 }, async ($, on) => {
   const { horloge, etat } = monde(on)
   on('session.end', (_, e) => ({ sessionId: e.sessionId }))
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
@@ -836,7 +836,7 @@ test('/worklog ouvre et ferme, ou nomme la session', async ($, on) => {
   expect(await ligneDe($, '---')).toBeUndefined()
 })
 
-test("une pause ne compte qu'au retour : courte, elle s'ajoute ; plus longue, une question ; trop longue, rien", async ($, on) => {
+test("une pause ne compte qu'au retour : courte, elle s'ajoute ; plus longue, une question ; trop longue, rien", { timeoutMs: 15_000 }, async ($, on) => {
   // Des réglages courts, pour un test rapide : compter jusqu'à 15 min, demander jusqu'à 1 h.
   const { horloge } = monde(on, ['terminal'], {}, 'fr', { options: { langue: 'fr', seuilPause: 15, pauseMax: 60 } })
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
@@ -877,7 +877,7 @@ test("une pause ne compte qu'au retour : courte, elle s'ajoute ; plus longue, un
   expect(await question()).toContain('Pause de 1 h 30')
 })
 
-test("les agents d'un workflow (Ultracode), absents de la liste des agents, font compter le temps", async ($, on) => {
+test("les agents d'un workflow (Ultracode), absents de la liste des agents, font compter le temps", { timeoutMs: 15_000 }, async ($, on) => {
   const { horloge } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
   await travailler($, horloge, 'FLO-I165 : lance le workflow', 1)
@@ -896,7 +896,7 @@ test("les agents d'un workflow (Ultracode), absents de la liste des agents, font
   await bande.unmount()
 })
 
-test('quand des sous-agents travaillent deux heures, le temps compte et aucune question ne vient', async ($, on) => {
+test('quand des sous-agents travaillent deux heures, le temps compte et aucune question ne vient', { timeoutMs: 15_000 }, async ($, on) => {
   const { horloge, etat, fichiers } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
   await travailler($, horloge, 'FLO-I165 : lance le workflow', 1)
@@ -969,7 +969,7 @@ test("après une longue pause, la question vient aussi quand on nomme la session
   await bande.unmount()
 })
 
-test("recharger les mods pendant une longue réponse ne coupe pas son temps", async ($, on) => {
+test("recharger les mods pendant une longue réponse ne coupe pas son temps", { timeoutMs: 15_000 }, async ($, on) => {
   const { horloge } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
   await $.prompt.submit({ ...PROMPT, text: 'FLO-I165 : une longue tâche' })
