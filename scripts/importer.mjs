@@ -7,6 +7,7 @@
 //   node importer.mjs <dossier projects> <dossier de sortie> <motif des ID>
 import fs from 'node:fs'
 import path from 'node:path'
+import readline from 'node:readline'
 
 const [projets, sortie, motif] = process.argv.slice(2)
 const VERSION = 3
@@ -32,9 +33,12 @@ const lireEtat = () => {
     const etat = JSON.parse(fs.readFileSync(fichierEtat, 'utf8'))
     if (etat.version === VERSION) return etat
   } catch {}
-  return { version: VERSION, positions: {}, vus: {}, tours: {} }
+  return { version: VERSION, positions: {}, vus: {}, tours: {}, dossiers: {}, nomsCorriges: true }
 }
 const etat = lireEtat()
+// Le nom de chaque session : le dossier où elle a démarré. Claude se déplace parfois dans un sous-dossier du projet
+// (un `cd`), et ses agents aussi : ce sous-dossier ne nomme pas la session.
+etat.dossiers ??= {}
 const vus = new Map(Object.entries(etat.vus))
 const idDe = new RegExp(`(?<![A-Za-z0-9])(?:${motif})(?![A-Za-z0-9])`)
 
@@ -47,6 +51,16 @@ const jourDe = t => {
 // Les sessions dont le tour en cours a été lancé par une personne.
 const tours = new Set(Object.keys(etat.tours))
 
+/** Le dossier du projet d'un chemin : celui d'avant `.claude/worktrees/` pour un worktree de Claude Code. */
+function dossierDuProjet(cwd) {
+  const parties = cwd.split(/[\\/]+/).filter(p => p !== '')
+  const i = parties.findIndex((p, j) => p === '.claude' && parties[j + 1] === 'worktrees')
+  return i > 0 ? parties[i - 1] : parties.at(-1)
+}
+
+/** Le nom de la session `s` : son dossier de départ, sinon le dossier de l'événement lu. */
+const nomDe = (s, cwd) => etat.dossiers[s] ?? (typeof cwd === 'string' && cwd !== '' ? dossierDuProjet(cwd) : undefined)
+
 /** Le texte écrit d'un message : ses parties texte ; rien pour un résultat d'outil. */
 function texteDe(contenu) {
   if (typeof contenu === 'string') return contenu
@@ -57,6 +71,8 @@ function texteDe(contenu) {
 // Les événements à écrire, par fichier de sortie ; l'activité et les tokens sont réunis par session et par minute.
 const sorties = new Map()
 const minutes = new Map()
+// Les messages lus : leur nom se décide à la fin, quand le dossier de départ de chaque session est connu.
+const messages = []
 const ajouter = (t, s, ev) => {
   const fichier = path.join(sortie, jourDe(t), `${s}.jsonl`)
   if (!sorties.has(fichier)) sorties.set(fichier, [])
@@ -80,7 +96,9 @@ function lire(ligne, sousAgent) {
   const t = Date.parse(ev.timestamp)
   const s = ev.sessionId
   if (!(t > 0) || typeof s !== 'string') return
-  const d = typeof ev.cwd === 'string' && ev.cwd !== '' ? path.basename(ev.cwd) : undefined
+  // Le dossier de départ vient de la conversation elle-même : ses agents tournent souvent dans un sous-dossier.
+  if (!sousAgent && etat.dossiers[s] === undefined && typeof ev.cwd === 'string' && ev.cwd !== '') etat.dossiers[s] = dossierDuProjet(ev.cwd)
+  const cwd = ev.cwd
   const u = ev.message?.usage
   if (ev.type === 'assistant' && u) {
     const id = ev.message.id ?? ev.uuid
@@ -88,7 +106,7 @@ function lire(ligne, sousAgent) {
     vus.set(id, Math.floor(t / JOUR))
     const n = (u.input_tokens ?? 0) + (u.output_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0)
     const cle = `${s}|${Math.floor(t / MINUTE)}`
-    const minute = minutes.get(cle) ?? { t, s, d, n: 0, actif: false }
+    const minute = minutes.get(cle) ?? { t, s, cwd, n: 0, actif: false }
     minute.n += n
     minute.actif ||= !sousAgent && tours.has(s)
     minutes.set(cle, minute)
@@ -101,7 +119,7 @@ function lire(ligne, sousAgent) {
     if (texte === '') return
     if (estHumain(ev, texte)) {
       tours.add(s)
-      ajouter(t, s, { t, s, e: 'message', k: idDe.exec(texte)?.[0] ?? null, ...(d === undefined ? {} : { d }), i: 1 })
+      messages.push({ t, s, cwd, k: idDe.exec(texte)?.[0] ?? null })
     } else if (ev.isMeta !== true) tours.delete(s)
   }
 }
@@ -124,6 +142,45 @@ async function lireDepuis(fichier, debut) {
   return position
 }
 
+/** Le dossier de départ de chaque conversation encore là : la première ligne qui en donne un. */
+async function connaitreDossiers() {
+  for (const fichier of fichiers) {
+    if (fichier.split(path.sep).includes('subagents')) continue
+    for await (const ligne of readline.createInterface({ input: fs.createReadStream(fichier) })) {
+      if (!ligne.includes('"cwd"') || !ligne.includes('"sessionId"')) continue
+      try {
+        const ev = JSON.parse(ligne)
+        if (typeof ev.sessionId === 'string' && typeof ev.cwd === 'string' && ev.cwd !== '') etat.dossiers[ev.sessionId] ??= dossierDuProjet(ev.cwd)
+      } catch {}
+      break
+    }
+  }
+}
+
+/** Réécrit le nom (`d`) des événements déjà importés selon le dossier de départ de leur session. */
+function corrigerNoms() {
+  for (const jour of fs.readdirSync(sortie, { withFileTypes: true })) {
+    if (!jour.isDirectory()) continue
+    for (const nom of fs.readdirSync(path.join(sortie, jour.name))) {
+      if (!nom.endsWith('.jsonl')) continue
+      const fichier = path.join(sortie, jour.name, nom)
+      let change = false
+      const lignes = fs.readFileSync(fichier, 'utf8').split('\n').map(ligne => {
+        try {
+          const ev = JSON.parse(ligne)
+          const d = etat.dossiers[ev.s]
+          if (d === undefined || ev.d === d) return ligne
+          change = true
+          return JSON.stringify({ ...ev, d })
+        } catch {
+          return ligne
+        }
+      })
+      if (change) fs.writeFileSync(fichier, lignes.join('\n'))
+    }
+  }
+}
+
 const fichiers = []
 const parcourir = dossier => {
   for (const entree of fs.readdirSync(dossier, { withFileTypes: true })) {
@@ -144,7 +201,12 @@ try {
     if (taille === debut) continue
     etat.positions[cle] = await lireDepuis(fichier, debut)
   }
-  for (const { t, s, d, n, actif } of minutes.values()) {
+  for (const { t, s, cwd, k } of messages) {
+    const d = nomDe(s, cwd)
+    ajouter(t, s, { t, s, e: 'message', k, ...(d === undefined ? {} : { d }), i: 1 })
+  }
+  for (const { t, s, cwd, n, actif } of minutes.values()) {
+    const d = nomDe(s, cwd)
     const defaut = d === undefined ? {} : { d }
     if (actif) ajouter(t, s, { t, s, e: 'reponse', k: null, ...defaut, i: 1 })
     ajouter(t, s, { t, s, e: 'jetons', n, k: null, ...defaut, i: 1 })
@@ -152,6 +214,12 @@ try {
   for (const [fichier, lignes] of sorties) {
     fs.mkdirSync(path.dirname(fichier), { recursive: true })
     fs.appendFileSync(fichier, `${lignes.join('\n')}\n`)
+  }
+  // Une fois : les noms déjà importés prennent le dossier de départ de leur session, quand sa conversation existe encore.
+  if (etat.nomsCorriges !== true) {
+    await connaitreDossiers()
+    corrigerNoms()
+    etat.nomsCorriges = true
   }
   const oubli = Math.floor(Date.now() / JOUR) - MEMOIRE_JOURS
   etat.vus = Object.fromEntries([...vus].filter(([, jour]) => jour >= oubli))
