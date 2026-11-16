@@ -75,11 +75,13 @@ function cielBraise(): string {
   )
 }
 
-/** Forêt : deux rangées de sapins en ombres, la plus loin plus claire ; une brume verte passe derrière eux ; des lucioles
- * s'allument et s'éteignent, chacune à son rythme. Sous les sapins, le sol garde leur couleur jusqu'en bas. */
+/** Forêt : deux rangées de sapins en ombres, fixes, en bas ; ils s'effacent vers le haut comme dans la brume, et leurs
+ * cimes restent pâles sous le texte. Une brume verte passe derrière eux ; des lucioles s'allument et s'éteignent,
+ * chacune à son rythme. Sous les sapins, le sol garde leur couleur jusqu'en bas. */
 function cielForet(): string {
-  // Une rangée de sapins à trois étages, de hauteurs variées, qui se touchent ; elle glisse lentement de côté.
-  const rangee = (graine: number, base: number, hMin: number, hMax: number, couleur: string, duree: number) => {
+  // Une rangée de sapins à trois étages, de hauteurs variées, qui se touchent. Sa couleur monte d'un fondu : transparente
+  // au-dessus de `haut`, pleine à sa base.
+  const rangee = (id: string, graine: number, base: number, hMin: number, hMax: number, couleur: string, haut: number) => {
     let d = ''
     for (let x = -60, i = 0; x < CIEL.largeur + 60; i++) {
       const h = hMin + (((i * graine) % 7) / 6) * (hMax - hMin)
@@ -91,8 +93,9 @@ function cielForet(): string {
       x += l * 0.9 + ((i * 3) % 5) * 4
     }
     return (
-      `<path d="${d}M-60 ${base}H${CIEL.largeur + 60}V${CIEL.hauteur}H-60z" fill="${couleur}" ` +
-      `style="animation:g ${duree}s ease-in-out infinite alternate"/>`
+      `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="0" y1="${haut}" x2="0" y2="${base}">` +
+      `<stop offset="0" stop-color="${couleur}" stop-opacity="0"/><stop offset="1" stop-color="${couleur}"/></linearGradient>` +
+      `<path d="${d}M-60 ${base}H${CIEL.largeur + 60}V${CIEL.hauteur}H-60z" fill="url(#${id})"/>`
     )
   }
   const lucioles = [[90, 150], [210, 60], [340, 120], [480, 95], [610, 40], [760, 140], [900, 80], [1040, 160], [1180, 70], [1330, 125]]
@@ -107,30 +110,41 @@ function cielForet(): string {
   return (
     ouvrirCiel(
       '@keyframes l{0%,100%{opacity:0;transform:translate(0,0)}50%{opacity:.9;transform:translate(6px,-10px)}}' +
-        '@keyframes g{from{transform:translateX(0)}to{transform:translateX(-40px)}}' +
         '.m{animation:m 46s ease-in-out infinite alternate}@keyframes m{from{transform:translateX(-160px)}to{transform:translateX(160px)}}',
       lueur('v', '#3FA66B', 0.12) + lueur('b', '#A7F3D0', 0.08),
     ) +
     '<ellipse cx="300" cy="230" rx="700" ry="150" fill="url(#v)"/>' +
     '<ellipse class="m" cx="800" cy="168" rx="900" ry="46" fill="url(#b)"/>' +
-    rangee(5, 196, 34, 64, '#0D2418', 70) +
-    rangee(3, 226, 50, 92, '#040B07', 50) +
+    rangee('loin', 5, 212, 30, 54, '#0F2A1C', 150) +
+    rangee('pres', 3, 234, 40, 70, '#050E09', 170) +
     `${lucioles}</svg>`
   )
 }
 
-/** Océan : trois houles glissent lentement dans le bas de la carte, même courte ; une lueur bleue en haut. */
+/** Océan : trois vagues dans le bas de la carte, même courte. Chacune a sa crête claire et une eau qui pâlit sous
+ * elle ; elles glissent à des vitesses différentes, la deuxième en sens inverse, et se soulèvent doucement, comme une
+ * houle. Une lueur bleue en haut. */
 function cielOcean(): string {
-  // Une houle : une onde de 400 unités de période, plus large que le ciel ; glisser d'une période la ramène à son départ.
-  const houle = (y: number, amplitude: number, opacite: number, duree: number) =>
-    `<path d="M-400 ${y}q100 ${-amplitude} 200 0${' t200 0'.repeat(11)}" fill="none" stroke="#7DD3FC" stroke-opacity="${opacite}" ` +
-    `stroke-width="1.5" style="animation:h ${duree}s linear infinite"/>`
+  // Une crête : une onde de 400 unités de période, plus large que le ciel ; glisser d'une période la ramène à son départ.
+  const crete = (y: number, amplitude: number) => `M-400 ${y}q100 ${-amplitude} 200 0${' t200 0'.repeat(11)}`
+  const vague = (i: number, y: number, amplitude: number, force: number, glisse: number, sens: 'd' | 'g', houle: number) =>
+    `<linearGradient id="e${i}" gradientUnits="userSpaceOnUse" x1="0" y1="${y - amplitude}" x2="0" y2="${y + 46}">` +
+    `<stop offset="0" stop-color="#38BDF8" stop-opacity="${force}"/><stop offset="1" stop-color="#38BDF8" stop-opacity="0"/></linearGradient>` +
+    `<g style="animation:${sens} ${glisse}s linear infinite"><g style="animation:s ${houle}s ease-in-out infinite alternate">` +
+    `<path d="${crete(y, amplitude)}V${CIEL.hauteur}H-400z" fill="url(#e${i})"/>` +
+    `<path d="${crete(y, amplitude)}" fill="none" stroke="#A5E1FD" stroke-opacity="${(force * 2).toFixed(2)}" stroke-width="1.2"/>` +
+    '</g></g>'
   return (
-    ouvrirCiel('@keyframes h{from{transform:translateX(0)}to{transform:translateX(400px)}}', lueur('b', '#38BDF8', 0.1)) +
+    ouvrirCiel(
+      '@keyframes d{from{transform:translateX(0)}to{transform:translateX(400px)}}' +
+        '@keyframes g{from{transform:translateX(0)}to{transform:translateX(-400px)}}' +
+        '@keyframes s{from{transform:translateY(-4px)}to{transform:translateY(4px)}}',
+      lueur('b', '#38BDF8', 0.1),
+    ) +
     '<ellipse cx="300" cy="20" rx="560" ry="160" fill="url(#b)"/>' +
-    houle(150, 10, 0.13, 38) +
-    houle(175, 14, 0.1, 52) +
-    houle(200, 8, 0.07, 66) +
+    vague(0, 150, 9, 0.07, 34, 'd', 7) +
+    vague(1, 172, 12, 0.06, 46, 'g', 9) +
+    vague(2, 196, 8, 0.06, 58, 'd', 11) +
     '</svg>'
   )
 }
@@ -199,11 +213,11 @@ export const THEMES: Record<Theme, { encres: Encres; ciel: (() => string) | null
     ciel: cielBraise,
   },
   foret: {
-    encres: { fond: '#07110C', bord: '#1E3A2B', texte: '#E3F0E8', vif: '#F5FBF7', gris: '#8FAE9C', faible: '#6C907C', legende: '#708F7E', accent: '#6FCF97', vide: '#CDEFD9', ...BLANCS },
+    encres: { fond: '#07110C', bord: '#1E3A2B', texte: '#E3F0E8', vif: '#F5FBF7', gris: '#8FAE9C', faible: '#6E937F', legende: '#739181', accent: '#6FCF97', vide: '#CDEFD9', ...BLANCS },
     ciel: cielForet,
   },
   ocean: {
-    encres: { fond: '#06101C', bord: '#1B3550', texte: '#E3EEF7', vif: '#F5FAFD', gris: '#8BA6BF', faible: '#6D88A4', legende: '#6C87A2', accent: '#5AB4F5', vide: '#CFE6FA', ...BLANCS },
+    encres: { fond: '#06101C', bord: '#1B3550', texte: '#E3EEF7', vif: '#F5FAFD', gris: '#8BA6BF', faible: '#6D88A4', legende: '#6E88A3', accent: '#5AB4F5', vide: '#CFE6FA', ...BLANCS },
     ciel: cielOcean,
   },
   crepuscule: {
