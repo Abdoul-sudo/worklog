@@ -27,9 +27,9 @@ export type Options = {
 export type Mesure = 'tout' | 'temps' | 'jetons'
 export const MESURES: readonly Mesure[] = ['tout', 'temps', 'jetons']
 /** Les thèmes du popover ; leurs couleurs et leurs fonds sont dans dessins.ts. */
-export type Theme = 'nuit' | 'simple' | 'aurore' | 'braise'
+export type Theme = 'nuit' | 'simple' | 'aurore' | 'braise' | 'foret' | 'ocean' | 'crepuscule' | 'sakura'
 // Dans les réglages, dans cet ordre : le plus sobre d'abord.
-export const THEMES_IDS: readonly Theme[] = ['simple', 'nuit', 'aurore', 'braise']
+export const THEMES_IDS: readonly Theme[] = ['simple', 'nuit', 'aurore', 'braise', 'foret', 'ocean', 'crepuscule', 'sakura']
 
 export const OPTIONS_PAR_DEFAUT: Options = {
   seuilPause: 60,

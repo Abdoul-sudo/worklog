@@ -1240,14 +1240,13 @@ function resume(
   )
 }
 
-/** Les réglages : deux sections (l'affichage, le comptage), côte à côte quand la place le permet, l'une sous l'autre
- * sinon ; une ligne par réglage, la commande à droite. */
-/** Le choix du thème : un aperçu par thème, son nom dessous ; le thème choisi est cerclé d'accent. */
+/** Le choix du thème : un aperçu par thème, son nom dessous, sur autant de rangs qu'il faut ; le thème choisi est
+ * cerclé d'accent. */
 function choixTheme($: Moteur, e: Site, options: Reglages) {
   if (!riche(e)) return null
   const { Box, Svg, Text } = $.ui.resolve(e)
   return (
-    <Box flexDirection="row" gap={2} paddingX="sm">
+    <Box flexDirection="row" flexWrap="wrap" columnGap={2} rowGap="sm" paddingX="sm">
       {THEMES_IDS.map((theme: Theme) => {
         const choisi = options.theme === theme
         return cliquable(
@@ -1267,7 +1266,8 @@ function choixTheme($: Moteur, e: Site, options: Reglages) {
   )
 }
 
-/** Les réglages là où la surface dessine. */
+/** Les réglages là où la surface dessine : l'affichage et les pauses à gauche, le thème à droite, ou tout l'un sous
+ * l'autre quand la place manque ; une ligne par réglage, la commande à droite. */
 function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
   if (!riche(e)) return null
   const { Box, Select, Text } = $.ui.resolve(e)
@@ -1323,42 +1323,41 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
   ]
   return (
     <Box flexDirection={aCote ? 'row' : 'column'} alignItems="stretch" gap={aCote ? 4 : 'md'}>
-      {section(t().sections.affichage, [
-        ...affichageLignes,
-        ligneReglage(
-          'mesure',
-          <Text size="footnote" {...encre(e, 'texte')}>
-            {t().mesure}
-          </Text>,
-          surFond(
-            <Select
-              key="mesure"
-              value={options.mesure}
-              options={MESURES.map(m => ({ value: m, label: t().mesures[m] }))}
-              onSelect={valeur => changerReglage($, { mesure: MESURES.find(m => m === valeur) ?? 'tout' })}
-            />,
-          ),
-        ),
-        ligneReglage(
-          'langue',
-          <Text size="footnote" {...encre(e, 'texte')}>
-            {t().langue}
-          </Text>,
-          surFond(
-            <Select
-              key="langue"
-              value={options.langue}
-              options={LANGUES.map(l => ({ value: l.id, label: l.nom }))}
-              onSelect={valeur => changerReglage($, { langue: valeur === 'fr' ? 'fr' : 'en' })}
-            />,
-          ),
-        ),
-      ])}
-      {/* Le thème en haut de la colonne de droite, qui n'a qu'une ligne : les réglages ne grandissent pas. */}
       <Box flexDirection="column" alignItems="stretch" gap="md" {...(aCote ? { flexGrow: 1, width: 0 } : {})}>
-        {section(t().sections.theme, choixTheme($, e, options), false)}
+        {section(t().sections.affichage, [
+          ...affichageLignes,
+          ligneReglage(
+            'mesure',
+            <Text size="footnote" {...encre(e, 'texte')}>
+              {t().mesure}
+            </Text>,
+            surFond(
+              <Select
+                key="mesure"
+                value={options.mesure}
+                options={MESURES.map(m => ({ value: m, label: t().mesures[m] }))}
+                onSelect={valeur => changerReglage($, { mesure: MESURES.find(m => m === valeur) ?? 'tout' })}
+              />,
+            ),
+          ),
+          ligneReglage(
+            'langue',
+            <Text size="footnote" {...encre(e, 'texte')}>
+              {t().langue}
+            </Text>,
+            surFond(
+              <Select
+                key="langue"
+                value={options.langue}
+                options={LANGUES.map(l => ({ value: l.id, label: l.nom }))}
+                onSelect={valeur => changerReglage($, { langue: valeur === 'fr' ? 'fr' : 'en' })}
+              />,
+            ),
+          ),
+        ], false)}
         {section(t().sections.comptage, comptage, false)}
       </Box>
+      {section(t().sections.theme, choixTheme($, e, options))}
     </Box>
   )
 }

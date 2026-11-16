@@ -461,7 +461,7 @@ describe('fichiers et textes', () => {
     expect([OPTIONS_PAR_DEFAUT.pauseMax, lireOptions({ pauseMax: 480 }).pauseMax, lireOptions({ pauseMax: 300 }).pauseMax]).toEqual([240, 480, 240])
     // Une durée qui n'est plus un choix du réglage reprend la valeur par défaut.
     expect(lireOptions({ seuilPause: 45 }).seuilPause).toBe(60)
-    expect([OPTIONS_PAR_DEFAUT.theme, lireOptions({ theme: 'braise' }).theme, lireOptions({ theme: 'rose' }).theme]).toEqual(['nuit', 'braise', 'nuit'])
+    expect([OPTIONS_PAR_DEFAUT.theme, lireOptions({ theme: 'sakura' }).theme, lireOptions({ theme: 'rose' }).theme]).toEqual(['nuit', 'sakura', 'nuit'])
     expect(lireOptions({ seuilPause: 30, motif: '([', jetons: false, activite: 'oui' })).toEqual({ ...OPTIONS_PAR_DEFAUT, seuilPause: 30 })
   })
 

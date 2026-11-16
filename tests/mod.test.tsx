@@ -322,6 +322,7 @@ test('les tokens, les onglets, les réglages et la frise', async ($, on) => {
       expect(await bande.find({ type: 'Text', text: /^Simple$/ })).toMatchObject({ props: { weight: 'semibold' } })
       expect(await bande.find({ type: 'Text', text: /^Nuit$/ })).toMatchObject({ props: { weight: 'regular' } })
       await bande.press({ key: 'theme-nuit' })
+      expect(await bande.find({ key: 'theme-sakura' })).toBeDefined()
     } else expect(await bande.find({ key: 'theme-nuit' })).toBeUndefined()
     // La croix ramène à l'onglet d'avant : Tout.
     await bande.press({ key: 'reglages' })

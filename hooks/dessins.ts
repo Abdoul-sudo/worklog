@@ -75,6 +75,78 @@ function cielBraise(): string {
   )
 }
 
+/** Forêt : une lueur verte respire en bas ; des lucioles s'allument et s'éteignent, chacune à son rythme. */
+function cielForet(): string {
+  const lucioles = [[90, 230], [210, 120], [340, 260], [480, 180], [610, 90], [760, 240], [900, 150], [1040, 270], [1180, 110], [1330, 210]]
+    .map(([x, y], i) => {
+      const duree = 4 + ((i * 3) % 5)
+      return `<circle cx="${x}" cy="${y}" r="1.5" fill="#D9F99D" opacity="0" style="animation:l ${duree}s ease-in-out ${-((i * 1.7) % duree).toFixed(1)}s infinite"/>`
+    })
+    .join('')
+  return (
+    ouvrirCiel(
+      '@keyframes l{0%,100%{opacity:0;transform:translate(0,0)}50%{opacity:.8;transform:translate(6px,-10px)}}' +
+        '.r{animation:r 12s ease-in-out infinite alternate}@keyframes r{from{opacity:.6}to{opacity:1}}',
+      lueur('v', '#3FA66B', 0.14) + trame('#CDEFD9', 0.04),
+    ) +
+    `<rect width="${CIEL.largeur}" height="${CIEL.hauteur}" fill="url(#p)"/>` +
+    `<ellipse class="r" cx="260" cy="320" rx="640" ry="220" fill="url(#v)"/>${lucioles}</svg>`
+  )
+}
+
+/** Océan : trois houles glissent lentement en bas ; une lueur bleue en haut. */
+function cielOcean(): string {
+  // Une houle : une onde de 400 unités de période, plus large que le ciel ; glisser d'une période la ramène à son départ.
+  const houle = (y: number, amplitude: number, opacite: number, duree: number) =>
+    `<path d="M-400 ${y}q100 ${-amplitude} 200 0${' t200 0'.repeat(11)}" fill="none" stroke="#7DD3FC" stroke-opacity="${opacite}" ` +
+    `stroke-width="1.5" style="animation:h ${duree}s linear infinite"/>`
+  return (
+    ouvrirCiel('@keyframes h{from{transform:translateX(0)}to{transform:translateX(400px)}}', lueur('b', '#38BDF8', 0.1)) +
+    '<ellipse cx="300" cy="20" rx="560" ry="160" fill="url(#b)"/>' +
+    houle(250, 10, 0.1, 38) +
+    houle(275, 14, 0.07, 52) +
+    houle(300, 8, 0.05, 66) +
+    '</svg>'
+  )
+}
+
+/** Crépuscule : un voile violet en haut à droite, un voile rose en bas à gauche, qui se balancent lentement ; quelques
+ * étoiles scintillent. */
+function cielCrepuscule(): string {
+  const etoiles = [[120, 40], [330, 75], [520, 30], [700, 95], [880, 55], [1060, 25], [1250, 80], [1420, 45]]
+    .map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="1" fill="#EDE4FF" style="animation:e ${5 + (i % 4)}s ease-in-out ${-i}s infinite alternate"/>`)
+    .join('')
+  return (
+    ouvrirCiel(
+      '@keyframes e{from{opacity:.15}to{opacity:.7}}' +
+        '.v{animation:v 40s ease-in-out infinite alternate}@keyframes v{from{transform:translate(0,0)}to{transform:translate(-260px,30px)}}',
+      lueur('u', '#8B5CF6', 0.14) + lueur('o', '#EC4899', 0.08),
+    ) +
+    '<ellipse class="v" cx="900" cy="30" rx="560" ry="170" fill="url(#u)"/>' +
+    `<ellipse cx="160" cy="330" rx="520" ry="170" fill="url(#o)"/>${etoiles}</svg>`
+  )
+}
+
+/** Sakura : des pétales tombent lentement en tournant ; une lueur rose en haut à gauche. */
+function cielSakura(): string {
+  const petales = [70, 230, 390, 560, 720, 880, 1040, 1200, 1360, 1500]
+    .map((x, i) => {
+      const duree = 14 + ((i * 5) % 9)
+      return (
+        `<ellipse cx="${x}" cy="-10" rx="3.2" ry="1.9" fill="#F9C6DA" opacity="0" ` +
+        `style="transform-box:fill-box;transform-origin:center;animation:f ${duree}s linear ${-((i * 3.1) % duree).toFixed(1)}s infinite"/>`
+      )
+    })
+    .join('')
+  return (
+    ouvrirCiel(
+      '@keyframes f{0%{transform:translate(0,0) rotate(0deg);opacity:0}10%{opacity:.7}85%{opacity:.5}100%{transform:translate(-70px,360px) rotate(300deg);opacity:0}}',
+      lueur('k', '#F472B6', 0.1),
+    ) +
+    `<ellipse cx="220" cy="30" rx="540" ry="170" fill="url(#k)"/>${petales}</svg>`
+  )
+}
+
 /** Les thèmes du popover. Simple n'a ni fond propre ni mouvement : le gris de l'app et un cadre fin. */
 export const THEMES: Record<Theme, { encres: Encres; ciel: (() => string) | null }> = {
   nuit: {
@@ -92,6 +164,22 @@ export const THEMES: Record<Theme, { encres: Encres; ciel: (() => string) | null
   braise: {
     encres: { fond: '#140F0C', bord: '#3D2B21', texte: '#F2E8E1', vif: '#FBF6F2', gris: '#B39B8D', faible: '#7D6759', legende: '#8F786A', accent: ARGILE, vide: '#FFD9C2', ...BLANCS },
     ciel: cielBraise,
+  },
+  foret: {
+    encres: { fond: '#07110C', bord: '#1E3A2B', texte: '#E3F0E8', vif: '#F5FBF7', gris: '#8FAE9C', faible: '#5C7A69', legende: '#6E8C7B', accent: '#6FCF97', vide: '#CDEFD9', ...BLANCS },
+    ciel: cielForet,
+  },
+  ocean: {
+    encres: { fond: '#06101C', bord: '#1B3550', texte: '#E3EEF7', vif: '#F5FAFD', gris: '#8BA6BF', faible: '#5A7590', legende: '#6C87A2', accent: '#5AB4F5', vide: '#CFE6FA', ...BLANCS },
+    ciel: cielOcean,
+  },
+  crepuscule: {
+    encres: { fond: '#0E0A18', bord: '#2E2547', texte: '#ECE8F5', vif: '#FAF8FD', gris: '#A398BD', faible: '#6C6287', legende: '#7F7499', accent: '#B794F6', vide: '#DCCFFB', ...BLANCS },
+    ciel: cielCrepuscule,
+  },
+  sakura: {
+    encres: { fond: '#140B10', bord: '#3D2333', texte: '#F5E9EF', vif: '#FDF7FA', gris: '#B898A8', faible: '#7D6170', legende: '#937483', accent: '#F49AC1', vide: '#FBD3E4', ...BLANCS },
+    ciel: cielSakura,
   },
 }
 
@@ -123,6 +211,10 @@ export function svgApercu(theme: Theme, choisi: boolean): string {
     simple: '',
     aurore: `<ellipse cx="18" cy="8" rx="30" ry="12" fill="#2DD4BF" fill-opacity=".15"/>`,
     braise: `<ellipse cx="22" cy="40" rx="40" ry="16" fill="${ARGILE}" fill-opacity=".18"/><circle cx="14" cy="22" r=".9" fill="#FFB38A"/><circle cx="34" cy="16" r=".7" fill="#FFB38A"/><circle cx="52" cy="26" r=".8" fill="#FFB38A"/>`,
+    foret: `<ellipse cx="20" cy="40" rx="40" ry="16" fill="#3FA66B" fill-opacity=".2"/><circle cx="12" cy="30" r=".9" fill="#D9F99D"/><circle cx="33" cy="20" r=".8" fill="#D9F99D"/><circle cx="54" cy="34" r=".9" fill="#D9F99D"/>`,
+    ocean: `<ellipse cx="20" cy="4" rx="34" ry="12" fill="#38BDF8" fill-opacity=".12"/><path d="M0 35q8-3 16 0t16 0 16 0 16 0" fill="none" stroke="#7DD3FC" stroke-opacity=".35"/>`,
+    crepuscule: `<ellipse cx="50" cy="4" rx="30" ry="12" fill="#8B5CF6" fill-opacity=".2"/><ellipse cx="10" cy="40" rx="28" ry="12" fill="#EC4899" fill-opacity=".12"/>`,
+    sakura: `<ellipse cx="18" cy="6" rx="30" ry="12" fill="#F472B6" fill-opacity=".12"/><ellipse cx="13" cy="31" rx="1.8" ry="1.1" fill="#F9C6DA" transform="rotate(30 13 31)"/><ellipse cx="34" cy="19" rx="1.8" ry="1.1" fill="#F9C6DA" transform="rotate(-20 34 19)"/><ellipse cx="55" cy="33" rx="1.8" ry="1.1" fill="#F9C6DA" transform="rotate(50 55 33)"/>`,
   }[theme]
   const cases = [0, 1, 2, 3].map(i => `<rect x="${37 + i * 6}" y="27" width="4.5" height="4.5" rx="1" fill="${i === 2 ? e.accent : e.vide}" fill-opacity="${i === 2 ? 1 : 0.18}"/>`).join('')
   return (

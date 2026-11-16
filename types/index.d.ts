@@ -56,7 +56,7 @@ export type Reglages = {
   /** Ce que le popover montre : le temps et les tokens, ou l'un des deux. */
   mesure: 'tout' | 'temps' | 'jetons'
   /** Le thème du popover : ses couleurs et son fond animé. */
-  theme: 'nuit' | 'simple' | 'aurore' | 'braise'
+  theme: 'nuit' | 'simple' | 'aurore' | 'braise' | 'foret' | 'ocean' | 'crepuscule' | 'sakura'
 }
 
 declare module 'claude-code' {
