@@ -117,7 +117,7 @@ To click in Worklog in the terminal, use the fullscreen mode: `/tui fullscreen`.
 | --- | --- |
 | See another period | Click **Day**, **Week**, **Month**, **Year** or **All**. Click **‹** or **›** to go back or forward. |
 | Count this session for another name | Point to the name, then click **⇄**. In the terminal, click the name. |
-| Count this session for a new name | Click **+ Add name**, type the name, then press Enter. |
+| Count this session for a new name | Click **+ Add item**, type the name, then press Enter. |
 | Rename | Click **✎** next to the name. The new name also replaces the old one on past days. |
 | Open the settings | Click the gear. In the terminal, click **≡**. |
 
