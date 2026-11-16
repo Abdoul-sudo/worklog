@@ -128,7 +128,7 @@ To click in Worklog in the terminal, use the fullscreen mode: `/tui fullscreen`.
 ## Settings
 
 <p align="center">
-  <img src="docs/screenshots/settings.png" width="880" alt="The settings: the display, the language and the breaks on the left, the eight themes on the right.">
+  <img src="docs/screenshots/settings.png" width="880" alt="The settings, with the Show menu open: Time and tokens, or Tokens and price. The eight themes on the right.">
 </p>
 
 | Setting | Default | What it does |
@@ -139,6 +139,16 @@ To click in Worklog in the terminal, use the fullscreen mode: `/tui fullscreen`.
 | Stay active during breaks | Up to 1h | A shorter break counts as work. |
 | Then ask | Up to 4h | Worklog asks about a longer break, up to this length. **Never** turns off the question. |
 | Theme | Night | Default, Night, Aurora, Ember, Forest, Ocean, Dusk or Sakura. Desktop app only. |
+
+### Tokens and price
+
+Do you look at your tokens more than at your time? Set **Show** to **Tokens and price**. The API price then takes the place of the time: in the stats, in each line and in the heatmap.
+
+<p align="center">
+  <img src="docs/screenshots/price.png" width="880" alt="Worklog with Show set to Tokens and price: 21.5M tokens and $23 today, and the tokens and the price of each name.">
+</p>
+
+The API price is not your bill. To learn more, see the [FAQ](#faq).
 
 ## Update
 
