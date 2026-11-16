@@ -19,7 +19,7 @@
   <a href="#quick-start">Quick start</a> ·
   <a href="#how-the-timer-works">How the timer works</a> ·
   <a href="#breaks">Breaks</a> ·
-  <a href="#names">Names</a> ·
+  <a href="#project-names">Project names</a> ·
   <a href="#themes">Themes</a> ·
   <a href="#in-the-terminal">Terminal</a> ·
   <a href="#settings">Settings</a> ·
@@ -76,7 +76,7 @@ When Worklog asks, click **Count** to add the break, or **Ignore** to leave it o
 
 You can change the 1h and the 4h in the settings. To never get the question, set **Then ask** to **Never**.
 
-## Names
+## Project names
 
 Each session counts for one name, such as a project or a task. Worklog decides on the name in this order:
 
