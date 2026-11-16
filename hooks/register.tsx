@@ -121,6 +121,7 @@ const IMPORT_MS = 5 * 60_000
 const LITELLM = 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json'
 /** Les prix se téléchargent au plus une fois par jour. */
 const PRIX_MS = 24 * 60 * 60_000
+const ESSAI_PRIX_MS = 60 * 60_000
 // Les tours qui partent seuls (tâche planifiée, observateur, notification d'une tâche de fond, message d'une autre
 // session, avis sans origine) ne comptent pas : ils ne sont pas un retour de la personne.
 const AUTOMATIQUES = ['scheduled-trigger', 'observer', 'observer-activity', 'task-notification', 'peer', 'peer-send-message', 'unclassified']
@@ -140,6 +141,10 @@ const reglages = atom({ plugin: 'worklog', key: 'reglages' } as const, null, { s
 let chemins: { journal: string; importe: string; projets: string; prix: string } | null = null
 // Les prix API des modèles Claude (prix.json) ; null tant que le mod n'en a pas.
 let prix: Prix | null = null
+// Les prix gardés, en texte : de nouveaux prix se reconnaissent sans comparer chaque modèle.
+let prixTexte = ''
+// Le dernier essai de téléchargement des prix : après un échec, le suivant attend ESSAI_PRIX_MS.
+let essaiPrix = -Infinity
 let ecritures: Promise<unknown> = Promise.resolve()
 let tourCompte = true
 let heritageClear: { item: string; manuel: boolean } | null = null
@@ -335,18 +340,33 @@ async function mettreAJourPrix($: Moteur): Promise<void> {
     try {
       const garde = JSON.parse(await $.fs.read(fichier)) as { maj?: unknown; modeles?: unknown }
       if (typeof garde.maj === 'number') maj = garde.maj
-      if (typeof garde.modeles === 'object' && garde.modeles !== null) prix = garde.modeles as Prix
+      if (typeof garde.modeles === 'object' && garde.modeles !== null) garderPrix(garde.modeles as Prix)
     } catch {}
   }
   const maintenant = await $.clock.now()
-  if (maintenant - maj < PRIX_MS || (await $.env.get('WORKLOG_PRICES')) === 'off') return
-  const reponse = await $.http.fetch(LITELLM).catch(() => null)
-  if (reponse === null || !reponse.ok) return
-  const modeles = prixClaude(JSON.parse(reponse.text))
-  if (Object.keys(modeles).length === 0) return
-  await $.fs.write(fichier, JSON.stringify({ maj: maintenant, modeles }))
+  if (maintenant - maj < PRIX_MS || maintenant - essaiPrix < ESSAI_PRIX_MS || (await $.env.get('WORKLOG_PRICES')) === 'off') return
+  essaiPrix = maintenant
+  // Un gros fichier, sans délai maximal possible : il se télécharge à côté, sans retarder l'import.
+  enFond(
+    (async () => {
+      const reponse = await $.http.fetch(LITELLM).catch(() => null)
+      if (reponse === null || !reponse.ok) return
+      const modeles = prixClaude(JSON.parse(reponse.text))
+      if (Object.keys(modeles).length === 0) return
+      await $.fs.write(fichier, JSON.stringify({ maj: maintenant, modeles }))
+      garderPrix(modeles)
+      await rafraichir($)
+    })(),
+  )
+}
+
+/** Garde de nouveaux prix : la frise, qui garde les jours passés en cache, se recalcule avec eux. */
+function garderPrix(modeles: Prix): void {
+  const texte = JSON.stringify(modeles)
+  if (texte === prixTexte) return
+  prixTexte = texte
   prix = modeles
-  await rafraichir($)
+  cacheFrise = null
 }
 
 /** Le bilan de [debut, fin[, avec le jour d'avant pour les plages qui passent minuit. Un item sans aucun token sur la

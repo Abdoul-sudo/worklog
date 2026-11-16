@@ -549,6 +549,60 @@ test("sans prix gardés, le mod télécharge la liste de LiteLLM et n'en garde q
   })
 })
 
+test("un téléchargement des prix raté ne se retente pas à chaque import", async ($, on) => {
+  const { horloge } = monde(on)
+  let demandes = 0
+  on('http.fetch', () => {
+    demandes++
+    return { value: { status: 503, ok: false, headers: {}, text: '' } }
+  })
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await horloge.settle()
+  expect(demandes).toBe(1)
+  // L'import suivant, cinq minutes plus tard, ne retente pas encore : il attend une heure.
+  await horloge.advance(6 * 60_000)
+  await horloge.settle()
+  expect(demandes).toBe(1)
+})
+
+test('des prix arrivés pendant que Worklog est ouvert redessinent la frise, jours passés compris', async ($, on) => {
+  const { horloge, fichiers } = monde(on, ['desktop'])
+  // Le téléchargement est retenu jusqu'à ce que le test le libère.
+  let liberer = () => {}
+  const attente = new Promise<void>(r => {
+    liberer = r
+  })
+  const liste = { 'claude-opus-5-5': { litellm_provider: 'anthropic', input_cost_per_token: 4e-6, output_cost_per_token: 2e-5 } }
+  on('http.fetch', async () => {
+    await attente
+    return { value: { status: 200, ok: true, headers: {}, text: JSON.stringify(liste) } }
+  })
+  // Hier, des tokens détaillés : 1 000 lus et 100 000 écrits sur Opus 5.5, soit 2 $ au tarif de l'API.
+  fichiers.set(
+    'C:/Users/test/.claude/worklog/journal/2026-11-11/S0.jsonl',
+    `${JSON.stringify({ t: new Date(2026, 10, 11, 10).getTime(), s: 'S0', e: 'jetons', n: 101_000, k: 'FLO-I1', p: [{ m: 'claude-opus-5-5', in: 1_000, out: 100_000, c5: 0, c1: 0, cr: 0 }] })}\n`,
+  )
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await horloge.settle()
+  const puce = await $.ui.mount({ ...PIED, surface: 'desktop' })
+  const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
+  await puce.press({ key: 'puce' })
+  await bande.press({ key: 'reglages' })
+  await bande.select({ key: 'mesure', value: 'jetons' })
+  await bande.press({ key: 'reglages' })
+  const caseDHier = async () => {
+    const svgs = await bande.findAll({ type: 'Svg' })
+    const source = svgs.map(x => String((x.props as { source?: unknown })?.source ?? '')).find(x => x.includes('<title>')) ?? ''
+    return /<title>Mercredi 11 novembre[^<]*<\/title>/.exec(source)?.[0]
+  }
+  expect(await caseDHier()).toBe('<title>Mercredi 11 novembre · 101 k tokens</title>')
+  liberer()
+  await horloge.settle()
+  expect(await caseDHier()).toBe('<title>Mercredi 11 novembre · 101 k tokens · 2,00 $</title>')
+  await puce.unmount()
+  await bande.unmount()
+})
+
 test('avec WORKLOG_PRICES=off, le mod ne télécharge pas les prix', async ($, on) => {
   const { horloge, fichiers } = monde(on, ['terminal'], { WORKLOG_PRICES: 'off' })
   const demandes: string[] = []
