@@ -73,7 +73,7 @@ const FR = {
     active: 'Activé',
     desactive: 'Désactivé',
   },
-  icones: { precedent: 'Période précédente', suivant: 'Période suivante', crayon: 'Renommer', changer: 'Passer sur cet item' },
+  icones: { precedent: 'Période précédente', suivant: 'Période suivante', crayon: 'Renommer', changer: 'Passer sur cet item', valider: 'Enregistrer le nom' },
   commande: {
     description: 'Worklog : afficher ou masquer. /worklog <nom> nomme la session',
     indice: '[<nom>]',
@@ -145,7 +145,7 @@ const EN: typeof FR = {
     active: 'On',
     desactive: 'Off',
   },
-  icones: { precedent: 'Previous period', suivant: 'Next period', crayon: 'Rename', changer: 'Switch to this item' },
+  icones: { precedent: 'Previous period', suivant: 'Next period', crayon: 'Rename', changer: 'Switch to this item', valider: 'Save the name' },
   commande: {
     description: 'Worklog: show or hide. /worklog <name> names this session',
     indice: '[<name>]',

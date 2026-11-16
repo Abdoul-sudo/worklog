@@ -69,7 +69,7 @@ const RAFRAICHISSEMENT_MS = 30_000
 const couper = (texte: string, n: number) => [...texte].slice(0, n).join('')
 
 /** Après ce délai sans frappe, le champ se quitte seul : l'app ne signale pas un clic ailleurs. */
-const CHAMP_INACTIF_MS = 2_000
+const CHAMP_INACTIF_MS = 3_000
 /** Deux clics plus proches que ce délai font un double-clic. */
 const DOUBLE_CLIC_MS = 450
 // L'heure du dernier clic sur le nom de chaque item.
@@ -962,6 +962,8 @@ function ligne(
   )
   const changer = !estActuel && !sansNom && icone($, e, `choisir-${l.item}`, 'changer', '⇄', () => choisirItem($, l.item))
   const crayon = estActuel && !enRenommage && icone($, e, 'crayon', 'crayon', '✎', ouvrirRenommage)
+  // Pendant le renommage, ✓ l'enregistre tout de suite : l'app ne signale pas un clic hors du champ.
+  const valider = enRenommage && icone($, e, 'valider-renommage', 'valider', '✓', () => quitterChamp($))
   // Pas de temps sur la période : un tiret discret, pour que la colonne ne paraisse pas vide par erreur.
   const temps =
     l.minutes > 0 ? (
@@ -1015,6 +1017,7 @@ function ligne(
       <Box flexDirection="row" gap={1} alignItems="center" minWidth={0} {...(nomFixe ? { width: COLONNES.nom } : { flexGrow: 1, flexShrink: 1 })}>
         {pastille($, e, couleur, l.enCours)}
         {nom}
+        {valider}
         {(crayon !== false || changer !== false) && (
           <Box display="none" hover={{ display: 'flex' }} flexShrink={0}>
             {crayon}
