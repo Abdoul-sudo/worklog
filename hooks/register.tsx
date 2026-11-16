@@ -76,7 +76,8 @@ const dernierClic = new Map<string, number>()
 let texteEdition = ''
 /** Ouvre un champ (renommer, autre item) et y met le focus, pour taper tout de suite. */
 async function ouvrirEdition($: Moteur, edition: NonNullable<Interface['edition']>, site: string): Promise<void> {
-  texteEdition = ''
+  // Le champ de renommage s'ouvre avec le nom : il n'est pas vide.
+  texteEdition = edition === 'autre' ? '' : edition.renommer
   await update($, ui, x => ({ ...x, edition }))
   surveillerChamp($)
   // Au mieux : une surface qui ne sait pas donner le focus laisse le champ ouvert, sans erreur.

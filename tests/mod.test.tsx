@@ -337,7 +337,11 @@ test('renommer depuis le popover : le crayon, ou un double-clic sur le nom', asy
   await bande.input({ key: 'renommer', text: 'FSY-I47' })
   expect(await bande.find({ key: 'renommer' })).toBeUndefined()
 
+  // Le champ de renommage tient déjà le nom : il ne se ferme pas seul.
   await bande.press({ key: 'crayon' })
+  await horloge.advance(7_000)
+  await horloge.settle()
+  expect(await bande.find({ key: 'renommer' })).toBeDefined()
   await bande.input({ key: 'renommer', text: 'FSY-I478' })
   await puceAffiche(puce, 'FSY-I478', '20 min')
   expect(await ligneDe($, 'FSY-I478')).toContain('20 min')
