@@ -47,8 +47,8 @@ Worklog needs Claude Code 2.1.325 or later. Node.js is optional: Worklog uses it
 
 - The timer starts with your first message in a session. Opening a session does not count.
 - The timer runs while Claude works: answers, subagents, workflows, Ultracode and background commands, even when they work alone for hours.
-- When Claude is done, a break starts. Worklog decides about the break when you come back.
-- When two sessions work at the same time, both count. Worklog shows how much of the day was in parallel.
+- When Claude is done, a break starts. When you come back, Worklog decides if the break counts as work.
+- When two sessions work at the same time, the time of both sessions counts. Worklog shows how much of the day was in parallel.
 
 ## Tokens and price
 
@@ -59,26 +59,26 @@ Do you look at your tokens more than at your time? Set **Show** to **Tokens and 
 </p>
 
 - The price is what your tokens cost at the Anthropic API list prices, for each model and each answer.
-- Worklog counts the price all the time. When you switch, your past days have their price too.
+- Worklog always counts the price, also when it shows the time. So when you switch, your past days have their price too.
 - With a Pro or Max plan, the API price is not your bill. It shows what your work would cost on the API.
 
 ## Breaks
 
-A break is the time between the end of Claude's work and your next message.
+A break is the time between the end of Claude's work and your next message. A short break counts as work. For a long break, Worklog asks you. A very long break does not count.
 
 <p align="center">
-  <img src="docs/breaks.svg" width="880" alt="One day with Worklog. Work counts. A 30 min break counts when you come back. Worklog asks about a 2h break. The night does not count.">
+  <img src="docs/breaks.svg" width="880" alt="One day with Worklog. Work always counts. A short 30 min break counts as work when you come back. For a long 2h break, Worklog asks you. The night is a very long break: it does not count.">
 </p>
 
 **Example.** Claude finishes at 10:00. You stop for a coffee. At 10:30, you send a new message. Worklog adds the 30 minutes at that moment. During the break, the total does not change. It catches up when you come back.
 
 | Break | What Worklog does |
 | --- | --- |
-| Up to 1h | Counts the break as work. |
-| From 1h to 4h | Asks you if the break was work. |
-| Longer than 4h | Does not count the break, and does not ask. |
+| Short: up to 1h | Counts the break as work. |
+| Long: from 1h to 4h | Asks you if the break was work. |
+| Very long: more than 4h | Does not count the break as work, and does not ask. |
 
-If you close Claude Code during a break, the break counts until you close it, if it is shorter than 1h.
+If you close Claude Code during a short break, the break counts as work up to the moment you close Claude Code.
 
 When Worklog asks, click **Count** to add the break, or **Ignore** to leave it out.
 
@@ -90,7 +90,7 @@ You can change the 1h and the 4h in the settings. To never get the question, set
 
 ## Project names
 
-Each session counts for one name, such as a project or a task. Worklog decides on the name in this order:
+The time of each session goes to one name, such as a project or a task. Worklog decides on the name in this order:
 
 1. The name that you choose, with `/worklog <name>` or in the list.
 2. An ID in your messages, such as `PROJ-142`.
@@ -99,7 +99,7 @@ Each session counts for one name, such as a project or a task. Worklog decides o
 
 When Worklog finds the first ID of a session, the time before it also goes to this ID.
 
-To count a session for another name, point to the name in the list, then click **⇄**.
+To count this session for another name from now on, point to the name in the list, then click **⇄**.
 
 <p align="center">
   <img src="docs/screenshots/switch.png" width="880" alt="The list of names. The pointer is on the switch icon next to website.">
@@ -128,15 +128,15 @@ To click in Worklog in the terminal, use the fullscreen mode: `/tui fullscreen`.
 | Task | Action |
 | --- | --- |
 | See another period | Click **Day**, **Week**, **Month**, **Year** or **All**. Click **‹** or **›** to go back or forward. |
-| Count this session for another name | Point to the name, then click **⇄**. In the terminal, click the name. |
-| Count this session for a new name | Click **+ Add item**, type the name, then press Enter. |
+| Count this session for another name, from now on | Point to the name, then click **⇄**. In the terminal, click the name. |
+| Count this session for a new name, from now on | Click **+ Add item**, type the name, then press Enter. |
 | Rename | Click **✎** next to the name. The new name also replaces the old one on past days. |
 | Open the settings | Click the gear. In the terminal, click **≡**. |
 
 | Command | What it does |
 | --- | --- |
 | `/worklog` | Shows or hides Worklog. |
-| `/worklog <name>` | Counts this session for `<name>`. For example: `/worklog PROJ-142`. |
+| `/worklog <name>` | Counts this session for `<name>`, from now on. For example: `/worklog PROJ-142`. |
 
 ## Settings
 
@@ -149,8 +149,8 @@ To click in Worklog in the terminal, use the fullscreen mode: `/tui fullscreen`.
 | Show the activity heatmap | On | Shows one square for each day of the year. |
 | Show | Time and tokens | Shows the time and the tokens, or the tokens and their API price. |
 | Language | English | English or French. |
-| Stay active during breaks | Up to 1h | A shorter break counts as work. |
-| Then ask | Up to 4h | Worklog asks about a longer break, up to this length. **Never** turns off the question. |
+| Stay active during breaks | Up to 1h | A break up to this length is short: it counts as work. |
+| Then ask | Up to 4h | For a long break, up to this length, Worklog asks you if it was work. A very long break does not count. **Never** turns off the question. |
 | Theme | Night | Default, Night, Aurora, Ember, Forest, Ocean, Dusk or Sakura. Desktop app only. |
 
 ## Update
@@ -175,7 +175,7 @@ Your data stays in `~/.claude/worklog/`. To remove it, delete this folder.
 <details>
 <summary><strong>Does the timer stop when I leave?</strong></summary>
 
-Yes. The timer runs only while Claude works. When you come back, Worklog decides if your break counts.
+Yes. The timer runs only while Claude works. When you come back, Worklog decides if your break counts as work.
 
 </details>
 
@@ -191,7 +191,7 @@ Yes, with the default settings. Worklog adds the 30 minutes when you send the me
 
 Yes. The timer runs while they work, even when you do not type. Their tokens count too.
 
-A background command counts while Claude waits for it to end. If you come back before it ends, such as with a dev server that never stops, the wait is a break.
+While Claude waits for a background command to end, the time counts as work. If you come back before it ends, such as with a dev server that never stops, the wait is a break.
 
 </details>
 

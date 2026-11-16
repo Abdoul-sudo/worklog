@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="880" height="262" viewBox="0 0 880 262" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
-  <title>One day with Worklog: work counts, a 30 min break counts when you come back, Worklog asks about a 2h break, the night does not count.</title>
+  <title>One day with Worklog: work always counts, a short 30 min break counts as work when you come back, Worklog asks about a long 2h break, the night is a very long break and does not count.</title>
   <defs>
     <clipPath id="barre"><rect x="32" y="88" width="816" height="36" rx="7"/></clipPath>
   </defs>
@@ -38,12 +38,12 @@
   <line x1="32" y1="164" x2="848" y2="164" stroke="#1E2740"/>
   <g font-size="13">
     <rect x="32" y="182" width="14" height="14" rx="3" fill="#4FD1C5"/>
-    <text x="56" y="194" fill="#E6E9F2"><tspan font-weight="600">Work</tspan><tspan fill="#8A93B2">: counts.</tspan></text>
+    <text x="56" y="194" fill="#E6E9F2"><tspan font-weight="600">Work</tspan><tspan fill="#8A93B2">: always counts.</tspan></text>
     <rect x="440" y="182" width="14" height="14" rx="3" fill="#4FD1C5" fill-opacity=".38"/>
-    <text x="464" y="194" fill="#E6E9F2"><tspan font-weight="600">Break up to 1h</tspan><tspan fill="#8A93B2">: counts when you come back.</tspan></text>
+    <text x="464" y="194" fill="#E6E9F2"><tspan font-weight="600">Short break, up to 1h</tspan><tspan fill="#8A93B2">: counts as work.</tspan></text>
     <rect x="32" y="218" width="14" height="14" rx="3" fill="#E8BE6A" fill-opacity=".45"/>
-    <text x="56" y="230" fill="#E6E9F2"><tspan font-weight="600">Break from 1h to 4h</tspan><tspan fill="#8A93B2">: Worklog asks you.</tspan></text>
+    <text x="56" y="230" fill="#E6E9F2"><tspan font-weight="600">Long break, 1h to 4h</tspan><tspan fill="#8A93B2">: Worklog asks you.</tspan></text>
     <rect x="440" y="218" width="14" height="14" rx="3" fill="#2B3350"/>
-    <text x="464" y="230" fill="#E6E9F2"><tspan font-weight="600">Longer break</tspan><tspan fill="#8A93B2">: does not count.</tspan></text>
+    <text x="464" y="230" fill="#E6E9F2"><tspan font-weight="600">Very long break</tspan><tspan fill="#8A93B2">: does not count.</tspan></text>
   </g>
 </svg>
