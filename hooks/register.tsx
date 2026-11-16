@@ -68,8 +68,8 @@ const RAFRAICHISSEMENT_MS = 30_000
 /** Les `n` premiers caractères de `texte`, sans couper un emoji ou un caractère en deux. */
 const couper = (texte: string, n: number) => [...texte].slice(0, n).join('')
 
-/** Un champ vide se ferme seul après ce délai sans frappe. */
-const CHAMP_VIDE_MS = 6_000
+/** Après ce délai sans frappe, le champ se quitte seul : l'app ne signale pas un clic ailleurs. */
+const CHAMP_INACTIF_MS = 6_000
 /** Deux clics plus proches que ce délai font un double-clic. */
 const DOUBLE_CLIC_MS = 450
 // L'heure du dernier clic sur le nom de chaque item.
@@ -93,12 +93,12 @@ function noterFrappe($: Moteur, texte: string): void {
   texteEdition = texte
   surveillerChamp($)
 }
-/** L'app ne signale pas un clic hors de la bande : un champ resté vide se ferme seul, CHAMP_VIDE_MS après la dernière
- * frappe. Un champ qui tient des lettres reste ouvert. */
+/** L'app ne signale pas un clic hors de la bande : CHAMP_INACTIF_MS après la dernière frappe, le champ se quitte seul. Un
+ * nouveau nom s'enregistre ; un nom inchangé ou un champ vide se ferme. Un autre item tapé reste ouvert. */
 function surveillerChamp($: Moteur): void {
   const numero = ++derniereFrappe
-  $.clock.after(CHAMP_VIDE_MS, () => {
-    if (numero === derniereFrappe) enFond(fermerChampVide($))
+  $.clock.after(CHAMP_INACTIF_MS, () => {
+    if (numero === derniereFrappe) enFond(quitterChamp($))
   })
 }
 /** Ferme le champ ouvert s'il ne tient ni lettre ni chiffre. */
