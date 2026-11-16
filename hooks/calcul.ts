@@ -401,11 +401,18 @@ export function bilan(
 
   const jours: Jour[] = []
   const totaux = new Map<string, { minutes: number; jetons: number }>()
+  // Le total et le temps réel de la période, en millisecondes : arrondis une seule fois, ils ne diffèrent que d'un vrai
+  // temps en parallèle.
+  let totalBrut = 0
+  let reelBrut = 0
   for (let jour = debut; jour < fin; jour = jourSuivant(jour)) {
     const lendemain = jourSuivant(jour)
     const lignes: Ligne[] = []
+    let brut = 0
     for (const [item, segments] of items) {
-      const minutes = Math.round(recouvrement(segments, jour, lendemain) / MINUTE)
+      const duree = recouvrement(segments, jour, lendemain)
+      brut += duree
+      const minutes = Math.round(duree / MINUTE)
       const n = jetonsParJour.get(`${jour}|${item}`) ?? 0
       if (minutes === 0 && n === 0) continue
       lignes.push({ item, minutes, enCours: enCours.has(item), jetons: n })
@@ -413,11 +420,14 @@ export function bilan(
       totaux.set(item, { minutes: cumul.minutes + minutes, jetons: cumul.jetons + n })
     }
     if (lignes.length === 0) continue
+    const reel = recouvrement(tous, jour, lendemain)
+    totalBrut += brut
+    reelBrut += reel
     jours.push({
       debut: jour,
       lignes: lignes.sort(parTemps),
-      total: lignes.reduce((s, l) => s + l.minutes, 0),
-      reel: Math.round(recouvrement(tous, jour, lendemain) / MINUTE),
+      total: Math.round(brut / MINUTE),
+      reel: Math.round(reel / MINUTE),
       jetons: lignes.reduce((s, l) => s + l.jetons, 0),
     })
   }
@@ -446,8 +456,8 @@ export function bilan(
     parSession,
     jours,
     lignes: lignes.sort(parTemps),
-    total: lignes.reduce((s, l) => s + l.minutes, 0),
-    reel: jours.reduce((s, j) => s + j.reel, 0),
+    total: Math.round(totalBrut / MINUTE),
+    reel: Math.round(reelBrut / MINUTE),
     jetons: lignes.reduce((s, l) => s + l.jetons, 0),
     ecarts: aConfirmer,
     derniere,

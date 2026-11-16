@@ -705,4 +705,15 @@ describe("l'affichage", () => {
       choisirLangue('fr')
     }
   })
+
+  test('deux sessions qui se suivent sans se chevaucher ne montrent pas de temps en parallèle', async () => {
+    const s = (debut: number, session: string, k: string) => [
+      { t: debut, s: session, e: 'message', k } as Evenement,
+      { t: debut + 10 * MINUTE + 31_000, s: session, e: 'reponse', k } as Evenement,
+      { t: debut + 10 * MINUTE + 31_000, s: session, e: 'jetons', n: 10, k } as Evenement,
+      { t: debut + 10 * MINUTE + 32_000, s: session, e: 'fermeture', k } as Evenement,
+    ]
+    const b = bilan([...s(h(9), 'A', 'X'), ...s(h(9) + 10 * MINUTE + 32_000, 'B', 'Y')], R, h(12), JOUR, jourSuivant(JOUR))
+    expect(b.total).toBe(b.reel)
+  })
 })
