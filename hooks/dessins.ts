@@ -47,32 +47,12 @@ function cielNuit(): string {
   )
 }
 
-/** Aurore : quatre lueurs, sarcelle, vert, cyan et violet, glissent lentement en haut et se mêlent comme de la
- * lumière (fusion « screen ») ; elles s'étirent et se tassent un peu. Pas de flou : de simples dégradés, légers à
- * animer. Le bas reste sombre, et le texte lisible. */
+/** Aurore : un voile sarcelle, fixe, en haut à gauche ; il ne bouge ni ne change de couleur. */
 function cielAurore(): string {
-  const lueurs = [
-    { couleur: '#2DD4BF', cx: 300, cy: 40, rx: 560, ry: 120, force: 0.2, dx: 220, duree: 38 },
-    { couleur: '#34D399', cx: 860, cy: 74, rx: 480, ry: 92, force: 0.14, dx: -260, duree: 46 },
-    { couleur: '#A78BFA', cx: 1200, cy: 26, rx: 500, ry: 104, force: 0.15, dx: -200, duree: 42 },
-    { couleur: '#22D3EE', cx: 620, cy: 8, rx: 440, ry: 72, force: 0.11, dx: 180, duree: 52 },
-  ]
   return (
-    ouvrirCiel(
-      lueurs
-        .map((l, i) => `@keyframes a${i}{from{transform:translateX(0) scaleY(1)}to{transform:translateX(${l.dx}px) scaleY(1.3)}}`)
-        .join('') + '.a{mix-blend-mode:screen;transform-box:fill-box;transform-origin:center top}',
-      trame('#BFEFF0', 0.04) + lueurs.map((l, i) => lueur(`a${i}`, l.couleur, l.force)).join(''),
-    ) +
+    ouvrirCiel('', lueur('t', '#2DD4BF', 0.13) + trame('#BFEFF0', 0.04)) +
     `<rect width="${CIEL.largeur}" height="${CIEL.hauteur}" fill="url(#p)"/>` +
-    lueurs
-      .map(
-        (l, i) =>
-          `<ellipse class="a" cx="${l.cx}" cy="${l.cy}" rx="${l.rx}" ry="${l.ry}" fill="url(#a${i})" ` +
-          `style="animation:a${i} ${l.duree}s ease-in-out ${-i * 7}s infinite alternate"/>`,
-      )
-      .join('') +
-    '</svg>'
+    '<ellipse cx="240" cy="40" rx="520" ry="150" fill="url(#t)"/></svg>'
   )
 }
 
@@ -129,11 +109,11 @@ function cielForet(): string {
       '@keyframes l{0%,100%{opacity:0;transform:translate(0,0)}50%{opacity:.9;transform:translate(6px,-10px)}}' +
         '@keyframes g{from{transform:translateX(0)}to{transform:translateX(-40px)}}' +
         '.m{animation:m 46s ease-in-out infinite alternate}@keyframes m{from{transform:translateX(-160px)}to{transform:translateX(160px)}}',
-      lueur('v', '#3FA66B', 0.16) + lueur('b', '#A7F3D0', 0.1),
+      lueur('v', '#3FA66B', 0.12) + lueur('b', '#A7F3D0', 0.08),
     ) +
     '<ellipse cx="300" cy="230" rx="700" ry="150" fill="url(#v)"/>' +
     '<ellipse class="m" cx="800" cy="168" rx="900" ry="46" fill="url(#b)"/>' +
-    rangee(5, 196, 34, 64, '#12301F', 70) +
+    rangee(5, 196, 34, 64, '#0D2418', 70) +
     rangee(3, 226, 50, 92, '#040B07', 50) +
     `${lucioles}</svg>`
   )
@@ -169,9 +149,9 @@ function cielCrepuscule(): string {
       '@keyframes e{from{opacity:.12}to{opacity:.75}}' +
         '@keyframes f{0%{transform:translate(260px,6px);opacity:0}1%{opacity:1}7%{transform:translate(680px,146px);opacity:0}100%{transform:translate(680px,146px);opacity:0}}' +
         '.s{animation:s 10s ease-in-out infinite alternate}@keyframes s{from{opacity:.7}to{opacity:1}}',
-      lueur('h', '#EC4899', 0.22) +
-        lueur('o', '#FB923C', 0.2) +
-        lueur('u', '#FDBA74', 0.34) +
+      lueur('h', '#EC4899', 0.15) +
+        lueur('o', '#FB923C', 0.13) +
+        lueur('u', '#FDBA74', 0.24) +
         '<linearGradient id="q"><stop offset="0" stop-color="#F3EDFF" stop-opacity="0"/><stop offset="1" stop-color="#FFFFFF"/></linearGradient>',
     ) +
     '<ellipse cx="760" cy="235" rx="1000" ry="130" fill="url(#h)"/>' +
@@ -203,35 +183,35 @@ function cielSakura(): string {
 /** Les thèmes du popover. Simple n'a ni fond propre ni mouvement : le gris de l'app et un cadre fin. */
 export const THEMES: Record<Theme, { encres: Encres; ciel: (() => string) | null }> = {
   nuit: {
-    encres: { fond: '#05070F', bord: '#1C243D', texte: '#E6E9F2', vif: '#F7F8FC', gris: '#8A93B2', faible: '#5B6585', legende: '#6E7897', accent: ARGILE, vide: '#C9D4FF', ...BLANCS },
+    encres: { fond: '#05070F', bord: '#1C243D', texte: '#E6E9F2', vif: '#F7F8FC', gris: '#8A93B2', faible: '#707B9D', legende: '#727C9A', accent: ARGILE, vide: '#C9D4FF', ...BLANCS },
     ciel: cielNuit,
   },
   simple: {
-    encres: { fond: SANS_FOND, bord: '#FFFFFF2E', texte: '#E4E4E4', vif: '#F5F5F5', gris: '#A3A3A3', faible: '#767676', legende: '#8C8C8C', accent: ARGILE, vide: '#FFFFFF', ...BLANCS },
+    encres: { fond: SANS_FOND, bord: '#FFFFFF2E', texte: '#E4E4E4', vif: '#F5F5F5', gris: '#A3A3A3', faible: '#8C8C8C', legende: '#8C8C8C', accent: ARGILE, vide: '#FFFFFF', ...BLANCS },
     ciel: null,
   },
   aurore: {
-    encres: { fond: '#040C12', bord: '#173241', texte: '#E2F1F2', vif: '#F4FBFB', gris: '#88A8B0', faible: '#587880', legende: '#6A8C94', accent: '#4FD1C5', vide: '#BFEFF0', ...BLANCS },
+    encres: { fond: '#040C12', bord: '#173241', texte: '#E2F1F2', vif: '#F4FBFB', gris: '#88A8B0', faible: '#678C95', legende: '#6A8C94', accent: '#4FD1C5', vide: '#BFEFF0', ...BLANCS },
     ciel: cielAurore,
   },
   braise: {
-    encres: { fond: '#140F0C', bord: '#3D2B21', texte: '#F2E8E1', vif: '#FBF6F2', gris: '#B39B8D', faible: '#7D6759', legende: '#8F786A', accent: ARGILE, vide: '#FFD9C2', ...BLANCS },
+    encres: { fond: '#140F0C', bord: '#3D2B21', texte: '#F2E8E1', vif: '#FBF6F2', gris: '#B39B8D', faible: '#957B6A', legende: '#937C6E', accent: ARGILE, vide: '#FFD9C2', ...BLANCS },
     ciel: cielBraise,
   },
   foret: {
-    encres: { fond: '#07110C', bord: '#1E3A2B', texte: '#E3F0E8', vif: '#F5FBF7', gris: '#8FAE9C', faible: '#5C7A69', legende: '#6E8C7B', accent: '#6FCF97', vide: '#CDEFD9', ...BLANCS },
+    encres: { fond: '#07110C', bord: '#1E3A2B', texte: '#E3F0E8', vif: '#F5FBF7', gris: '#8FAE9C', faible: '#6C907C', legende: '#708F7E', accent: '#6FCF97', vide: '#CDEFD9', ...BLANCS },
     ciel: cielForet,
   },
   ocean: {
-    encres: { fond: '#06101C', bord: '#1B3550', texte: '#E3EEF7', vif: '#F5FAFD', gris: '#8BA6BF', faible: '#5A7590', legende: '#6C87A2', accent: '#5AB4F5', vide: '#CFE6FA', ...BLANCS },
+    encres: { fond: '#06101C', bord: '#1B3550', texte: '#E3EEF7', vif: '#F5FAFD', gris: '#8BA6BF', faible: '#6D88A4', legende: '#6C87A2', accent: '#5AB4F5', vide: '#CFE6FA', ...BLANCS },
     ciel: cielOcean,
   },
   crepuscule: {
-    encres: { fond: '#0E0A18', bord: '#2E2547', texte: '#ECE8F5', vif: '#FAF8FD', gris: '#A398BD', faible: '#6C6287', legende: '#7F7499', accent: '#B794F6', vide: '#DCCFFB', ...BLANCS },
+    encres: { fond: '#0E0A18', bord: '#2E2547', texte: '#ECE8F5', vif: '#FAF8FD', gris: '#A398BD', faible: '#8F86A7', legende: '#8F86A6', accent: '#B794F6', vide: '#DCCFFB', ...BLANCS },
     ciel: cielCrepuscule,
   },
   sakura: {
-    encres: { fond: '#140B10', bord: '#3D2333', texte: '#F5E9EF', vif: '#FDF7FA', gris: '#B898A8', faible: '#7D6170', legende: '#937483', accent: '#F49AC1', vide: '#FBD3E4', ...BLANCS },
+    encres: { fond: '#140B10', bord: '#3D2333', texte: '#F5E9EF', vif: '#FDF7FA', gris: '#B898A8', faible: '#977A8A', legende: '#977A88', accent: '#F49AC1', vide: '#FBD3E4', ...BLANCS },
     ciel: cielSakura,
   },
 }
@@ -274,7 +254,7 @@ export function svgApercu(theme: Theme, choisi: boolean): string {
     nuit: [8, 20, 32, 44, 56].flatMap(x => [8, 20, 32].map(y => `<circle cx="${x}" cy="${y}" r=".6" fill="${e.vide}" fill-opacity=".35"/>`)).join('') +
       `<ellipse cx="20" cy="10" rx="28" ry="12" fill="#6E8BFF" fill-opacity=".1"/>`,
     simple: '',
-    aurore: `<ellipse cx="16" cy="6" rx="26" ry="10" fill="#2DD4BF" fill-opacity=".2"/><ellipse cx="38" cy="10" rx="20" ry="8" fill="#34D399" fill-opacity=".14"/><ellipse cx="54" cy="4" rx="20" ry="9" fill="#A78BFA" fill-opacity=".18"/>`,
+    aurore: `<ellipse cx="18" cy="8" rx="30" ry="12" fill="#2DD4BF" fill-opacity=".15"/>`,
     braise: `<ellipse cx="22" cy="40" rx="40" ry="16" fill="${ARGILE}" fill-opacity=".18"/><circle cx="14" cy="22" r=".9" fill="#FFB38A"/><circle cx="34" cy="16" r=".7" fill="#FFB38A"/><circle cx="52" cy="26" r=".8" fill="#FFB38A"/>`,
     foret: `<ellipse cx="24" cy="36" rx="40" ry="10" fill="#3FA66B" fill-opacity=".22"/><path d="M6 40l5-13 5 13zM14 40l6-16 6 16zM24 40l4-10 4 10zM38 40l6-15 6 15zM48 40l5-12 5 12zM56 40l5-14 5 14z" fill="#12301F"/><circle cx="12" cy="18" r=".9" fill="#D9F99D"/><circle cx="33" cy="22" r=".8" fill="#D9F99D"/><circle cx="54" cy="16" r=".9" fill="#D9F99D"/>`,
     ocean: `<ellipse cx="20" cy="4" rx="34" ry="12" fill="#38BDF8" fill-opacity=".12"/><path d="M0 35q8-3 16 0t16 0 16 0 16 0" fill="none" stroke="#7DD3FC" stroke-opacity=".35"/>`,
