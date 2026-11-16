@@ -176,19 +176,18 @@ function cielCrepuscule(): string {
 
 /** Sakura : des pétales tombent lentement en tournant ; une lueur rose en haut à gauche. */
 function cielSakura(): string {
-  // Des pétales qui tombent en tournant : assez grands pour se voir bouger, assez rares pour laisser lire.
-  const petales = Array.from({ length: 18 }, (_, i) => {
-    const x = 40 + ((i * 263) % 1540)
-    const duree = 12 + ((i * 5) % 9)
-    const taille = 1 + (i % 3) * 0.25
-    return (
-      `<ellipse cx="${x}" cy="-14" rx="${(4.6 * taille).toFixed(1)}" ry="${(2.8 * taille).toFixed(1)}" fill="#F9C6DA" opacity="0" ` +
-      `style="transform-box:fill-box;transform-origin:center;animation:f ${duree}s linear ${-((i * 3.1) % duree).toFixed(1)}s infinite"/>`
-    )
-  }).join('')
+  const petales = [70, 230, 390, 560, 720, 880, 1040, 1200, 1360, 1500]
+    .map((x, i) => {
+      const duree = 14 + ((i * 5) % 9)
+      return (
+        `<ellipse cx="${x}" cy="-10" rx="3.2" ry="1.9" fill="#F9C6DA" opacity="0" ` +
+        `style="transform-box:fill-box;transform-origin:center;animation:f ${duree}s linear ${-((i * 3.1) % duree).toFixed(1)}s infinite"/>`
+      )
+    })
+    .join('')
   return (
     ouvrirCiel(
-      '@keyframes f{0%{transform:translate(0,0) rotate(0deg);opacity:0}10%{opacity:.6}50%{transform:translate(-45px,220px) rotate(150deg)}85%{opacity:.45}100%{transform:translate(-90px,440px) rotate(300deg);opacity:0}}',
+      '@keyframes f{0%{transform:translate(0,0) rotate(0deg);opacity:0}10%{opacity:.7}85%{opacity:.5}100%{transform:translate(-70px,360px) rotate(300deg);opacity:0}}',
       lueur('k', '#F472B6', 0.1),
     ) +
     `<ellipse cx="220" cy="30" rx="540" ry="170" fill="url(#k)"/>${petales}</svg>`
