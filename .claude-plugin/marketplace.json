@@ -1,6 +1,6 @@
 {
   "name": "worklog",
-  "description": "Worklog: automatic time and token tracking for Claude Code, per project",
+  "description": "Worklog: automatic time, token and API price tracking for Claude Code, per project",
   "owner": { "name": "Abdoul-sudo" },
   "plugins": [{ "name": "worklog", "source": "./" }]
 }
