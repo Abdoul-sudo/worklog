@@ -124,7 +124,7 @@ const session = atom({ plugin: 'worklog', key: 'session' } as const, null, { sha
 const question = atom({ plugin: 'worklog', key: 'question' } as const, null, { shape: 'question-2' })
 const deplie = atom({ plugin: 'worklog', key: 'deplie' } as const, false)
 const ui = atom({ plugin: 'worklog', key: 'ui' } as const, INTERFACE_INITIALE, { shape: 'ui-6' })
-const vue = atom({ plugin: 'worklog', key: 'vue' } as const, null, { shape: 'vue-4' })
+const vue = atom({ plugin: 'worklog', key: 'vue' } as const, null, { shape: 'vue-5' })
 const frise = atom({ plugin: 'worklog', key: 'frise' } as const, null, { shape: 'frise-7' })
 const reglages = atom({ plugin: 'worklog', key: 'reglages' } as const, null, { shape: 'reglages-2' })
 
@@ -493,7 +493,7 @@ async function calculerVue($: Moteur): Promise<void> {
   const actuel = (await read($, session))?.item ?? null
   const lignes: Ligne[] = [...b.lignes]
   if (actuel !== null && debut <= maintenant && maintenant < fin && !lignes.some(l => l.item === actuel)) {
-    lignes.unshift({ item: actuel, minutes: 0, enCours: false, jetons: 0 })
+    lignes.unshift({ item: actuel, minutes: 0, enCours: false, jetons: 0, cout: 0 })
   }
   // Pendant le calcul, un autre onglet ou une autre période a pu être choisi : ce résultat n'est plus le bon.
   const apres = await read($, ui)
@@ -506,6 +506,7 @@ async function calculerVue($: Moteur): Promise<void> {
     total: b.total,
     reel: b.reel,
     jetons: b.jetons,
+    cout: b.cout,
     lignes,
     derniere: Object.fromEntries(b.derniere),
   }
