@@ -197,6 +197,8 @@ const PX_CELLULE = 8.2
 const ETROIT = 64
 /** La hauteur demandée pour le panneau quand il s'ouvre au-dessus de la saisie, en rangées. */
 const RANGEES_PANNEAU = 30
+/** Sous MOYEN, la frise passe sous les stats : la bande lui laisse cette hauteur (en rangées) avant de la montrer. */
+const RANGEES_FRISE_DESSOUS = 20
 const TRANSPARENT = '#00000000'
 /** Un espace qui ne disparaît pas en début de texte. */
 const ESPACE = '\u00a0'
@@ -1273,8 +1275,11 @@ function resume(
       ),
     jours !== null && options.activite && stat('serie', t().stats.serie, t().joursSerie(jours)),
   ].filter(c => c !== false)
-  // Dans le terminal, la frise ne va qu'à côté de la liste, quand la largeur le permet : dessous, la bande défilerait.
-  const avecFrise = options.activite && activite !== null && (!serre || placeFrise !== null)
+  // Dans le terminal, la frise ne va qu'à côté de la liste, quand la largeur le permet : dessous, la bande défilerait. Dans
+  // une bande étroite de l'app, elle irait sous les stats : elle n'y va que si la bande a la hauteur pour elle, la liste
+  // et le pied.
+  const friseCoupe = !serre && !d.enPanneau && d.colonnes < MOYEN && d.rangees < RANGEES_FRISE_DESSOUS
+  const avecFrise = options.activite && activite !== null && (!serre || placeFrise !== null) && !friseCoupe
   // Trois stats au plus, sur une ligne, groupées à gauche : une ou deux stats ne laissent pas de grand vide entre elles.
   // À côté de la frise, le groupe prend la place libre, et pousse la frise au bord droit.
   const stats = (

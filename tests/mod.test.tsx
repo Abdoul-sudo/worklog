@@ -616,6 +616,29 @@ test('avec WORKLOG_PRICES=off, le mod ne télécharge pas les prix', async ($, o
   expect(fichiers.has(PRIX_FICHIER)).toBe(false)
 })
 
+test("dans une bande étroite et basse de l'app desktop, la frise laisse la place à la liste et au pied", async ($, on) => {
+  const { horloge } = monde(on, ['desktop'])
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await travailler($, horloge, 'FLO-I1', 10)
+  await travailler($, horloge, 'FLO-I2', 5)
+  const puce = await $.ui.mount({ ...PIED, surface: 'desktop' })
+  await puce.press({ key: 'puce' })
+  const dessin = async (props: { maxRows: number; bodyColumns: number }) => {
+    const bande = await $.ui.mount({ ...BANDE, props: { ...BANDE.props, ...props }, surface: 'desktop' })
+    const svgs = await bande.findAll({ type: 'Svg' })
+    const frise = svgs.some(x => String((x.props as { source?: unknown })?.source ?? '').includes('<title>'))
+    const ajouter = (await bande.find({ key: 'autre' })) !== undefined
+    await bande.unmount()
+    return { frise, ajouter }
+  }
+  // Étroite, la frise irait sous les stats : dans 12 rangées, elle couperait la liste et le pied.
+  expect(await dessin({ maxRows: 12, bodyColumns: 70 })).toEqual({ frise: false, ajouter: true })
+  // Avec la hauteur qu'il faut, ou assez large pour la mettre à côté des stats, elle revient.
+  expect(await dessin({ maxRows: 30, bodyColumns: 70 })).toEqual({ frise: true, ajouter: true })
+  expect(await dessin({ maxRows: 12, bodyColumns: 120 })).toEqual({ frise: true, ajouter: true })
+  await puce.unmount()
+})
+
 test("dans le terminal, la frise prend la place qu'il y a, et la liste remplit sa hauteur", async ($, on) => {
   const { horloge } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
