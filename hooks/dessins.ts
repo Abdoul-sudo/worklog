@@ -182,13 +182,13 @@ function cielSakura(): string {
     const duree = 12 + ((i * 5) % 9)
     const taille = 1 + (i % 3) * 0.25
     return (
-      `<ellipse cx="${x}" cy="-14" rx="${(9 * taille).toFixed(1)}" ry="${(5.4 * taille).toFixed(1)}" fill="#F9C6DA" opacity="0" ` +
+      `<ellipse cx="${x}" cy="-14" rx="${(4.6 * taille).toFixed(1)}" ry="${(2.8 * taille).toFixed(1)}" fill="#F9C6DA" opacity="0" ` +
       `style="transform-box:fill-box;transform-origin:center;animation:f ${duree}s linear ${-((i * 3.1) % duree).toFixed(1)}s infinite"/>`
     )
   }).join('')
   return (
     ouvrirCiel(
-      '@keyframes f{0%{transform:translate(0,0) rotate(0deg);opacity:0}10%{opacity:.7}50%{transform:translate(-45px,220px) rotate(150deg)}85%{opacity:.5}100%{transform:translate(-90px,440px) rotate(300deg);opacity:0}}',
+      '@keyframes f{0%{transform:translate(0,0) rotate(0deg);opacity:0}10%{opacity:.6}50%{transform:translate(-45px,220px) rotate(150deg)}85%{opacity:.45}100%{transform:translate(-90px,440px) rotate(300deg);opacity:0}}',
       lueur('k', '#F472B6', 0.1),
     ) +
     `<ellipse cx="220" cy="30" rx="540" ry="170" fill="url(#k)"/>${petales}</svg>`
