@@ -897,10 +897,13 @@ describe('le prix API', () => {
     expect(arrondi(coutReponse({ ...d, m: 'claude-opus-5-5-20260101' }, PRIX))).toBe(0.149)
   })
 
-  test('au-delà de 100 k tokens de contexte, Haiku 5.5 prend ses autres prix', async () => {
+  test('au-delà de 100 k tokens de contexte dans une réponse, Haiku 5.5 prend ses autres prix ; une somme de réponses, non', async () => {
     expect(arrondi(coutReponse({ m: 'claude-haiku-5-5', in: 50_000, out: 1_000, c5: 0, c1: 0, cr: 40_000 }, PRIX))).toBe(0.0059)
-    expect(arrondi(coutReponse({ m: 'claude-haiku-5-5', in: 50_000, out: 1_000, c5: 0, c1: 0, cr: 60_000 }, PRIX))).toBe(0.0305)
+    expect(arrondi(coutReponse({ m: 'claude-haiku-5-5', in: 50_000, out: 1_000, c5: 0, c1: 0, cr: 60_000, ctx: 100 }, PRIX))).toBe(0.0305)
+    // 110 k en tout, mais en plusieurs réponses (sans palier) : les prix de base.
+    expect(arrondi(coutReponse({ m: 'claude-haiku-5-5', in: 50_000, out: 1_000, c5: 0, c1: 0, cr: 60_000 }, PRIX))).toBe(0.0061)
   })
+
 
   test("sans prix de cache, ceux d'Anthropic ; un modèle inconnu n'a pas de prix", async () => {
     expect(arrondi(coutReponse({ m: 'claude-sans-cache', in: 0, out: 0, c5: 1_000, c1: 1_000, cr: 1_000 }, PRIX))).toBe(0.00335)

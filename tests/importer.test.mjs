@@ -123,7 +123,7 @@ test("une fois, les tokens déjà importés reçoivent le détail de leurs répo
       [{ m: 'claude-opus-5-5', in: 20, out: 10, c5: 0, c1: 0, cr: 0 }],
       [{ m: 'claude-opus-5-5', in: 10, out: 5, c5: 0, c1: 0, cr: 0 }],
     ])
-    assert.equal(JSON.parse(fs.readFileSync(path.join(sortie, 'etat.json'), 'utf8')).details, 3)
+    assert.equal(JSON.parse(fs.readFileSync(path.join(sortie, 'etat.json'), 'utf8')).details, 4)
     // La fois suivante, rien ne change.
     const avant = fs.readFileSync(path.join(sortie, jour(T), 'abc.jsonl'), 'utf8')
     importer(projets, sortie)
@@ -180,7 +180,7 @@ test("une fois, les messages déjà importés en double dans une copie de la con
         ligne({ t: T + 60_000, s: 'aaa', e: 'message', k: null, d: 'proj', i: 1 }) +
         ligne({ t: T + 3_600_000, s: 'aaa', e: 'message', k: null, d: 'proj', i: 1 }),
     )
-    fs.writeFileSync(path.join(sortie, 'etat.json'), JSON.stringify({ version: 3, positions: {}, vus: {}, tours: {}, dossiers: {}, nomsCorriges: true, details: 3 }))
+    fs.writeFileSync(path.join(sortie, 'etat.json'), JSON.stringify({ version: 3, positions: {}, vus: {}, tours: {}, dossiers: {}, nomsCorriges: true, details: 4 }))
     importer(projets, sortie)
     // Le message en double quitte la copie ; son message à elle reste.
     assert.deepEqual(
@@ -234,6 +234,31 @@ test("une reprise faite après la mise à jour reconnaît les messages déjà im
     assert.deepEqual(
       tousImportes(sortie).filter(ev => ev.e === 'message').map(ev => `${ev.s}@${(ev.t - T) / 60_000}`).sort(),
       ['aaa@3', 'abc@0'],
+    )
+  } finally {
+    fs.rmSync(racine, { recursive: true, force: true })
+  }
+})
+
+test("le palier de contexte d'une réponse vient d'elle seule, pas de la somme de la minute", () => {
+  const { racine, projets, sortie } = monde()
+  try {
+    // Deux réponses de 60 k de contexte dans la même minute, puis une de 120 k : seule celle-ci passe le palier de 100 k.
+    fs.writeFileSync(
+      path.join(projets, 'D--proj', 'abc.jsonl'),
+      humain(0, 'D:\proj') +
+        reponse(1, 'D:\proj', 'r1', 'claude-haiku-5-5', { input_tokens: 60_000, output_tokens: 10 }) +
+        reponse(1, 'D:\proj', 'r2', 'claude-haiku-5-5', { input_tokens: 60_000, output_tokens: 10 }) +
+        reponse(1, 'D:\proj', 'r3', 'claude-haiku-5-5', { input_tokens: 0, output_tokens: 10, cache_read_input_tokens: 120_000 }),
+    )
+    importer(projets, sortie)
+    const [jetons] = lignes(sortie).filter(ev => ev.e === 'jetons')
+    assert.deepEqual(
+      jetons.p.sort((a, b) => (a.ctx ?? 0) - (b.ctx ?? 0)),
+      [
+        { m: 'claude-haiku-5-5', in: 120_000, out: 20, c5: 0, c1: 0, cr: 0 },
+        { m: 'claude-haiku-5-5', in: 0, out: 10, c5: 0, c1: 0, cr: 120_000, ctx: 100 },
+      ],
     )
   } finally {
     fs.rmSync(racine, { recursive: true, force: true })

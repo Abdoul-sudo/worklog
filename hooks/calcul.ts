@@ -553,7 +553,7 @@ export function formatJetons(n: number): string {
 /** Ce que des réponses d'un modèle ont lu et écrit, en tokens : `in` hors cache, `c5` et `c1` écrits en cache pour 5 min
  * et pour 1 h, `cr` relus du cache, `out` générés ; `web` : les recherches web ; `rapide` : le mode rapide ; `us` :
  * l'inférence gardée aux États-Unis. */
-export type Detail = { m: string; in: number; out: number; c5: number; c1: number; cr: number; web?: number; rapide?: 1; us?: 1 }
+export type Detail = { m: string; in: number; out: number; c5: number; c1: number; cr: number; web?: number; rapide?: 1; us?: 1; ctx?: number }
 /** Les prix de LiteLLM des modèles Claude, en dollars par token, tels que le mod les garde (prix.json). */
 export type Prix = Readonly<Record<string, Readonly<Record<string, unknown>>>>
 
@@ -578,13 +578,13 @@ export function coutReponse(d: Detail, prix: Prix): number | null {
   const entree = prix[d.m] ?? prix[d.m.replace(/-\d{8}$/, '')]
   if (entree === undefined) return null
   const valeur = (cle: string) => (typeof entree[cle] === 'number' ? (entree[cle] as number) : undefined)
-  // Au-delà d'un seuil de contexte (100 k pour Haiku 5.5, 200 k pour d'anciens Sonnet), tous les tokens ont d'autres prix.
-  const contexte = d.in + d.c5 + d.c1 + d.cr
+  // Au-delà d'un seuil de contexte (100 k pour Haiku 5.5, 200 k pour d'anciens Sonnet), tous les tokens d'une réponse ont
+  // d'autres prix. Le palier vient de chaque réponse (`ctx`, en milliers) : une somme de réponses n'en dit rien.
   const seuil = Math.max(
     0,
     ...Object.keys(entree)
       .map(cle => Number(/^input_cost_per_token_above_(\d+)k_tokens$/.exec(cle)?.[1] ?? 0))
-      .filter(k => contexte > k * 1_000),
+      .filter(k => k > 0 && (d.ctx ?? 0) >= k),
   )
   const prixDe = (cle: string) => (seuil > 0 ? valeur(`${cle}_above_${seuil}k_tokens`) : undefined) ?? valeur(cle)
   const lecture = prixDe('input_cost_per_token')

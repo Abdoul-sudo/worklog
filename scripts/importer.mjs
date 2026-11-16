@@ -16,9 +16,9 @@ const MINUTE = 60_000
 const VERROU_MS = 15 * MINUTE
 const JOUR = 24 * 60 * MINUTE
 // Une réponse revue dans une conversation reprise est reconnue pendant 90 jours ; au-delà, son numéro est oublié.
-// La version du rattrapage des détails (ajouterDetails) : la monter le relance une fois. Il ne touche qu'aux lignes encore
-// sans détail.
-const DETAILS = 3
+// La version du rattrapage des détails (ajouterDetails) : la monter le relance une fois. Il récrit le détail des lignes
+// dont la conversation existe encore.
+const DETAILS = 4
 const MEMOIRE_JOURS = 90
 
 const fichierEtat = path.join(sortie, 'etat.json')
@@ -104,13 +104,17 @@ const ajouter = (t, s, ev) => {
 const jetonsDe = u => (u.input_tokens ?? 0) + (u.output_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0)
 
 /** Ajoute une réponse au détail de sa minute, par modèle : de quoi calculer son prix API. Sans le partage du cache entre
- * 5 min et 1 h, tout le cache écrit compte pour 5 min. */
+ * 5 min et 1 h, tout le cache écrit compte pour 5 min. Le palier de contexte (`ctx`, en milliers de tokens) vient de la
+ * réponse elle-même : au-delà de 100 k ou 200 k, certains modèles ont d'autres prix, et une somme de réponses n'en dit
+ * rien. */
 function ajouterDetail(details, message) {
   const u = message.usage
   const rapide = u.speed === 'fast'
   const us = u.inference_geo === 'us'
-  const cle = `${message.model}|${rapide}|${us}`
-  const d = details.get(cle) ?? { m: message.model ?? '', in: 0, out: 0, c5: 0, c1: 0, cr: 0, web: 0, rapide, us }
+  const contexte = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0)
+  const ctx = contexte > 200_000 ? 200 : contexte > 100_000 ? 100 : 0
+  const cle = `${message.model}|${rapide}|${us}|${ctx}`
+  const d = details.get(cle) ?? { m: message.model ?? '', in: 0, out: 0, c5: 0, c1: 0, cr: 0, web: 0, rapide, us, ctx }
   d.in += u.input_tokens ?? 0
   d.out += u.output_tokens ?? 0
   d.c5 += u.cache_creation === undefined ? (u.cache_creation_input_tokens ?? 0) : (u.cache_creation.ephemeral_5m_input_tokens ?? 0)
@@ -122,12 +126,13 @@ function ajouterDetail(details, message) {
 
 /** Le détail d'une minute, tel que le journal le garde (`p`) ; `part` le partage entre plusieurs lignes de la minute. */
 const detailsEcrits = (details, part = 1) =>
-  [...details.values()].map(({ m, web, rapide, us, ...tokens }) => ({
+  [...details.values()].map(({ m, web, rapide, us, ctx, ...tokens }) => ({
     m,
     ...Object.fromEntries(Object.entries(tokens).map(([cle, n]) => [cle, n * part])),
     ...(web > 0 ? { web: web * part } : {}),
     ...(rapide ? { rapide: 1 } : {}),
     ...(us ? { us: 1 } : {}),
+    ...(ctx > 0 ? { ctx } : {}),
   }))
 
 /** Un message écrit par une personne : tapé, une commande slash, une interruption. */
@@ -291,7 +296,7 @@ async function ajouterDetails() {
     const lignes = fs.readFileSync(fichier, 'utf8').split('\n').map(ligne => {
       try {
         const ev = JSON.parse(ligne)
-        const minute = ev.e === 'jetons' && ev.p === undefined ? parMinute.get(minuteDe(ev)) : undefined
+        const minute = ev.e === 'jetons' ? parMinute.get(minuteDe(ev)) : undefined
         if (minute === undefined || minute.n === 0) return ligne
         change = true
         return JSON.stringify({ ...ev, p: detailsEcrits(minute.details, ev.n / minute.n) })
