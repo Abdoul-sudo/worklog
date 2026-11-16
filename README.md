@@ -1,7 +1,7 @@
 <h1 align="center">Worklog</h1>
 
 <p align="center">
-  <em>Time and tokens for each project, counted for you while you work with Claude.</em>
+  <em>Time, tokens and API price for each project, counted for you while you work with Claude.</em>
 </p>
 
 <p align="center">
@@ -17,6 +17,7 @@
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
   <a href="#how-the-timer-works">How the timer works</a> ·
+  <a href="#tokens-and-price">Tokens and price</a> ·
   <a href="#breaks">Breaks</a> ·
   <a href="#project-names">Project names</a> ·
   <a href="#themes">Themes</a> ·
@@ -27,9 +28,9 @@
 
 ---
 
-At the end of the week, someone asks: how long did the checkout API take? How many tokens did it use? You do not remember, and you never started a timer.
+At the end of the week, someone asks: how long did the checkout API take? How many tokens did it use, and what would they cost on the API? You do not remember, and you never started a timer.
 
-Worklog remembers. It counts the time and the tokens of each Claude Code session, and shows them above the prompt. You do not start, stop or pause anything.
+Worklog remembers. It counts the time, the tokens and their API price for each Claude Code session, and shows them above the prompt. You do not start, stop or pause anything.
 
 ## Quick start
 
@@ -48,6 +49,18 @@ Worklog needs Claude Code 2.1.325 or later. Node.js is optional: Worklog uses it
 - The timer runs while Claude works: answers, subagents, workflows, Ultracode and background commands, even when they work alone for hours.
 - When Claude is done, a break starts. Worklog decides about the break when you come back.
 - When two sessions work at the same time, both count. Worklog shows how much of the day was in parallel.
+
+## Tokens and price
+
+Do you look at your tokens more than at your time? Set **Show** to **Tokens and price** in the settings. The API price then takes the place of the time: in the stats, in each line and in the heatmap.
+
+<p align="center">
+  <img src="docs/screenshots/price.png" width="880" alt="Worklog with Show set to Tokens and price: 21.5M tokens and $23 today, and the tokens and the price of each name.">
+</p>
+
+- The price is what your tokens cost at the Anthropic API list prices, for each model and each answer.
+- Worklog counts the price all the time. When you switch, your past days have their price too.
+- With a Pro or Max plan, the API price is not your bill. It shows what your work would cost on the API.
 
 ## Breaks
 
@@ -140,16 +153,6 @@ To click in Worklog in the terminal, use the fullscreen mode: `/tui fullscreen`.
 | Then ask | Up to 4h | Worklog asks about a longer break, up to this length. **Never** turns off the question. |
 | Theme | Night | Default, Night, Aurora, Ember, Forest, Ocean, Dusk or Sakura. Desktop app only. |
 
-### Tokens and price
-
-Do you look at your tokens more than at your time? Set **Show** to **Tokens and price**. The API price then takes the place of the time: in the stats, in each line and in the heatmap.
-
-<p align="center">
-  <img src="docs/screenshots/price.png" width="880" alt="Worklog with Show set to Tokens and price: 21.5M tokens and $23 today, and the tokens and the price of each name.">
-</p>
-
-The API price is not your bill. To learn more, see the [FAQ](#faq).
-
 ## Update
 
 ```sh
@@ -200,11 +203,7 @@ Yes, if Node.js is installed. On the first start, Worklog reads your Claude Code
 </details>
 
 <details>
-<summary><strong>What is the API price?</strong></summary>
-
-It is the price of your tokens at the Anthropic API list prices. With a Pro or Max plan, it is not what you pay.
-
-To see it, set **Show** to **Tokens and price**. The price then takes the place of the time. Worklog counts the price all the time, also when it does not show it.
+<summary><strong>Where does the API price come from?</strong></summary>
 
 Worklog takes the prices from the public [LiteLLM price list](https://github.com/BerriAI/litellm). It gets the list again once a day.
 
