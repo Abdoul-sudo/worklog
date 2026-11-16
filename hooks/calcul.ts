@@ -617,8 +617,10 @@ export function avecCouts(evenements: readonly Evenement[], prix: Prix | null): 
 /** `3,40 $`, `31 $`, `< 0,01 $` ; en anglais `$3.40`, `$31`, `< $0.01`. */
 export function formatCout(usd: number): string {
   const { cout, centimes } = texte()
-  if (usd < 0.005) return `< ${cout(centimes(0.01))}`
-  return cout(usd < 10 ? centimes(usd) : String(Math.round(usd)))
+  // Arrondi au centime d'abord : 9,996 $ s'écrit 10 $, comme 10,40 $.
+  const montant = Math.round(usd * 100) / 100
+  if (montant < 0.01) return `< ${cout(centimes(0.01))}`
+  return cout(montant < 10 ? centimes(montant) : String(Math.round(montant)))
 }
 
 export function dureeEcart(ecart: Plage): string {

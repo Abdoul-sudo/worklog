@@ -141,7 +141,8 @@ export function svgActivite(
     const prix = (c.cout ?? 0) > 0 ? formatCout(c.cout!) : null
     const valeur =
       mesure === 'jetons' ? (jetons === null ? t().rien : prix === null ? jetons : `${jetons} · ${prix}`) : jetons === null ? temps : `${temps} · ${jetons}`
-    const infobulle = estAujourdhui ? t().aujourdhui : `${majuscule(formatJour(c.t))} · ${valeur}`
+    // Le texte va dans du XML : « < 0,01 $ » y garde son « < » échappé.
+    const infobulle = (estAujourdhui ? t().aujourdhui : `${majuscule(formatJour(c.t))} · ${valeur}`).replace(/&/g, '&amp;').replace(/</g, '&lt;')
     const opacite = avenir ? 0.035 : OPACITES[n]!
     // Un jour à venir reste presque transparent : la frise ne montre pas de cases sombres après aujourd'hui.
     const dessous = !aUnCiel() || avenir ? null : bande && colonne >= de && colonne <= a ? fondBande : ENCRE.fond

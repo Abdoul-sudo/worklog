@@ -720,6 +720,9 @@ describe('corrections, tokens et périodes', () => {
     // L'infobulle ne donne que ce que montre le réglage « Afficher ».
     expect(svgActivite(liste, null, null, 'jetons').source).toContain('<title>Lundi 5 janvier · 1,5 M tokens · 3,40 $</title>')
     expect(svgActivite(liste, null, null, 'jetons').source).toContain('<title>Mardi 6 janvier · 15 k tokens</title>')
+    // Un prix sous le centime s'écrit « < 0,01 $ » : le « < » est échappé, le SVG reste du XML valide.
+    const petit = casesEntre(debut, debut, new Map([['2026-01-05', 30]]), Infinity, new Map([['2026-01-05', 1_000]]), new Map([['2026-01-05', 0.001]]))
+    expect(svgActivite(petit, null, null, 'jetons').source).toContain('<title>Lundi 5 janvier · 1 k tokens · &lt; 0,01 $</title>')
     // Même temps, tokens très différents : par temps, les deux cases ont la même intensité ; par tokens, non.
     const peintures = (svg: string) => [...svg.matchAll(/ rx="[\d.]+" ([^>]*)><title>/g)].map(m => m[1])
     expect(new Set(peintures(source)).size).toBe(1)
@@ -904,18 +907,17 @@ describe('le prix API', () => {
     expect(arrondi(coutReponse({ m: 'claude-haiku-5-5', in: 50_000, out: 1_000, c5: 0, c1: 0, cr: 60_000 }, PRIX))).toBe(0.0061)
   })
 
-
   test("sans prix de cache, ceux d'Anthropic ; un modèle inconnu n'a pas de prix", async () => {
     expect(arrondi(coutReponse({ m: 'claude-sans-cache', in: 0, out: 0, c5: 1_000, c1: 1_000, cr: 1_000 }, PRIX))).toBe(0.00335)
     expect(coutReponse({ m: 'claude-inconnu', in: 1_000, out: 0, c5: 0, c1: 0, cr: 0 }, PRIX)).toBeNull()
   })
 
   test('le prix suit la langue', async () => {
-    const montants = [0.004, 0.42, 3.4, 31.4, 312.6]
-    expect(montants.map(formatCout)).toEqual(['< 0,01 $', '0,42 $', '3,40 $', '31 $', '313 $'])
+    const montants = [0.004, 0.42, 3.4, 9.996, 31.4, 312.6]
+    expect(montants.map(formatCout)).toEqual(['< 0,01 $', '0,42 $', '3,40 $', '10 $', '31 $', '313 $'])
     choisirLangue('en')
     try {
-      expect(montants.map(formatCout)).toEqual(['< $0.01', '$0.42', '$3.40', '$31', '$313'])
+      expect(montants.map(formatCout)).toEqual(['< $0.01', '$0.42', '$3.40', '$10', '$31', '$313'])
     } finally {
       choisirLangue('fr')
     }
