@@ -1,7 +1,7 @@
 {
   "name": "worklog",
   "displayName": "Worklog",
-  "version": "4.3.1",
+  "version": "4.4.0",
   "description": "Automatic time and token tracking for Claude Code, per project, with a yearly activity heatmap",
   "types": "./types/index.d.ts",
   "author": { "name": "Abdoul-sudo", "url": "https://github.com/Abdoul-sudo" },
