@@ -1,73 +1,86 @@
-# Worklog
+<h1 align="center">Worklog</h1>
 
-**See how much time and how many tokens each project takes. No timer to start.**
+<p align="center">
+  <em>Time and tokens for each project, counted for you while you work with Claude.</em>
+</p>
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license">
+  <img src="https://img.shields.io/badge/data-stays%20local-111111?style=flat-square" alt="Data stays local">
+  <img src="https://img.shields.io/badge/desktop%20%2B%20terminal-111111?style=flat-square" alt="Desktop app and terminal">
+  <img src="https://img.shields.io/badge/English%20%C2%B7%20Fran%C3%A7ais-111111?style=flat-square" alt="English and French">
+</p>
 
-Worklog is a mod for Claude Code. It records your working time and your tokens automatically, for each project and each day.
+<p align="center">
+  <img src="docs/screenshots/desktop.png" width="880" alt="Worklog: the time, the tokens and the streak of today, a heatmap of the year, and the time of each item.">
+</p>
 
-![Worklog above the prompt](docs/screenshots/desktop.png)
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#how-the-timer-works">How the timer works</a> ·
+  <a href="#breaks">Breaks</a> ·
+  <a href="#items">Items</a> ·
+  <a href="#themes">Themes</a> ·
+  <a href="#in-the-terminal">Terminal</a> ·
+  <a href="#settings">Settings</a> ·
+  <a href="#faq">FAQ</a>
+</p>
 
-## Features
+---
 
-- **Automatic time tracking.** The time counts while Claude works. Your pauses count when you come back.
-- **Token count** for each project, subagents and Ultracode included.
-- **Totals** for the day, the week, the month, the year, or since the start.
-- **Activity heatmap** with one square for each day of the year.
-- **Automatic names.** A ticket ID in your messages or in your Git branch names the session.
-- **Four themes** and **two languages**: English and French.
-- **Desktop app and terminal.**
-- **Local data.** Nothing leaves your computer.
+At the end of the week, someone asks: how long did the checkout API take? How many tokens did it use? You do not remember, and you never started a timer.
 
-## Requirements
-
-- Claude Code 2.1.325 or later. Worklog is tested with this version.
-- Node.js, optional. Worklog uses it once, to read your past Claude Code history.
+Worklog remembers. It counts the time and the tokens of each Claude Code session, and shows them above the prompt. You do not start, stop or pause anything.
 
 ## Quick start
 
-1. Install Worklog:
+```sh
+claude plugin marketplace add Abdoul-sudo/worklog
+claude plugin install worklog@worklog
+```
 
-   ```sh
-   claude plugin marketplace add Abdoul-sudo/worklog
-   claude plugin install worklog@worklog
-   ```
+Restart Claude Code, then work as usual. A chip at the bottom shows the item of the session and its time today, for example `⏱ mobile-app · 1h 12`. Click the chip to open Worklog, or type `/worklog`.
 
-2. Restart Claude Code.
-3. Work as usual. A chip at the bottom shows the name of the session and its time today: `⏱ mobile-app · 1h 12`.
-4. Click the chip to open Worklog. Click it again to close it.
+Worklog needs Claude Code 2.1.325 or later. Node.js is optional: Worklog uses it once, to read your past history.
 
-## How it works
-
-### When the timer runs
+## How the timer works
 
 - The timer starts with your first message in a session. Opening a session does not count.
-- The timer runs while Claude works. This includes subagents, workflows and Ultracode, even when they work alone for hours.
-- When Claude is done, the timer waits for you.
+- The timer runs while Claude works: answers, subagents, workflows and Ultracode, even when they work alone for hours.
+- When Claude is done, a break starts. Worklog decides about the break when you come back.
+- When two sessions work at the same time, both count. Worklog shows how much of the day was in parallel.
 
-### Pauses
+## Breaks
 
-A pause is the time between the end of Claude's work and your next message. You read, you test, or you leave. Worklog looks at the pause when you come back:
+A break is the time between the end of Claude's work and your next message.
 
-- **Shorter than 1 hour:** the pause counts as work. Worklog adds it to the total.
-- **From 1 to 4 hours:** Worklog asks if this pause was work. Click **Count** to add it, or **Ignore** to leave it out.
-- **Longer than 4 hours**, for example a night: the pause does not count, and Worklog does not ask.
+<p align="center">
+  <img src="docs/breaks.svg" width="880" alt="One day with Worklog. Work counts. A 30 min break counts when you come back. Worklog asks about a 2h break. The night does not count.">
+</p>
 
-If you quit Claude Code or close its window, the pause until then counts if it is shorter than 1 hour.
+**Example.** Claude finishes at 10:00. You stop for a coffee. At 10:30, you send a new message. Worklog adds the 30 minutes at that moment. During the break, the total does not change. It catches up when you come back.
 
-You can change the 1 hour and the 4 hours in the settings.
+| Break | What Worklog does |
+| --- | --- |
+| Up to 1h | Counts the break as work. |
+| From 1h to 4h | Asks you if the break was work. |
+| Longer than 4h | Does not count the break, and does not ask. |
 
-### What Worklog counts
+If you close Claude Code during a break, the break counts until you close it, if it is shorter than 1h.
 
-- **Time** for each name, each day.
-- **Tokens** for each name: all the tokens that Claude and its subagents use, cache reads included.
-- **Parallel sessions.** When two sessions work at the same time, both count. The total of the day can then be more than the clock time. Worklog shows how much of it was in parallel.
+When Worklog asks, click **Count** to add the break, or **Ignore** to leave it out.
 
-### How Worklog names a session
+<p align="center">
+  <img src="docs/screenshots/ask.png" width="880" alt="Under Worklog, the question: 2h 08 break on website, from 9:12 to 11:20. Count it as work? Two buttons: Count and Ignore.">
+</p>
 
-Each session counts for one name. Worklog uses the first name that it finds in this list:
+You can change the 1h and the 4h in the settings. To never get the question, set **Then ask** to **Never**.
 
-1. A name that you give, with `/worklog <name>` or in the Worklog list.
+## Items
+
+Each session counts for one item: a ticket, a feature or a project. Worklog finds the item for you, in this order:
+
+1. The item that you choose, with `/worklog <name>` or in the list.
 2. A ticket ID in your messages, such as `PROJ-142`.
 3. A ticket ID in the name of your Git branch, such as `feature/PROJ-142-login`.
 4. The name of the session group in the desktop app.
@@ -75,39 +88,59 @@ Each session counts for one name. Worklog uses the first name that it finds in t
 
 When Worklog finds the first ticket ID of a session, the time before it also goes to this ticket.
 
-## Usage
+To move a session to another item, point to the item in the list, then click **⇄**.
 
-### In Worklog
+<p align="center">
+  <img src="docs/screenshots/switch.png" width="880" alt="The list of items. The pointer is on the switch icon next to website.">
+</p>
+
+## Themes
+
+Worklog has eight themes in the desktop app. Click the gear, then click a theme.
+
+<p align="center">
+  <img src="docs/screenshots/themes.png" width="880" alt="Worklog in its eight themes: Default, Night, Aurora, Ember, Forest, Ocean, Dusk and Sakura.">
+</p>
+
+## In the terminal
+
+Worklog works in the terminal too, with the same data. In a wide terminal, the heatmap shows one square for each day.
+
+<p align="center">
+  <img src="docs/screenshots/terminal.png" width="880" alt="Worklog in the terminal: the stats and the items on the left, the heatmap of the year on the right.">
+</p>
+
+To click in Worklog in the terminal, use the fullscreen mode: `/tui fullscreen`.
+
+## Usage
 
 | Task | Action |
 | --- | --- |
 | See another period | Click **Day**, **Week**, **Month**, **Year** or **All**. Click **‹** or **›** to go back or forward. |
-| Count this session for another name | Point to the name in the list, then click **⇄**. In the terminal, click the name. |
-| Count this session for a new name | Click **+ Add item**, type the name, then press Enter. |
-| Rename the name of this session | Click **✎** next to it. The new name also replaces the old one on past days. |
+| Move this session to another item | Point to the item, then click **⇄**. In the terminal, click the item. |
+| Count this session for a new item | Click **+ Add item**, type the name, then press Enter. |
+| Rename an item | Click **✎** next to it. The new name also replaces the old one on past days. |
 | Open the settings | Click the gear. In the terminal, click **≡**. |
 
-### Commands
-
-| Command | Description |
+| Command | What it does |
 | --- | --- |
 | `/worklog` | Shows or hides Worklog. |
 | `/worklog <name>` | Counts this session for `<name>`. For example: `/worklog PROJ-142`. |
 
 ## Settings
 
-Open Worklog, then click the gear.
+<p align="center">
+  <img src="docs/screenshots/settings.png" width="880" alt="The settings: the display, the language and the breaks on the left, the eight themes on the right.">
+</p>
 
-![Worklog settings](docs/screenshots/settings.png)
-
-| Setting | Default | Description |
+| Setting | Default | What it does |
 | --- | --- | --- |
 | Show the activity heatmap | On | Shows one square for each day of the year. |
 | Show | Time and tokens | Shows the time, the tokens, or both. |
 | Language | English | English or French. |
-| Theme | Night | Simple, Night, Aurora or Ember. Desktop app only. |
-| Pauses › Count up to | 1h | A shorter pause counts as work. |
-| Pauses › Ask up to | 4h | For a longer pause, Worklog asks if it was work. A pause longer than this does not count. |
+| Stay active during breaks | Up to 1h | A shorter break counts as work. |
+| Then ask | Up to 4h | Worklog asks about a longer break, up to this length. **Never** turns off the question. |
+| Theme | Night | Default, Night, Aurora, Ember, Forest, Ocean, Dusk or Sakura. Desktop app only. |
 
 ## Update
 
@@ -128,27 +161,53 @@ Your data stays in `~/.claude/worklog/`. To remove it, delete this folder.
 
 ## FAQ
 
-**Do subagents and Ultracode count?**
+<details>
+<summary><strong>Do I need to stop the timer when I leave?</strong></summary>
+
+No. The timer runs only while Claude works. Worklog decides about your break when you come back.
+
+</details>
+
+<details>
+<summary><strong>I stop for 30 minutes, then I send a message. Does the total grow by 30 minutes?</strong></summary>
+
+Yes, with the default settings. Worklog adds the 30 minutes when you send the message. During the break, the total does not move.
+
+</details>
+
+<details>
+<summary><strong>Can both break settings be 1h?</strong></summary>
+
+No. **Then ask** offers only lengths longer than **Stay active during breaks**, or **Never**. With **Never**, a break longer than 1h does not count, and Worklog never asks.
+
+</details>
+
+<details>
+<summary><strong>Do subagents and Ultracode count?</strong></summary>
+
 Yes. The timer runs while they work, even when you do not type. Their tokens count too.
 
-**Do I need to stop the timer when I leave?**
-No. The timer runs only while Claude works. Worklog looks at your pause when you come back.
+</details>
 
-**Does Worklog see my past work?**
+<details>
+<summary><strong>Does Worklog see my past work?</strong></summary>
+
 Yes, if Node.js is installed. On the first start, Worklog reads your Claude Code history. Without Node.js, Worklog counts from the day you install it.
 
-**Can I use Worklog in the terminal?**
-Yes. To click in Worklog, use the fullscreen mode: `/tui fullscreen`.
+</details>
+
+<details>
+<summary><strong>What does Worklog not count?</strong></summary>
+
+Work outside Claude Code: meetings, calls and other tools.
+
+</details>
 
 ## Privacy
 
 Worklog keeps its data on your computer, in `~/.claude/worklog/`. It does not keep your messages. It sends nothing over the network.
 
 To keep the data in another folder, set the environment variable `WORKLOG_DATA_DIR`.
-
-## Limitations
-
-Worklog sees only your work in Claude Code. Meetings, calls and work in other tools do not count.
 
 ## License
 
