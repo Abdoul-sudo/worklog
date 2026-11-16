@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/desktop.png" width="880" alt="Worklog: the time, the tokens and the streak of today, a heatmap of the year, and the time of each name.">
+  <img src="docs/screenshots/desktop.gif" width="880" alt="Worklog: the time, the tokens and the streak, a heatmap of the year, and the time of each name. The pointer clicks Day, Month and Year.">
 </p>
 
 <p align="center">
