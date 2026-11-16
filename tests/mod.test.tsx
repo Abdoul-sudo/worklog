@@ -99,6 +99,7 @@ function monde(
   on('prompt.submit', (_, e) => ({ text: e.text }))
   on('turn.complete', (_, e) => ({ text: e.answer }))
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('classic.Stop', () => ({}))
   return { horloge, fichiers, toasts, statuts, etat }
 }
 
@@ -745,6 +746,33 @@ test("quand un sous-agent a fini, la session n'est plus en cours et son temps s'
   const ligne = await ligneDe($, 'FLO-I165')
   expect(ligne).toStartWith('○')
   expect(ligne).toContain('21 min')
+})
+
+test("une commande de fond que Claude attend garde la session en cours ; sa fin arrête le temps", async ($, on) => {
+  const { horloge } = monde(on)
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  // Un agent a travaillé plus tôt : la fin du travail de fond ne recule pas jusqu'à lui.
+  await $.turn.start({ text: '', turnId: 'a1-t', agentId: 'a1' })
+  await $.turn.complete({ ...FIN_DE_TOUR, turnId: 'a1-t', agentId: 'a1' })
+  await travailler($, horloge, 'FLO-I165 : lance les extractions', 1)
+  // Le tour finit, mais une commande tourne encore en fond : Claude attend sa fin.
+  const extraction = { id: 'b1', type: 'shell', status: 'running', description: 'extractions', command: 'node extraire.mjs' }
+  await $.classic.Stop({ stop_hook_active: false, background_tasks: [extraction] })
+  await horloge.advance(40 * 60_000)
+  await horloge.settle()
+  const pendant = await ligneDe($, 'FLO-I165')
+  expect(pendant).toStartWith('●')
+  expect(pendant).toContain('41 min')
+  // La commande finit : sa notification réveille Claude, qui conclut ; plus rien ne tourne en fond.
+  await $.prompt.submit({ ...PROMPT, text: 'extractions finies', origin: { kind: 'task-notification' } } as never)
+  await horloge.advance(2 * 60_000)
+  await $.turn.complete({ ...FIN_DE_TOUR, usage: { model: 'm', input_tokens: 1_000, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } })
+  await $.classic.Stop({ stop_hook_active: false, background_tasks: [] })
+  await horloge.advance(10 * 60_000)
+  await horloge.settle()
+  const apres = await ligneDe($, 'FLO-I165')
+  expect(apres).toStartWith('○')
+  expect(apres).toContain('43 min')
 })
 
 test("après une longue pause, la question vient aussi quand on nomme la session avant d'écrire", async ($, on) => {

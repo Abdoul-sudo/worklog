@@ -46,7 +46,7 @@ Worklog needs Claude Code 2.1.325 or later. Node.js is optional: Worklog uses it
 ## How the timer works
 
 - The timer starts with your first message in a session. Opening a session does not count.
-- The timer runs while Claude works: answers, subagents, workflows and Ultracode, even when they work alone for hours.
+- The timer runs while Claude works: answers, subagents, workflows, Ultracode and background commands, even when they work alone for hours.
 - When Claude is done, a break starts. Worklog decides about the break when you come back.
 - When two sessions work at the same time, both count. Worklog shows how much of the day was in parallel.
 
@@ -175,7 +175,7 @@ Yes, with the default settings. Worklog adds the 30 minutes when you send the me
 </details>
 
 <details>
-<summary><strong>Do subagents and Ultracode count?</strong></summary>
+<summary><strong>Do subagents, Ultracode and background commands count?</strong></summary>
 
 Yes. The timer runs while they work, even when you do not type. Their tokens count too.
 
