@@ -324,7 +324,7 @@ test('les tokens, les onglets, les réglages et la frise', async ($, on) => {
     if (surface === 'desktop') {
       expect(await bande.find({ type: 'Text', text: /^Nuit$/ })).toMatchObject({ props: { weight: 'semibold' } })
       await bande.press({ key: 'theme-simple' })
-      expect(await bande.find({ type: 'Text', text: /^Simple$/ })).toMatchObject({ props: { weight: 'semibold' } })
+      expect(await bande.find({ type: 'Text', text: /^Par défaut$/ })).toMatchObject({ props: { weight: 'semibold' } })
       expect(await bande.find({ type: 'Text', text: /^Nuit$/ })).toMatchObject({ props: { weight: 'regular' } })
       await bande.press({ key: 'theme-nuit' })
       expect(await bande.find({ key: 'theme-sakura' })).toBeDefined()
