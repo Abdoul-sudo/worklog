@@ -105,6 +105,12 @@ function surveillerChamp($: Moteur): void {
 async function fermerChampVide($: Moteur): Promise<void> {
   if ((await read($, ui)).edition !== null && !/[\p{L}\p{N}]/u.test(texteEdition)) await update($, ui, x => ({ ...x, edition: null }))
 }
+/** Le focus quitte le champ : un nouveau nom s'enregistre, comme avec Entrée ; un nom inchangé referme le champ. */
+async function quitterChamp($: Moteur): Promise<void> {
+  const { edition } = await read($, ui)
+  if (edition === null || edition === 'autre' || !/[\p{L}\p{N}]/u.test(texteEdition)) return fermerChampVide($)
+  await renommer($, edition.renommer, couper(texteEdition.trim(), 60))
+}
 /** L'historique de Claude Code est relu au plus toutes les cinq minutes. */
 const IMPORT_MS = 5 * 60_000
 // Les tours qui partent seuls (tâche planifiée, observateur, notification d'une tâche de fond, message d'une autre
@@ -1584,7 +1590,7 @@ export const register: Register = on => {
       const instant = await $.clock.now()
       enFond(apresMessage($, e.text, e.isMeta !== true && ECRITS.includes(e.origin.kind), instant))
     }
-    if (e.origin.kind === 'composer') enFond(fermerChampVide($))
+    if (e.origin.kind === 'composer') enFond(quitterChamp($))
     return next(e)
   })
 
@@ -1663,12 +1669,13 @@ export const register: Register = on => {
     )
   })
 
-  // Le focus quitte le champ ouvert pour un autre élément de la bande : sans lettre ni chiffre tapé, le champ se ferme.
-  // L'app ne signale pas un clic hors de la bande ; un message envoyé dans le chat ferme aussi le champ vide.
+  // Le focus quitte le champ ouvert pour un autre élément de la bande : le renommage s'enregistre, ou se referme s'il est
+  // inchangé ; un champ sans lettre ni chiffre se ferme. L'app ne signale pas un clic hors de la bande ; un message
+  // envoyé dans le chat quitte aussi le champ.
   on('ui.focus', async ($, e, next) => {
     const { edition } = await read($, ui)
     const champ = edition === null ? null : edition === 'autre' ? 'autre-item' : 'renommer'
-    if (e.element !== champ) await fermerChampVide($)
+    if (e.element !== champ) await quitterChamp($)
     return next(e)
   })
 

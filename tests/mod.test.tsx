@@ -346,6 +346,19 @@ test('renommer depuis le popover : le crayon, ou un double-clic sur le nom', asy
   await bande.input({ key: 'renommer', text: 'FSY-I478' })
   await puceAffiche(puce, 'FSY-I478', '20 min')
   expect(await ligneDe($, 'FSY-I478')).toContain('20 min')
+
+  // Quitter le champ sans rien changer le referme ; avec un nouveau nom, il l'enregistre, comme Entrée.
+  const quitter = () => $.ui.focus({ component: 'AbovePrompt', requestId: BANDE.requestId, element: 'onglet-semaine', origin: { kind: 'person' } })
+  await bande.press({ key: 'crayon' })
+  await quitter()
+  expect(await bande.find({ key: 'renommer' })).toBeUndefined()
+  await puceAffiche(puce, 'FSY-I478', '20 min')
+  await bande.press({ key: 'crayon' })
+  await bande.input({ key: 'renommer', text: 'FSY-I479', kind: 'change' })
+  await quitter()
+  await horloge.settle()
+  expect(await bande.find({ key: 'renommer' })).toBeUndefined()
+  await puceAffiche(puce, 'FSY-I479', '20 min')
   // Ni masquer ni retirer : les lignes n'ont plus que ⇄ ou le crayon.
   expect(await bande.find({ key: 'retirer-FSY-I478' })).toBeUndefined()
   expect(await bande.find({ key: 'masquer-FSY-I478' })).toBeUndefined()
