@@ -1441,7 +1441,7 @@ async function popover($: Moteur, e: Site, colonnes: number, rangees: number, en
   const { Svg } = $.ui.resolve(e)
   // Le fond est fait de couches posées sous le contenu ; une couche vide fait du contenu une couche posée au-dessus.
   // Le fond animé du thème ; Simple n'en a pas.
-  const motif = svgCiel()
+  const motif = svgCiel(await $.clock.now())
   const ciel = motif !== null && (
     <Box key="ciel" position="absolute" top={-1} left={-1}>
       <Svg alt={t().alt.fond} source={motif} width={CIEL.largeur} height={CIEL.hauteur} />

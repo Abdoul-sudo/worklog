@@ -247,9 +247,21 @@ export function choisirTheme(theme: Theme): void {
 /** Le thème choisi a-t-il un fond (une trame, des lueurs) ? */
 export const aUnCiel = (): boolean => THEMES[themeChoisi].ciel !== null
 
-/** Le fond du thème choisi, ou null s'il n'en a pas. */
-export function svgCiel(): string | null {
-  return THEMES[themeChoisi].ciel?.() ?? null
+/** Cale chaque animation du fond sur l'heure (`secondes`) : son retard devient la phase qu'elle aurait si elle tournait
+ * depuis toujours. Quand l'app redessine le fond, et relance ses animations, il reprend ainsi là où il en était, sans
+ * sauter à son début. */
+function caler(svg: string, secondes: number): string {
+  return svg.replace(/animation:(\w+) ([\d.]+)s ([\w-]+) (?:(-?[\d.]+)s )?infinite( alternate)?/g, (_, nom, duree, courbe, retard, alterne) => {
+    const periode = Number(duree) * (alterne === undefined ? 1 : 2)
+    const phase = (((secondes - Number(retard ?? 0)) % periode) + periode) % periode
+    return `animation:${nom} ${duree}s ${courbe} ${(-phase).toFixed(2)}s infinite${alterne ?? ''}`
+  })
+}
+
+/** Le fond du thème choisi à l'instant `maintenant` (en millisecondes), ou null s'il n'en a pas. */
+export function svgCiel(maintenant: number): string | null {
+  const ciel = THEMES[themeChoisi].ciel?.()
+  return ciel === undefined ? null : caler(ciel, maintenant / 1000)
 }
 
 /** L'aperçu d'un thème dans les réglages : son fond, un titre, deux lignes, quatre cases de frise ; cerclé d'accent quand
