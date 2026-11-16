@@ -175,13 +175,6 @@ Yes, with the default settings. Worklog adds the 30 minutes when you send the me
 </details>
 
 <details>
-<summary><strong>Can both break settings be 1h?</strong></summary>
-
-No. **Then ask** offers only lengths longer than **Stay active during breaks**, or **Never**. With **Never**, a break longer than 1h does not count, and Worklog never asks.
-
-</details>
-
-<details>
 <summary><strong>Do subagents and Ultracode count?</strong></summary>
 
 Yes. The timer runs while they work, even when you do not type. Their tokens count too.
