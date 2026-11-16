@@ -14,8 +14,8 @@ const jour = (t) => {
 }
 const ligne = (ev) => `${JSON.stringify(ev)}\n`
 const humain = (minute, cwd) => ligne({ type: 'user', sessionId: 'abc', cwd, timestamp: new Date(T + minute * 60_000).toISOString(), origin: { kind: 'human' }, message: { content: 'on avance' } })
-const reponse = (minute, cwd, id) =>
-  ligne({ type: 'assistant', sessionId: 'abc', cwd, timestamp: new Date(T + minute * 60_000).toISOString(), message: { id, usage: { input_tokens: 10, output_tokens: 5 } } })
+const reponse = (minute, cwd, id, model = 'claude-opus-5-5', usage = { input_tokens: 10, output_tokens: 5 }) =>
+  ligne({ type: 'assistant', sessionId: 'abc', cwd, timestamp: new Date(T + minute * 60_000).toISOString(), message: { id, model, usage } })
 
 function monde() {
   const racine = fs.mkdtempSync(path.join(os.tmpdir(), 'worklog-importer-'))
@@ -25,6 +25,12 @@ function monde() {
   return { racine, projets, sortie }
 }
 const importer = (projets, sortie) => execFileSync(process.execPath, [IMPORTER, projets, sortie, 'PROJ-\\d+'])
+const lignes = (sortie) =>
+  fs
+    .readFileSync(path.join(sortie, jour(T), 'abc.jsonl'), 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .map(l => JSON.parse(l))
 const noms = (sortie) =>
   fs
     .readFileSync(path.join(sortie, jour(T), 'abc.jsonl'), 'utf8')
@@ -56,6 +62,91 @@ test('une fois, les noms déjà importés prennent le dossier de départ de leur
     importer(projets, sortie)
     assert.deepEqual(noms(sortie), ['proj'])
     assert.equal(JSON.parse(fs.readFileSync(path.join(sortie, 'etat.json'), 'utf8')).nomsCorriges, true)
+  } finally {
+    fs.rmSync(racine, { recursive: true, force: true })
+  }
+})
+
+test("chaque dépense de tokens importée garde le détail de ses réponses, par modèle, pour leur prix API", () => {
+  const { racine, projets, sortie } = monde()
+  try {
+    const usage = {
+      input_tokens: 10,
+      output_tokens: 5,
+      cache_creation_input_tokens: 300,
+      cache_read_input_tokens: 1_000,
+      cache_creation: { ephemeral_5m_input_tokens: 100, ephemeral_1h_input_tokens: 200 },
+      server_tool_use: { web_search_requests: 2 },
+      speed: 'fast',
+      inference_geo: 'us',
+    }
+    fs.writeFileSync(path.join(projets, 'D--proj', 'abc.jsonl'), humain(0, 'D:\\proj') + reponse(1, 'D:\\proj', 'r1', 'claude-opus-5-5', usage))
+    // Un sous-agent sur un autre modèle, dans la même minute, sans détail du cache.
+    fs.writeFileSync(
+      path.join(projets, 'D--proj', 'abc', 'subagents', 'agent-1.jsonl'),
+      reponse(1, 'D:\\proj', 'r2', 'claude-haiku-5-5', { input_tokens: 1, output_tokens: 2, cache_creation_input_tokens: 40 }),
+    )
+    importer(projets, sortie)
+    const jetons = lignes(sortie).filter(ev => ev.e === 'jetons')
+    assert.equal(jetons.length, 1)
+    assert.equal(jetons[0].n, 1_358)
+    assert.deepEqual(
+      jetons[0].p.sort((a, b) => a.m.localeCompare(b.m)),
+      [
+        { m: 'claude-haiku-5-5', in: 1, out: 2, c5: 40, c1: 0, cr: 0 },
+        { m: 'claude-opus-5-5', in: 10, out: 5, c5: 100, c1: 200, cr: 1_000, web: 2, rapide: 1, us: 1 },
+      ],
+    )
+  } finally {
+    fs.rmSync(racine, { recursive: true, force: true })
+  }
+})
+
+test("une fois, les tokens déjà importés reçoivent le détail de leurs réponses, partagé quand une minute a plusieurs lignes", () => {
+  const { racine, projets, sortie } = monde()
+  try {
+    const conversation = path.join(projets, 'D--proj', 'abc.jsonl')
+    fs.writeFileSync(conversation, humain(0, 'D:\\proj') + reponse(1, 'D:\\proj', 'r1', 'claude-opus-5-5', { input_tokens: 30, output_tokens: 15 }))
+    // Un import d'une version passée, sans détail : la minute 1 en deux lignes (deux imports au milieu de la minute).
+    fs.mkdirSync(path.join(sortie, jour(T)), { recursive: true })
+    fs.writeFileSync(
+      path.join(sortie, jour(T), 'abc.jsonl'),
+      ligne({ t: T + 60_000, s: 'abc', e: 'jetons', n: 30, k: null, d: 'proj', i: 1 }) + ligne({ t: T + 61_000, s: 'abc', e: 'jetons', n: 15, k: null, d: 'proj', i: 1 }),
+    )
+    fs.writeFileSync(
+      path.join(sortie, 'etat.json'),
+      JSON.stringify({ version: 3, positions: { [path.join('D--proj', 'abc.jsonl')]: fs.statSync(conversation).size }, vus: { r1: 1 }, tours: {}, dossiers: {}, nomsCorriges: true }),
+    )
+    importer(projets, sortie)
+    const details = lignes(sortie).map(ev => ev.p)
+    assert.deepEqual(details, [
+      [{ m: 'claude-opus-5-5', in: 20, out: 10, c5: 0, c1: 0, cr: 0 }],
+      [{ m: 'claude-opus-5-5', in: 10, out: 5, c5: 0, c1: 0, cr: 0 }],
+    ])
+    assert.equal(JSON.parse(fs.readFileSync(path.join(sortie, 'etat.json'), 'utf8')).details, 2)
+    // La fois suivante, rien ne change.
+    const avant = fs.readFileSync(path.join(sortie, jour(T), 'abc.jsonl'), 'utf8')
+    importer(projets, sortie)
+    assert.equal(fs.readFileSync(path.join(sortie, jour(T), 'abc.jsonl'), 'utf8'), avant)
+  } finally {
+    fs.rmSync(racine, { recursive: true, force: true })
+  }
+})
+
+test("une réponse recopiée dans une conversation reprise donne son détail à la minute où l'import l'a comptée", () => {
+  const { racine, projets, sortie } = monde()
+  try {
+    const conversation = path.join(projets, 'D--proj', 'abc.jsonl')
+    fs.writeFileSync(conversation, humain(0, 'D:\\proj') + reponse(1, 'D:\\proj', 'r1'))
+    // La reprise, lue avant elle : la même réponse, sous l'id de la nouvelle conversation.
+    const reprise = path.join(projets, 'D--proj', 'aaa.jsonl')
+    fs.writeFileSync(reprise, reponse(1, 'D:\\proj', 'r1').replace('"sessionId":"abc"', '"sessionId":"aaa"'))
+    fs.mkdirSync(path.join(sortie, jour(T)), { recursive: true })
+    fs.writeFileSync(path.join(sortie, jour(T), 'abc.jsonl'), ligne({ t: T + 60_000, s: 'abc', e: 'jetons', n: 15, k: null, d: 'proj', i: 1 }))
+    const positions = { [path.join('D--proj', 'abc.jsonl')]: fs.statSync(conversation).size, [path.join('D--proj', 'aaa.jsonl')]: fs.statSync(reprise).size }
+    fs.writeFileSync(path.join(sortie, 'etat.json'), JSON.stringify({ version: 3, positions, vus: { r1: 1 }, tours: {}, dossiers: {}, nomsCorriges: true }))
+    importer(projets, sortie)
+    assert.deepEqual(lignes(sortie)[0].p, [{ m: 'claude-opus-5-5', in: 10, out: 5, c5: 0, c1: 0, cr: 0 }])
   } finally {
     fs.rmSync(racine, { recursive: true, force: true })
   }
