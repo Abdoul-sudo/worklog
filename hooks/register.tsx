@@ -498,7 +498,7 @@ async function toutLeJournal($: Moteur, maintenant: number) {
   }
   jours.sort()
   const premier = jours[0] === undefined ? debutJour(maintenant) : debutJour(new Date(`${jours[0]}T12:00`).getTime())
-  return { debut: premier, fin: jourSuivant(debutJour(maintenant)), titre: depuis(premier) }
+  return { debut: premier, fin: jourSuivant(debutJour(maintenant)), titre: depuis(premier, maintenant) }
 }
 
 /** La période de la frise : de janvier à décembre. L'onglet Année montre son année ; Tout, l'année en cours ; les autres,

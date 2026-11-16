@@ -487,10 +487,17 @@ export function formatJour(t: number): string {
   return date(jours[d.getDay()]!, d.getDate(), mois[d.getMonth()]!)
 }
 
-/** Le titre de l'onglet Tout : « Depuis le 12 novembre », « Since Nov 12 ». */
-export function depuis(t: number): string {
+/** Le titre de l'onglet Tout : « Depuis le 12 novembre », « Since Nov 12 » ; avec l'année quand ce n'est pas celle de
+ * `maintenant`. */
+export function depuis(t: number, maintenant = t): string {
   const d = new Date(t)
-  return texte().depuis(d.getDate(), texte().mois[d.getMonth()]!)
+  return avecAnnee(texte().depuis(d.getDate(), texte().mois[d.getMonth()]!), t, maintenant)
+}
+
+/** Ajoute l'année au titre quand `t` n'est pas dans l'année de `maintenant`. */
+function avecAnnee(titre: string, t: number, maintenant: number): string {
+  const annee = new Date(t).getFullYear()
+  return annee === new Date(maintenant).getFullYear() ? titre : texte().annee(titre, annee)
 }
 
 export type Periode = 'jour' | 'semaine' | 'mois' | 'annee'
@@ -499,14 +506,18 @@ export type Periode = 'jour' | 'semaine' | 'mois' | 'annee'
 export function bornes(periode: Periode, decalage: number, maintenant: number): { debut: number; fin: number; titre: string } {
   if (periode === 'jour') {
     const debut = decalerJours(debutJour(maintenant), decalage)
-    const titre = decalage === 0 ? texte().aujourdhui : decalage === -1 ? texte().hier : majuscule(formatJour(debut))
+    const titre = decalage === 0 ? texte().aujourdhui : decalage === -1 ? texte().hier : avecAnnee(majuscule(formatJour(debut)), debut, maintenant)
     return { debut, fin: jourSuivant(debut), titre }
   }
   if (periode === 'semaine') {
     const debut = decalerJours(debutSemaine(maintenant), 7 * decalage)
     const d = new Date(debut)
     const titre =
-      decalage === 0 ? texte().cetteSemaine : decalage === -1 ? texte().semaineDerniere : texte().semaineDu(d.getDate(), texte().mois[d.getMonth()]!)
+      decalage === 0
+        ? texte().cetteSemaine
+        : decalage === -1
+          ? texte().semaineDerniere
+          : avecAnnee(texte().semaineDu(d.getDate(), texte().mois[d.getMonth()]!), debut, maintenant)
     return { debut, fin: decalerJours(debut, 7), titre }
   }
   const d = new Date(maintenant)

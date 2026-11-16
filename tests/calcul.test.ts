@@ -26,7 +26,7 @@ import {
 } from '../hooks/calcul'
 import { casesEntre, cellulesActivite, serie, svgActivite } from '../hooks/activite'
 import { choisirTheme, couleurs, svgCiel } from '../hooks/dessins'
-import { choisirLangue } from '../hooks/langue'
+import { choisirLangue, t } from '../hooks/langue'
 
 // Ces tests lisent les textes en français ; ceux en anglais choisissent leur langue.
 choisirLangue('fr')
@@ -690,5 +690,19 @@ describe("l'affichage", () => {
 
   test('les tokens passent à l\'unité suivante quand ils arrondissent à 1000', async () => {
     expect([999_400, 999_600, 999_600_000].map(formatJetons)).toEqual(['999 k', '1 M', '1 Md'])
+  })
+
+  test("les titres d'une autre année donnent l'année ; « 1er » partout en français ; « 0 days » en anglais", async () => {
+    expect(bornes('jour', -400, h(12)).titre).toContain('2025')
+    expect(bornes('semaine', -60, h(12)).titre).toContain('2025')
+    expect(depuis(new Date(2024, 10, 12).getTime(), h(12))).toBe('Depuis le 12 novembre 2024')
+    expect(t().semaineDu(1, 'juin')).toBe('Semaine du 1er juin')
+    choisirLangue('en')
+    try {
+      expect(t().joursSerie(0)).toBe('0 days')
+      expect(depuis(new Date(2024, 10, 12).getTime(), h(12))).toBe('Since Nov 12, 2024')
+    } finally {
+      choisirLangue('fr')
+    }
   })
 })
