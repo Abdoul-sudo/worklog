@@ -246,6 +246,20 @@ test("une conversation de l'app desktop reprise sous un autre id garde le nom ch
   await puce.unmount()
 })
 
+test("une notification ou un message d'une autre session n'est pas un retour : la pause continue", async ($, on) => {
+  const { horloge, fichiers } = monde(on)
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await travailler($, horloge, 'FLO-I1 : une tâche', 10)
+  const messages = () => fichiers.get(JOURNAL)!.trim().split('\n').filter(l => l.includes('"e":"message"')).length
+  const avant = messages()
+  for (const kind of ['task-notification', 'peer', 'peer-send-message', 'unclassified'] as const) {
+    await horloge.advance(10 * 60_000)
+    await $.prompt.submit({ ...PROMPT, origin: { kind } as never, text: 'tâche finie' })
+    await horloge.settle()
+  }
+  expect(messages()).toBe(avant)
+})
+
 test("un item choisi à la main ne change plus tout seul ; deux sessions sur un même ID sont regroupées", async ($, on) => {
   const { horloge, etat } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })

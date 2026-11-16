@@ -103,8 +103,9 @@ async function fermerChampVide($: Moteur): Promise<void> {
 }
 /** L'historique de Claude Code est relu au plus toutes les cinq minutes. */
 const IMPORT_MS = 5 * 60_000
-// Les tours qui partent seuls (tâche planifiée, observateur) ne comptent pas.
-const AUTOMATIQUES = ['scheduled-trigger', 'observer', 'observer-activity']
+// Les tours qui partent seuls (tâche planifiée, observateur, notification d'une tâche de fond, message d'une autre
+// session, avis sans origine) ne comptent pas : ils ne sont pas un retour de la personne.
+const AUTOMATIQUES = ['scheduled-trigger', 'observer', 'observer-activity', 'task-notification', 'peer', 'peer-send-message', 'unclassified']
 // L'ID de l'item se cherche dans ce qu'une personne a écrit, ou dans le brief d'une session lancée par une autre.
 const ECRITS = ['composer', 'bridge', 'sdk', 'slack-ping', 'coordinator', 'projects-relay']
 const ONGLETS = ['jour', 'semaine', 'mois', 'annee', 'tout'] as const
