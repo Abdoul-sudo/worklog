@@ -1402,17 +1402,21 @@ function choixTheme($: Moteur, e: Site, options: Reglages) {
     <Box flexDirection="row" flexWrap="wrap" columnGap={2} rowGap="sm" paddingX="sm">
       {THEMES_IDS.map((theme: Theme) => {
         const choisi = options.theme === theme
-        return cliquable(
-          $,
-          e,
-          `theme-${theme}`,
-          <Box flexDirection="column" alignItems="center" gap="xs">
-            <Svg alt={t().themes[theme]} source={svgApercu(theme, choisi)} width={APERCU.largeur} height={APERCU.hauteur} />
+        // Seul l'aperçu se clique : l'app cadre un bouton cliqué sur 44 px de haut. Plus haut que l'aperçu, ce cadre est
+        // coupé, comme celui des icônes ; sur toute la carte (aperçu et nom), il en resterait deux traits.
+        return (
+          <Box key={`carte-${theme}`} flexDirection="column" alignItems="center" gap="xs">
+            {cliquable(
+              $,
+              e,
+              `theme-${theme}`,
+              <Svg alt={t().themes[theme]} source={svgApercu(theme, choisi)} width={APERCU.largeur} height={APERCU.hauteur} />,
+              () => changerReglage($, { theme }),
+            )}
             <Text size="caption" weight={choisi ? 'semibold' : 'regular'} color={choisi ? ENCRE.vif : ENCRE.gris} hover={{ scope: `theme-${theme}`, color: ENCRE.vif }}>
               {t().themes[theme]}
             </Text>
-          </Box>,
-          () => changerReglage($, { theme }),
+          </Box>
         )
       })}
     </Box>

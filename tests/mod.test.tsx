@@ -443,6 +443,13 @@ test('les tokens, les onglets, les réglages et la frise', async ($, on) => {
       expect(await bande.find({ type: 'Text', text: /^Nuit$/ })).toMatchObject({ props: { weight: 'regular' } })
       await bande.press({ key: 'theme-nuit' })
       expect(await bande.find({ key: 'theme-sakura' })).toBeDefined()
+      // Seul l'aperçu se clique : le nom reste hors de la zone du bouton, sinon l'app cadrerait la carte de deux traits.
+      const zone = (n: Noeud): Noeud | undefined =>
+        n.props?.key === 'zone-theme-sakura' ? n : (n.children ?? []).map(c => (typeof c === 'object' ? zone(c) : undefined)).find(x => x !== undefined)
+      const texte = (n: Noeud): string => (n.children ?? []).map(c => (typeof c === 'string' ? c : texte(c))).join('')
+      const carte = zone((await bande.drawn()) as Noeud)
+      expect(carte).toBeDefined()
+      expect(texte(carte!)).not.toContain('Sakura')
     } else expect(await bande.find({ key: 'theme-nuit' })).toBeUndefined()
     // La croix ramène à l'onglet d'avant : Tout.
     await bande.press({ key: 'reglages' })
