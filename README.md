@@ -28,7 +28,7 @@
 
 ---
 
-You work with Claude on several projects, sometimes for hours without a break. Where did the time go? Which project used the most tokens?
+You work with Claude on several projects, sometimes for hours without a break. Where did the time go? Which project used the most tokens? How much would they cost on the API?
 
 Worklog knows, without a timer. It counts the time and the tokens of each Claude Code session, with their API price, and shows them above the prompt. You do not start, stop or pause anything.
 
