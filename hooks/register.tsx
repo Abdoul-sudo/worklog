@@ -125,6 +125,8 @@ let tourCompte = true
 let heritageClear: { item: string; manuel: boolean } | null = null
 // La session qu'un /clear vient de fermer : sa dernière pause se juge au premier message de la suivante.
 let avantClear: string | null = null
+// Les mods viennent d'être rechargés dans un processus vivant.
+let rechargement = false
 let brancheVue: string | null = null
 let nomParDefaut: string | null = null
 // Dernier état connu des sous-agents de la session : null tant qu'il n'est pas lu.
@@ -388,14 +390,26 @@ async function suivreAgents($: Moteur): Promise<void> {
   const listes = (await $.agent.list()).some(a => a.status === 'running' || a.status === 'pending' || a.status === 'waiting')
   // Un tour d'agent sans fin notée ni signe depuis SILENCE_AGENTS_MS est tenu pour fini (un workflow arrêté, par exemple).
   const occupes = listes || (agentsEnTour.size > 0 && maintenant - derniereActiviteAgents < SILENCE_AGENTS_MS)
-  if (occupes === agentsOccupes || (agentsOccupes === null && !occupes)) {
-    agentsOccupes = occupes
+  if (agentsOccupes === null && !occupes) {
+    agentsOccupes = false
+    // Après un rechargement des mods, des agents notés au travail avant lui ont pu finir sans que leur fin soit vue.
+    if (rechargement && (await dernierEtatAgents($)) === 'agents-debut') await noterActivite($, 'agents-fin')
     return
   }
+  if (occupes === agentsOccupes) return
   agentsOccupes = occupes
   // Les agents d'un workflow ont fini à leur dernier signe, pas quand ce silence est remarqué.
   const fin = !occupes && !listes && derniereActiviteAgents > -Infinity ? derniereActiviteAgents : undefined
   await noterActivite($, occupes ? 'agents-debut' : 'agents-fin', fin)
+}
+
+/** Le dernier état des agents noté aujourd'hui dans le journal de la session : `agents-debut`, `agents-fin`, ou null. */
+async function dernierEtatAgents($: Moteur): Promise<string | null> {
+  const { journal } = await dossiers($)
+  const fichier = `${journal}/${cleJour(await $.clock.now())}/${await $.session.id()}.jsonl`
+  if (!(await $.fs.exists(fichier))) return null
+  const etats = lireLignes(await $.fs.read(fichier)).filter(ev => ev.e === 'agents-debut' || ev.e === 'agents-fin')
+  return etats.at(-1)?.e ?? null
 }
 
 /** Un agent travaille : un sous-agent, ou un agent d'un workflow. Le premier signe ouvre son temps tout de suite. */
@@ -1519,7 +1533,8 @@ export const register: Register = on => {
     const deBranche = await itemDeNouvelleBranche($, MOTIF_ID)
     if (deBranche !== null && (await itemDe($, s)) === null) await definirItem($, s, deBranche, false)
     // Après /reload-plugins, ce hook revient dans un processus vivant : ce n'est pas une ouverture.
-    if (!(await vivaitDeja($).catch(() => false))) await noterActivite($, 'ouverture')
+    rechargement = await vivaitDeja($).catch(() => false)
+    if (!rechargement) await noterActivite($, 'ouverture')
     enFond(rafraichir($))
     enFond(importerHistorique($))
     $.clock.every(RAFRAICHISSEMENT_MS, () => {
