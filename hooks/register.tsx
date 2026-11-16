@@ -300,7 +300,8 @@ async function bilanDe($: Moteur, debut: number, fin: number) {
   const maintenant = await $.clock.now()
   const options = await lireReglages($)
   const corrections = await lireCorrections($)
-  const lecture = await lireJournal($, decalerJours(debut, -1), Math.min(fin, jourSuivant(debutJour(maintenant))))
+  // Avec la veille et le lendemain : les plages qui passent minuit ont leur début et leur fin.
+  const lecture = await lireJournal($, decalerJours(debut, -1), Math.min(jourSuivant(fin), jourSuivant(debutJour(maintenant))))
   return {
     b: bilan(lecture.evenements, options, maintenant, debut, fin, lecture.vivants, corrections, true),
     evenements: lecture.evenements,
@@ -540,8 +541,9 @@ async function apresMessage($: Moteur, texte: string, chercherItem: boolean, ins
   }
   await noterActivite($, 'message', instant)
   await rafraichir($)
+  // Depuis la veille : une pause qui passe minuit pose aussi sa question.
   const jour = debutJour(await $.clock.now())
-  const { b, evenements } = await bilanDe($, jour, jourSuivant(jour))
+  const { b, evenements } = await bilanDe($, decalerJours(jour, -1), jourSuivant(jour))
   // La pause qui finit à ce message, ou juste avant lui quand on a d'abord nommé la session ou changé d'item. Une pause
   // laissée sans réponse avant un message précédent ne revient pas.
   const ecart = b.ecarts.filter(x => x.session === s && x.fin <= instant).at(-1)

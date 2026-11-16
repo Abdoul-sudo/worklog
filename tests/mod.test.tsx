@@ -260,6 +260,25 @@ test("une notification ou un message d'une autre session n'est pas un retour : l
   expect(messages()).toBe(avant)
 })
 
+test("une pause qui passe minuit pose sa question au retour, et ne compte pas d'avance la veille", async ($, on) => {
+  const { horloge } = monde(on)
+  // Le 12 novembre, 23 h : la session s'ouvre.
+  await horloge.advance(14 * 60 * 60_000)
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await travailler($, horloge, 'FLO-I1 : une tâche', 10)
+  // Retour à 1 h, le 13 : 1 h 50 de pause, une question.
+  await horloge.advance(110 * 60_000)
+  await $.prompt.submit({ ...PROMPT, text: 'je reviens' })
+  await horloge.settle()
+  await $.command.run({ ...COMMANDE, args: '' })
+  const bande = await $.ui.mount({ ...BANDE, surface: 'terminal' })
+  expect(await bande.find({ type: 'Text', text: /Pause de 1 h 50 sur FLO-I1/ })).toBeDefined()
+  // La veille, seuls les 10 min de travail comptent : la pause attend sa réponse.
+  await bande.press({ key: 'precedent' })
+  expect((await bande.find({ key: 'ligne-FLO-I1' }))?.text).toContain('10 min')
+  await bande.unmount()
+})
+
 test("un item choisi à la main ne change plus tout seul ; deux sessions sur un même ID sont regroupées", async ($, on) => {
   const { horloge, etat } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
