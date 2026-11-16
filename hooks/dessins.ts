@@ -77,7 +77,7 @@ function cielBraise(): string {
 
 /** Forêt : une lueur verte respire en bas ; des lucioles s'allument et s'éteignent, chacune à son rythme. */
 function cielForet(): string {
-  const lucioles = [[90, 230], [210, 120], [340, 260], [480, 180], [610, 90], [760, 240], [900, 150], [1040, 270], [1180, 110], [1330, 210]]
+  const lucioles = [[90, 170], [210, 60], [340, 190], [480, 120], [610, 40], [760, 160], [900, 90], [1040, 200], [1180, 70], [1330, 140]]
     .map(([x, y], i) => {
       const duree = 4 + ((i * 3) % 5)
       return `<circle cx="${x}" cy="${y}" r="1.5" fill="#D9F99D" opacity="0" style="animation:l ${duree}s ease-in-out ${-((i * 1.7) % duree).toFixed(1)}s infinite"/>`
@@ -94,7 +94,7 @@ function cielForet(): string {
   )
 }
 
-/** Océan : trois houles glissent lentement en bas ; une lueur bleue en haut. */
+/** Océan : trois houles glissent lentement dans le bas de la carte, même courte ; une lueur bleue en haut. */
 function cielOcean(): string {
   // Une houle : une onde de 400 unités de période, plus large que le ciel ; glisser d'une période la ramène à son départ.
   const houle = (y: number, amplitude: number, opacite: number, duree: number) =>
@@ -103,9 +103,9 @@ function cielOcean(): string {
   return (
     ouvrirCiel('@keyframes h{from{transform:translateX(0)}to{transform:translateX(400px)}}', lueur('b', '#38BDF8', 0.1)) +
     '<ellipse cx="300" cy="20" rx="560" ry="160" fill="url(#b)"/>' +
-    houle(250, 10, 0.1, 38) +
-    houle(275, 14, 0.07, 52) +
-    houle(300, 8, 0.05, 66) +
+    houle(150, 10, 0.13, 38) +
+    houle(175, 14, 0.1, 52) +
+    houle(200, 8, 0.07, 66) +
     '</svg>'
   )
 }
