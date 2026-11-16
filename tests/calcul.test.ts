@@ -687,4 +687,8 @@ describe("l'affichage", () => {
   test("un nom comme « constructor » ou « toString » reste lui-même", async () => {
     expect([nommer('constructor', {}), nommer('toString', {}), nommer('__proto__', {})]).toEqual(['constructor', 'toString', '__proto__'])
   })
+
+  test('les tokens passent à l\'unité suivante quand ils arrondissent à 1000', async () => {
+    expect([999_400, 999_600, 999_600_000].map(formatJetons)).toEqual(['999 k', '1 M', '1 Md'])
+  })
 })

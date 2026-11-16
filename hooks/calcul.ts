@@ -464,9 +464,9 @@ export function formatJetons(n: number): string {
   const { nombre, unites } = texte()
   if (n < 1_000) return String(n)
   if (n < 100_000) return `${nombre(n / 1_000)}${unites.mille}`
-  if (n < 1_000_000) return `${Math.round(n / 1_000)}${unites.mille}`
+  if (n < 999_500) return `${Math.round(n / 1_000)}${unites.mille}`
   if (n < 100_000_000) return `${nombre(n / 1_000_000)}${unites.million}`
-  if (n < 1_000_000_000) return `${Math.round(n / 1_000_000)}${unites.million}`
+  if (n < 999_500_000) return `${Math.round(n / 1_000_000)}${unites.million}`
   return `${nombre(n / 1_000_000_000)}${unites.milliard}`
 }
 
