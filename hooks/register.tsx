@@ -476,6 +476,9 @@ async function calculerVue($: Moteur): Promise<void> {
   if (actuel !== null && debut <= maintenant && maintenant < fin && !lignes.some(l => l.item === actuel)) {
     lignes.unshift({ item: actuel, minutes: 0, enCours: false, jetons: 0 })
   }
+  // Pendant le calcul, un autre onglet ou une autre période a pu être choisi : ce résultat n'est plus le bon.
+  const apres = await read($, ui)
+  if (apres.onglet !== etat.onglet || apres.decalage !== etat.decalage) return
   const contenu: Vue = {
     cle: `${etat.onglet}:${etat.decalage}`,
     titre,
