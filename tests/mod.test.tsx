@@ -566,6 +566,10 @@ test('/worklog ouvre et ferme, ou nomme la session', async ($, on) => {
   await $.prompt.submit({ ...PROMPT, text: 'suite' })
   await horloge.settle()
   expect(await ligneDe($, 'site client')).toBeDefined()
+  // « stop » ou « pause » n'arrêtent rien et ne deviennent pas le nom de la session.
+  expect((await $.command.run({ ...COMMANDE, args: 'Stop' })).text).toContain('Rien à arrêter')
+  expect((await $.command.run({ ...COMMANDE, args: 'pause' })).text).toContain('Rien à arrêter')
+  expect(await ligneDe($, 'stop')).toBeUndefined()
 })
 
 test("une pause ne compte qu'au retour : courte, elle s'ajoute ; plus longue, une question ; trop longue, rien", async ($, on) => {

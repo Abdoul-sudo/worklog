@@ -616,10 +616,14 @@ async function commande($: Moteur, args: string): Promise<string> {
     await ouvrirOuFermer($)
     return (await read($, deplie)) ? textes.bande : textes.ferme
   }
+  // Ces mots demandent d'arrêter ou de reprendre le temps, ce qui n'existe pas : ils ne deviennent pas le nom.
+  if (MOTS_SANS_ARRET.includes(texte.toLowerCase())) return textes.sansArret
   const nom = texte.slice(0, 60)
   await changerItem($, nom)
   return textes.item(nom)
 }
+
+const MOTS_SANS_ARRET = ['stop', 'pause', 'start', 'resume', 'arreter', 'arrêter', 'reprendre']
 
 /** Dans l'app desktop, le bouton du pied est dessiné par l'app : des espaces insécables autour du libellé lui donnent de
  * l'air, comme une marge intérieure. */
