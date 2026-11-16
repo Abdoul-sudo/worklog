@@ -8,6 +8,7 @@ import {
   depuis,
   formatJetons,
   fusionner,
+  MINUTE,
   MOTIF_ID,
   lireOptions,
   SANS_ITEM,
@@ -94,6 +95,19 @@ describe('écart court ou long', () => {
     const evts = [ev(h(9), 'A', 'message', 'X'), ev(h(9, 5), 'A', 'reponse', 'X'), ev(h(11, 5), 'A', 'message', 'X')]
     expect(calculer(evts, { ...R, pauseMax: 0 }, h(11, 6)).ecarts).toEqual([])
     expect(calculer(evts, R, h(11, 6)).ecarts).toHaveLength(1)
+  })
+
+  test("des tokens espacés ne font pas compter une longue pause ; des tokens serrés, si", async () => {
+    const options = { ...OPTIONS_PAR_DEFAUT }
+    const base = [ev(h(9), 'A', 'message', 'X'), ev(h(9, 10), 'A', 'reponse', 'X'), ev(h(14), 'A', 'message', 'X')]
+    const jetons = (pas: number) =>
+      Array.from({ length: Math.floor((h(14) - h(9, 10)) / (pas * MINUTE)) }, (_, i) => ({ t: h(9, 10) + (i + 1) * pas * MINUTE - 1, s: 'A', e: 'jetons', n: 100, k: 'X' }) as Evenement)
+    // Une boucle qui tourne toutes les 30 min : entre deux tours, Claude ne fait rien. La pause de 4 h 50 ne compte pas.
+    const espaces = bilan([...base, ...jetons(30)], options, h(14, 1), JOUR, jourSuivant(JOUR))
+    expect(espaces.jours[0]?.lignes.map(l => l.minutes)).toEqual([11])
+    // Des agents qui dépensent des tokens toutes les 10 min travaillent : le temps compte.
+    const serres = bilan([...base, ...jetons(10)], options, h(14, 1), JOUR, jourSuivant(JOUR))
+    expect(serres.jours[0]?.lignes.map(l => l.minutes)).toEqual([301])
   })
 
   test("une pause encore ouverte ne compte pas : elle compte au retour, ou à la fermeture, si elle reste courte", async () => {

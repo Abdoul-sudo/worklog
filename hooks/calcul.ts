@@ -9,6 +9,9 @@ const DUREE_MAX_TOUR = 12 * 60 * MINUTE
 // Chaque session vivante donne signe de vie toutes les 30 s ; au-delà de cette marge, elle est tenue pour morte
 // (fenêtre fermée sans fin de session notée).
 export const MARGE_VIE = 2 * MINUTE
+// Pendant une longue pause, des agents travaillent tant que leurs tokens ne cessent pas plus longtemps que ceci. Des
+// dépenses plus espacées (une boucle planifiée toutes les 30 min) laissent Claude inactif entre elles.
+const SILENCE_TRAVAIL = 15 * MINUTE
 
 /** Les réglages, modifiables dans la vue Réglages du popover. */
 export type Options = {
@@ -304,8 +307,10 @@ export function calculer(
       const claudeTravaille = enCoursDepuis(debutTour) || enCoursDepuis(debutAgents)
       if (arrete && !claudeTravaille) continue
       const ouverte = b === undefined && finDeVie >= maintenant
-      // Un silence où les tokens n'ont pas cessé de partir plus longtemps que le seuil est du travail de Claude.
-      if (claudeTravaille || (!ouverte && plusLongSilence(session, a.t, fin) <= seuil)) {
+      // Une pause courte compte au retour. Plus longue, elle compte si les tokens n'ont pas cessé de partir : des agents
+      // travaillaient.
+      const travailAgents = fin - a.t <= seuil || plusLongSilence(session, a.t, fin) <= SILENCE_TRAVAIL
+      if (claudeTravaille || (!ouverte && travailAgents)) {
         plages.push(plage)
         if (ouverte) actives.set(session, plage.item)
       } else if (b !== undefined && fin - a.t <= pauseMax) {
