@@ -1281,8 +1281,6 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
   if (!riche(e)) return null
   const { Box, Select, Text } = $.ui.resolve(e)
   const bascules: { cle: 'activite'; libelle: string }[] = [{ cle: 'activite', libelle: t().bascules.activite }]
-  // Une liste déroulante sur le fond plein du popover : la trame de points ne se voit pas au travers.
-  const surFond = (commande: RenderChildren) => <Box backgroundColor={ENCRE.fond}>{commande}</Box>
   const ligneReglage = (cle: string, contenu: RenderChildren, aDroite: RenderChildren) => (
     <Box key={`ligne-reglage-${cle}`} flexDirection="row" justifyContent="space-between" alignItems="center" gap={2} paddingX="sm">
       {contenu}
@@ -1307,14 +1305,12 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
       <Text size="footnote" {...encre(e, 'texte')}>
         {libelle}
       </Text>,
-      surFond(
-        <Select
-          key={cle}
-          value={String(actuelle)}
-          options={valeurs.map(m => ({ value: String(m), label: nommer(m) }))}
-          onSelect={valeur => choisir(Number(valeur))}
-        />,
-      ),
+      <Select
+        key={cle}
+        value={String(actuelle)}
+        options={valeurs.map(m => ({ value: String(m), label: nommer(m) }))}
+        onSelect={valeur => choisir(Number(valeur))}
+      />,
     )
   const jusqua = (m: number) => t().jusqua(t().seuilChoix(m))
   const pauses = [
@@ -1330,28 +1326,24 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
           <Text size="footnote" {...encre(e, 'texte')}>
             {t().mesure}
           </Text>,
-          surFond(
-            <Select
-              key="mesure"
-              value={options.mesure}
-              options={MESURES.map(m => ({ value: m, label: t().mesures[m] }))}
-              onSelect={valeur => changerReglage($, { mesure: MESURES.find(m => m === valeur) ?? 'tout' })}
-            />,
-          ),
+          <Select
+            key="mesure"
+            value={options.mesure}
+            options={MESURES.map(m => ({ value: m, label: t().mesures[m] }))}
+            onSelect={valeur => changerReglage($, { mesure: MESURES.find(m => m === valeur) ?? 'tout' })}
+          />,
         ),
         ligneReglage(
           'langue',
           <Text size="footnote" {...encre(e, 'texte')}>
             {t().langue}
           </Text>,
-          surFond(
-            <Select
-              key="langue"
-              value={options.langue}
-              options={LANGUES.map(l => ({ value: l.id, label: l.nom }))}
-              onSelect={valeur => changerReglage($, { langue: valeur === 'fr' ? 'fr' : 'en' })}
-            />,
-          ),
+          <Select
+            key="langue"
+            value={options.langue}
+            options={LANGUES.map(l => ({ value: l.id, label: l.nom }))}
+            onSelect={valeur => changerReglage($, { langue: valeur === 'fr' ? 'fr' : 'en' })}
+          />,
         ),
         ...pauses,
       ])}
