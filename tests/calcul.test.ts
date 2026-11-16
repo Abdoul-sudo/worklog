@@ -22,6 +22,7 @@ import {
   jourSuivant,
   libellePuce,
   lireLignes,
+  nomSaisi,
   nommer,
 } from '../hooks/calcul'
 import { casesEntre, cellulesActivite, compterSerie, serie, svgActivite } from '../hooks/activite'
@@ -774,6 +775,16 @@ describe('corrections, tokens et périodes', () => {
 })
 
 describe("l'affichage", () => {
+  test('un nom tapé est nettoyé et coupé ; sans lettre ni chiffre, ou réservé, il est refusé', async () => {
+    expect(nomSaisi('  FSY-I47  ')).toBe('FSY-I47')
+    expect(nomSaisi('mon\tprojet\n   web')).toBe('mon projet web')
+    // Les marques invisibles de sens d'écriture partent ; le liant d'un emoji composé reste.
+    expect(nomSaisi('a‮b​c')).toBe('abc')
+    expect(nomSaisi('👨‍👩‍👧 équipe')).toBe('👨‍👩‍👧 équipe')
+    expect([...nomSaisi('é'.repeat(80))!].length).toBe(60)
+    expect([nomSaisi('---'), nomSaisi('   '), nomSaisi(''), nomSaisi(SANS_ITEM)]).toEqual([null, null, null, null])
+  })
+
   test("un nom comme « constructor » ou « toString » reste lui-même", async () => {
     expect([nommer('constructor', {}), nommer('toString', {}), nommer('__proto__', {})]).toEqual(['constructor', 'toString', '__proto__'])
   })

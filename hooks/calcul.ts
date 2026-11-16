@@ -170,6 +170,22 @@ export function detecterItem(texte: string, motif: string): string | null {
   return expression(motif, false)?.exec(texte)?.[0] ?? null
 }
 
+/** La longueur maximale d'un nom tapé, en caractères. */
+export const NOM_MAX = 60
+
+/** Un nom tapé (renommage, autre item, /worklog <nom>), nettoyé : sans caractère de contrôle ni marque invisible de sens
+ * d'écriture, les espaces réduits, coupé à NOM_MAX caractères. null sans lettre ni chiffre, ou pour le nom réservé aux
+ * sessions sans nom. */
+export function nomSaisi(texte: string): string | null {
+  const propre = texte
+    .replace(/\p{Cc}/gu, ' ')
+    .replace(/[​‎‏‪-‮⁦-⁩﻿]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const nom = [...propre].slice(0, NOM_MAX).join('').trim()
+  return /[\p{L}\p{N}]/u.test(nom) && nom !== SANS_ITEM ? nom : null
+}
+
 /** Le nom à afficher : suit les renommages, sans boucler. */
 export function nommer(item: string, renommages: Readonly<Record<string, string>>): string {
   let nom = item

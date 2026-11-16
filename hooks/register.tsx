@@ -16,6 +16,7 @@ import {
   MARGE_VIE,
   MOTIF_ID,
   SANS_ITEM,
+  nomSaisi,
   SEUILS,
   choixDemande,
   demandeEffective,
@@ -74,8 +75,7 @@ const CHAMP_INACTIF_MS = 3_000
 const DOUBLE_CLIC_MS = 450
 // L'heure du dernier clic sur le nom de chaque item.
 const dernierClic = new Map<string, number>()
-// Ce qui est tapé dans le champ ouvert (renommer, autre item) : sans lettre ni chiffre, il se ferme quand le focus le
-// quitte.
+// Ce qui est tapé dans le champ ouvert (renommer, autre item) : quitter le champ l'enregistre.
 let texteEdition = ''
 /** Ouvre un champ (renommer, autre item) et y met le focus, pour taper tout de suite. */
 async function ouvrirEdition($: Moteur, edition: NonNullable<Interface['edition']>, site: string): Promise<void> {
@@ -93,23 +93,22 @@ function noterFrappe($: Moteur, texte: string): void {
   texteEdition = texte
   surveillerChamp($)
 }
-/** L'app ne signale pas un clic hors de la bande : CHAMP_INACTIF_MS après la dernière frappe, le champ se quitte seul. Un
- * nouveau nom s'enregistre ; un nom inchangé ou un champ vide se ferme. Un autre item tapé reste ouvert. */
+/** L'app ne signale pas un clic hors de la bande : CHAMP_INACTIF_MS après la dernière frappe, le champ se quitte seul. */
 function surveillerChamp($: Moteur): void {
   const numero = ++derniereFrappe
   $.clock.after(CHAMP_INACTIF_MS, () => {
     if (numero === derniereFrappe) enFond(quitterChamp($))
   })
 }
-/** Ferme le champ ouvert s'il ne tient ni lettre ni chiffre. */
-async function fermerChampVide($: Moteur): Promise<void> {
-  if ((await read($, ui)).edition !== null && !/[\p{L}\p{N}]/u.test(texteEdition)) await update($, ui, x => ({ ...x, edition: null }))
-}
-/** Le focus quitte le champ : un nouveau nom s'enregistre, comme avec Entrée ; un nom inchangé referme le champ. */
+/** On quitte le champ (Entrée, ✓, le focus ailleurs, quelques secondes sans frappe) : un nom valide renomme l'item, ou
+ * devient l'item de la session ; un nom inchangé, ou sans lettre ni chiffre, referme le champ. */
 async function quitterChamp($: Moteur): Promise<void> {
   const { edition } = await read($, ui)
-  if (edition === null || edition === 'autre' || !/[\p{L}\p{N}]/u.test(texteEdition)) return fermerChampVide($)
-  await renommer($, edition.renommer, couper(texteEdition.trim(), 60))
+  if (edition === null) return
+  const nom = nomSaisi(texteEdition)
+  if (nom === null) await update($, ui, x => ({ ...x, edition: null }))
+  else if (edition === 'autre') await choisirItem($, nom)
+  else await renommer($, edition.renommer, nom)
 }
 /** L'historique de Claude Code est relu au plus toutes les cinq minutes. */
 const IMPORT_MS = 5 * 60_000
@@ -692,7 +691,8 @@ async function commande($: Moteur, args: string): Promise<string> {
   }
   // Ces mots demandent d'arrêter ou de reprendre le temps, ce qui n'existe pas : ils ne deviennent pas le nom.
   if (MOTS_SANS_ARRET.includes(texte.toLowerCase())) return textes.sansArret
-  const nom = couper(texte, 60)
+  const nom = nomSaisi(texte)
+  if (nom === null) return textes.nomRefuse
   await changerItem($, nom)
   return textes.item(nom)
 }
@@ -950,7 +950,10 @@ function ligne(
       value={sansNom ? '' : l.item}
       placeholder={t().renommerPlaceholder}
       onInput={texte => noterFrappe($, texte)}
-      onSubmit={texte => renommer($, l.item, couper(texte.trim(), 60))}
+      onSubmit={texte => {
+        texteEdition = texte
+        return quitterChamp($)
+      }}
     />
   ) : sansNom || estActuel ? (
     // L'item en cours se renomme par le crayon, ou d'un double-clic sur son nom là où la surface dessine.
@@ -1219,15 +1222,18 @@ function resume(
   const pied = (
     <Box flexDirection="row" justifyContent="space-between" alignItems="center" gap={1} paddingX={retrait} marginTop={serre ? 0 : 'xs'}>
       {etat.edition === 'autre' ? (
-        <Input
-          key="autre-item"
-          placeholder={t().autrePlaceholder}
-          onInput={texte => noterFrappe($, texte)}
-          onSubmit={texte => {
-            const item = couper(texte.trim(), 60)
-            return item === '' ? update($, ui, x => ({ ...x, edition: null })) : choisirItem($, item)
-          }}
-        />
+        <Box flexDirection="row" alignItems="center" gap={1} flexGrow={1} minWidth={0}>
+          <Input
+            key="autre-item"
+            placeholder={t().autrePlaceholder}
+            onInput={texte => noterFrappe($, texte)}
+            onSubmit={texte => {
+              texteEdition = texte
+              return quitterChamp($)
+            }}
+          />
+          {riche(e) && icone($, e, 'valider-autre', 'valider', '✓', () => quitterChamp($))}
+        </Box>
       ) : (
         bouton($, e, 'autre', t().autreItem, 'gris', () => ouvrirEdition($, 'autre', e.requestId))
       )}
@@ -1685,9 +1691,8 @@ export const register: Register = on => {
     )
   })
 
-  // Le focus quitte le champ ouvert pour un autre élément de la bande : le renommage s'enregistre, ou se referme s'il est
-  // inchangé ; un champ sans lettre ni chiffre se ferme. L'app ne signale pas un clic hors de la bande ; un message
-  // envoyé dans le chat quitte aussi le champ.
+  // Le focus quitte le champ ouvert pour un autre élément de la bande : on quitte le champ, son nom s'enregistre. L'app
+  // ne signale pas un clic hors de la bande ; un message envoyé dans le chat quitte aussi le champ.
   on('ui.focus', async ($, e, next) => {
     const { edition } = await read($, ui)
     const champ = edition === null ? null : edition === 'autre' ? 'autre-item' : 'renommer'

@@ -82,6 +82,7 @@ const FR = {
     ferme: 'Fermé.',
     item: (item: string) => `Cette session compte maintenant pour ${item}.`,
     sansArret: "Rien à arrêter : le temps ne compte que pendant que Claude travaille. À votre retour, Worklog décide si votre pause compte. Pour nommer la session, choisissez un autre nom.",
+    nomRefuse: 'Ce nom ne convient pas. Choisissez un nom avec au moins une lettre ou un chiffre.',
   },
 }
 
@@ -154,6 +155,7 @@ const EN: typeof FR = {
     ferme: 'Closed.',
     item: (item: string) => `This session now counts for ${item}.`,
     sansArret: 'Nothing to stop: the timer runs only while Claude works. When you come back, Worklog decides if your break counts. To name this session, choose another name.',
+    nomRefuse: 'This name does not work. Choose a name with at least one letter or digit.',
   },
 }
 

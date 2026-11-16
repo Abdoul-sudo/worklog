@@ -573,29 +573,48 @@ test("un item sans temps ni tokens n'a pas de ligne ; seul l'item de la session 
   await bande.unmount()
 })
 
-test('un champ vide ou sans lettre se ferme quand le focus le quitte ; un nom tapé le garde ouvert', async ($, on) => {
+test("« Ajouter un item » : quitter le champ, ✓ ou trois secondes sans frappe passent sur le nom tapé ; un champ vide ou sans lettre se ferme", async ($, on) => {
   const { horloge } = monde(on, ['desktop'])
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
   await travailler($, horloge, 'FLO-I1', 10)
   const puce = await $.ui.mount({ ...PIED, surface: 'desktop' })
   const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
   await puce.press({ key: 'puce' })
+  const nomPuce = async () => (await puce.find({ key: 'puce' }))?.text ?? ''
+  const quitter = () => $.ui.focus({ component: 'AbovePrompt', requestId: BANDE.requestId, element: 'onglet-semaine', origin: { kind: 'person' } })
+  // Vide, ou sans lettre ni chiffre : le champ se ferme, la session garde son item.
   await bande.press({ key: 'autre' })
   await bande.input({ key: 'autre-item', text: '   ', kind: 'change' })
-  await $.ui.focus({ component: 'AbovePrompt', requestId: BANDE.requestId, element: 'onglet-semaine', origin: { kind: 'person' } })
+  await quitter()
   expect(await bande.find({ key: 'autre-item' })).toBeUndefined()
+  await bande.press({ key: 'autre' })
+  await bande.input({ key: 'autre-item', text: '---', kind: 'change' })
+  await bande.press({ key: 'valider-autre' })
+  await horloge.settle()
+  expect(await bande.find({ key: 'autre-item' })).toBeUndefined()
+  expect(await nomPuce()).toContain('FLO-I1')
+  // Un nom tapé : quitter le champ, ✓, ou trois secondes sans frappe passent dessus.
   await bande.press({ key: 'autre' })
   await bande.input({ key: 'autre-item', text: 'FLO-I2', kind: 'change' })
-  await $.ui.focus({ component: 'AbovePrompt', requestId: BANDE.requestId, element: 'onglet-semaine', origin: { kind: 'person' } })
-  expect(await bande.find({ key: 'autre-item' })).toBeDefined()
-  // Resté vide, le champ se ferme seul quelques secondes après la dernière frappe ; avec un nom, il reste.
-  await horloge.advance(7_000)
-  expect(await bande.find({ key: 'autre-item' })).toBeDefined()
-  await bande.input({ key: 'autre-item', text: '', kind: 'change' })
-  await horloge.advance(7_000)
+  await quitter()
+  await horloge.settle()
   expect(await bande.find({ key: 'autre-item' })).toBeUndefined()
+  expect(await nomPuce()).toContain('FLO-I2')
   await bande.press({ key: 'autre' })
+  await bande.input({ key: 'autre-item', text: 'FLO-I3', kind: 'change' })
+  await bande.press({ key: 'valider-autre' })
+  await horloge.settle()
+  expect(await nomPuce()).toContain('FLO-I3')
+  await bande.press({ key: 'autre' })
+  await bande.input({ key: 'autre-item', text: 'FLO-I4', kind: 'change' })
+  await horloge.advance(2_000)
+  expect(await bande.find({ key: 'autre-item' })).toBeDefined()
+  await horloge.advance(1_500)
+  await horloge.settle()
+  expect(await bande.find({ key: 'autre-item' })).toBeUndefined()
+  expect(await nomPuce()).toContain('FLO-I4')
   // Un message envoyé dans le chat ferme le champ vide (l'app ne signale pas un clic hors de la bande).
+  await bande.press({ key: 'autre' })
   await bande.input({ key: 'autre-item', text: ' ', kind: 'change' })
   await $.prompt.submit({ ...PROMPT, text: 'on continue' })
   await horloge.settle()
@@ -684,6 +703,9 @@ test('/worklog ouvre et ferme, ou nomme la session', async ($, on) => {
   expect((await $.command.run({ ...COMMANDE, args: 'Stop' })).text).toContain('Rien à arrêter')
   expect((await $.command.run({ ...COMMANDE, args: 'pause' })).text).toContain('Rien à arrêter')
   expect(await ligneDe($, 'stop')).toBeUndefined()
+  // Un nom sans lettre ni chiffre est refusé.
+  expect((await $.command.run({ ...COMMANDE, args: '---' })).text).toContain('Ce nom ne convient pas')
+  expect(await ligneDe($, '---')).toBeUndefined()
 })
 
 test("une pause ne compte qu'au retour : courte, elle s'ajoute ; plus longue, une question ; trop longue, rien", async ($, on) => {
