@@ -443,13 +443,18 @@ test('les tokens, les onglets, les réglages et la frise', async ($, on) => {
       expect(await bande.find({ type: 'Text', text: /^Nuit$/ })).toMatchObject({ props: { weight: 'regular' } })
       await bande.press({ key: 'theme-nuit' })
       expect(await bande.find({ key: 'theme-sakura' })).toBeDefined()
-      // Seul l'aperçu se clique : le nom reste hors de la zone du bouton, sinon l'app cadrerait la carte de deux traits.
-      const zone = (n: Noeud): Noeud | undefined =>
-        n.props?.key === 'zone-theme-sakura' ? n : (n.children ?? []).map(c => (typeof c === 'object' ? zone(c) : undefined)).find(x => x !== undefined)
-      const texte = (n: Noeud): string => (n.children ?? []).map(c => (typeof c === 'string' ? c : texte(c))).join('')
-      const carte = zone((await bande.drawn()) as Noeud)
-      expect(carte).toBeDefined()
-      expect(texte(carte!)).not.toContain('Sakura')
+      // Un clic pose le cadre de focus puis presse aussitôt : le bouton change de clé, et le cadre de l'app, qui ferait deux
+      // traits sur la carte, disparaît avec l'ancien. Au clavier, Entrée vient plus tard : la clé reste, le cadre aussi.
+      const focus = (element: string) => $.ui.focus({ component: 'AbovePrompt', requestId: BANDE.requestId, element, origin: { kind: 'person' } })
+      await focus('theme-sakura')
+      await bande.press({ key: 'theme-sakura' })
+      expect(await bande.find({ key: 'theme-sakura' })).toBeUndefined()
+      expect(await bande.find({ key: 'theme-sakura~1' })).toBeDefined()
+      await focus('theme-nuit~1')
+      await horloge.advance(2_000)
+      await bande.press({ key: 'theme-nuit~1' })
+      expect(await bande.find({ key: 'theme-nuit~1' })).toBeDefined()
+      expect(await bande.find({ type: 'Text', text: /^Nuit$/ })).toMatchObject({ props: { weight: 'semibold' } })
     } else expect(await bande.find({ key: 'theme-nuit' })).toBeUndefined()
     // La croix ramène à l'onglet d'avant : Tout.
     await bande.press({ key: 'reglages' })

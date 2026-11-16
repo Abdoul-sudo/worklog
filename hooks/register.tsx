@@ -197,6 +197,8 @@ const PX_CELLULE = 8.2
 const ETROIT = 64
 /** La hauteur demandée pour le panneau quand il s'ouvre au-dessus de la saisie, en rangées. */
 const RANGEES_PANNEAU = 30
+/** Un clic pose le cadre de focus de l'app, puis presse dans ce délai ; au clavier, Entrée vient plus tard. */
+const CLIC_MS = 500
 /** Sous MOYEN, la frise passe sous les stats : la bande lui laisse cette hauteur (en rangées) avant de la montrer. */
 const RANGEES_FRISE_DESSOUS = 20
 const TRANSPARENT = '#00000000'
@@ -1395,6 +1397,13 @@ function resume(
 
 /** Le choix du thème : un aperçu par thème, son nom dessous, sur autant de rangs qu'il faut ; le thème choisi est
  * cerclé d'accent. */
+// Le dernier élément où le cadre de focus de l'app s'est posé, et quand : une pression qui le suit de près vient d'un clic.
+let dernierFocus: { element: string; t: number } | null = null
+// Après un clic, les aperçus de thème changent de clé. Le cadre de focus que le clic a posé ferait deux traits sur la carte
+// (le bouton invisible qui la couvre est coupé sur les côtés) : il disparaît avec l'ancien bouton, à tout zoom.
+let generationThemes = 0
+const cleTheme = (theme: Theme) => (generationThemes === 0 ? `theme-${theme}` : `theme-${theme}~${generationThemes}`)
+
 function choixTheme($: Moteur, e: Site, options: Reglages) {
   if (!riche(e)) return null
   const { Box, Svg, Text } = $.ui.resolve(e)
@@ -1402,21 +1411,24 @@ function choixTheme($: Moteur, e: Site, options: Reglages) {
     <Box flexDirection="row" flexWrap="wrap" columnGap={2} rowGap="sm" paddingX="sm">
       {THEMES_IDS.map((theme: Theme) => {
         const choisi = options.theme === theme
-        // Seul l'aperçu se clique : l'app cadre un bouton cliqué sur 44 px de haut. Plus haut que l'aperçu, ce cadre est
-        // coupé, comme celui des icônes ; sur toute la carte (aperçu et nom), il en resterait deux traits.
-        return (
-          <Box key={`carte-${theme}`} flexDirection="column" alignItems="center" gap="xs">
-            {cliquable(
-              $,
-              e,
-              `theme-${theme}`,
-              <Svg alt={t().themes[theme]} source={svgApercu(theme, choisi)} width={APERCU.largeur} height={APERCU.hauteur} />,
-              () => changerReglage($, { theme }),
-            )}
-            <Text size="caption" weight={choisi ? 'semibold' : 'regular'} color={choisi ? ENCRE.vif : ENCRE.gris} hover={{ scope: `theme-${theme}`, color: ENCRE.vif }}>
+        const cle = cleTheme(theme)
+        const choisir = async () => {
+          const focus = dernierFocus
+          const clic = focus !== null && focus.element === cle && (await $.clock.now()) - focus.t < CLIC_MS
+          if (clic) generationThemes++
+          await changerReglage($, { theme })
+        }
+        return cliquable(
+          $,
+          e,
+          cle,
+          <Box flexDirection="column" alignItems="center" gap="xs">
+            <Svg alt={t().themes[theme]} source={svgApercu(theme, choisi)} width={APERCU.largeur} height={APERCU.hauteur} />
+            <Text size="caption" weight={choisi ? 'semibold' : 'regular'} color={choisi ? ENCRE.vif : ENCRE.gris} hover={{ scope: cle, color: ENCRE.vif }}>
               {t().themes[theme]}
             </Text>
-          </Box>
+          </Box>,
+          choisir,
         )
       })}
     </Box>
@@ -1769,6 +1781,7 @@ export const register: Register = on => {
   // Le focus quitte le champ ouvert pour un autre élément de la bande : on quitte le champ, son nom s'enregistre. L'app
   // ne signale pas un clic hors de la bande ; un message envoyé dans le chat quitte aussi le champ.
   on('ui.focus', async ($, e, next) => {
+    if (e.element !== undefined) dernierFocus = { element: e.element, t: await $.clock.now() }
     const { edition } = await read($, ui)
     const champ = edition === null ? null : edition === 'autre' ? 'autre-item' : 'renommer'
     if (e.element !== champ) await quitterChamp($)
