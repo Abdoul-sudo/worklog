@@ -208,7 +208,7 @@ To see it, set **Show** to **Tokens and price**. The price then takes the place 
 
 Worklog takes the prices from the public [LiteLLM price list](https://github.com/BerriAI/litellm). It gets the list again once a day.
 
-For your past work, Worklog reads the details of each answer in your Claude Code history. If Claude Code deleted an old conversation, the tokens of that conversation have no cost.
+For your past work, Worklog reads the details of each answer in your Claude Code history. If Claude Code deleted an old conversation, the tokens of that conversation have no price.
 
 </details>
 
