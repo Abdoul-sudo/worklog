@@ -196,7 +196,7 @@ test("l'item vient de la branche Git ; un clic dans la liste passe sur un autre"
   await bande.unmount()
 })
 
-test("sans item, le temps va au groupe de l'app desktop ; « Ajouter un item » accepte un nom libre", async ($, on) => {
+test("sans item, le temps va au dossier du projet, même dans un groupe de l'app desktop ; « Ajouter un item » accepte un nom libre", async ($, on) => {
   const { horloge, fichiers } = monde(on, ['desktop'], {
     CLAUDE_CODE_HOST_SESSION_ID: 'local_abc',
     CLAUDE_CODE_EXECPATH: 'C:\\App\\Claude-Data\\claude-code\\2.1.322\\claude.exe',
@@ -204,16 +204,17 @@ test("sans item, le temps va au groupe de l'app desktop ; « Ajouter un item » 
   const groupes = { groups: [{ id: 'cg-1', name: 'Codepath' }], assignments: { 'code:local_abc': 'cg-1' } }
   fichiers.set('C:/App/Claude-Data/claude_desktop_config.json', JSON.stringify({ preferences: { epitaxyPrefs: { 'dframe-group-scopes': { 'u/o': groupes } } } }))
 
-  await $.session.start({ cwd: 'D:/PROJECTS/jeu', surface: 'terminal', isInteractive: true })
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
   await travailler($, horloge, 'ajoute le menu', 15)
   const puce = await $.ui.mount({ ...PIED, surface: 'desktop' })
   const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
-  await puceAffiche(puce, 'Codepath', '15 min')
+  // Le groupe de l'app desktop ne nomme plus la session : son nom vient du dossier du projet.
+  await puceAffiche(puce, 'FSY', '15 min')
 
   await puce.press({ key: 'puce' })
   await bande.press({ key: 'autre' })
   await bande.input({ key: 'autre-item', text: 'Refonte menu' })
-  // Un item choisi à la main compte à partir du choix : les 15 minutes restent au groupe.
+  // Un item choisi à la main compte à partir du choix : les 15 minutes restent au dossier.
   await puceAffiche(puce, 'Refonte menu', '0 min')
   await puce.unmount()
   await bande.unmount()

@@ -21,7 +21,6 @@ import {
   jourSuivant,
   libellePuce,
   lireLignes,
-  nomDuGroupe,
 } from '../hooks/calcul'
 import { casesEntre, cellulesActivite, serie, svgActivite } from '../hooks/activite'
 import { couleurs } from '../hooks/dessins'
@@ -489,18 +488,6 @@ describe('fichiers et textes', () => {
     expect(libellePuce('FLO-I165', 134, false)).toBe('⏱ FLO-I165 · 2 h 14')
     expect(libellePuce(null, 20, false)).toBe('⏱ 20 min')
     expect(libellePuce('FLO-I165', 134, true)).toBe('⏸ FLO-I165 · 2 h 14')
-  })
-
-  test("le nom du groupe de l'app desktop", async () => {
-    const config = JSON.stringify({
-      preferences: { epitaxyPrefs: { 'dframe-group-scopes': { 'u/o': {
-        groups: [{ id: 'cg-1', name: 'FSY' }, { id: 'cg-2', name: 'Codepath' }],
-        assignments: { 'code:local_a': 'cg-2' },
-      } } } },
-    })
-    expect(nomDuGroupe(config, 'local_a')).toBe('Codepath')
-    expect(nomDuGroupe(config, 'local_b')).toBe(null)
-    expect(nomDuGroupe('pas du json', 'local_a')).toBe(null)
   })
 
   test('les tokens du jour vont à leur item', async () => {

@@ -83,8 +83,7 @@ Each session counts for one item: a ticket, a feature or a project. Worklog find
 1. The item that you choose, with `/worklog <name>` or in the list.
 2. A ticket ID in your messages, such as `PROJ-142`.
 3. A ticket ID in the name of your Git branch, such as `feature/PROJ-142-login`.
-4. The name of the session group in the desktop app.
-5. The name of the project folder.
+4. The name of the project folder. In a Git worktree, the name of the main project.
 
 When Worklog finds the first ticket ID of a session, the time before it also goes to this ticket.
 

@@ -36,7 +36,6 @@ import {
   libellePuce,
   lireLignes,
   lireOptions,
-  nomDuGroupe,
   nommer,
 } from './calcul'
 import {
@@ -337,19 +336,9 @@ async function definirItem($: Moteur, s: string, item: string, manuel: boolean):
   await $.store.set('recents', ajouterRecent(await lireRecents($), item))
 }
 
-/**
- * Le nom par défaut de la session : son groupe dans l'app desktop, sinon le nom du projet.
- * L'app desktop range les groupes dans sa config, à côté du dossier `claude-code` de son exécutable.
- */
+/** Le nom par défaut de la session : le dossier du projet, la racine du dépôt Git (celle du dépôt principal, même depuis
+ * un worktree), sinon le dossier de la session. Le même dans le terminal et dans l'app desktop. */
 async function calculerNomParDefaut($: Moteur): Promise<string | null> {
-  const hote = await $.env.get('CLAUDE_CODE_HOST_SESSION_ID')
-  const executable = (await $.env.get('CLAUDE_CODE_EXECPATH'))?.replace(/\\/g, '/')
-  const dossierApp = executable?.includes('/claude-code/') ? executable.split('/claude-code/')[0] : undefined
-  if (hote !== undefined && dossierApp !== undefined) {
-    const config = await $.fs.read(`${dossierApp}/claude_desktop_config.json`).catch(() => '')
-    const groupe = nomDuGroupe(config, hote)
-    if (groupe !== null) return groupe
-  }
   const racine = (await $.session.repo())?.root ?? (await $.session.cwd())
   return racine.replace(/\\/g, '/').replace(/\/+$/, '').split('/').pop() || null
 }

@@ -73,7 +73,7 @@ export type Choix = 'travail' | 'pause'
 // `agents-debut` et `agents-fin` : des sous-agents (workflows, Ultracode) travaillent, puis s'arrêtent.
 export type Activite = 'ouverture' | 'message' | 'reponse' | 'item' | 'pause' | 'fermeture' | 'agents-debut' | 'agents-fin'
 // `k` : l'item choisi ou trouvé (ID cité, branche Git, choix dans la liste).
-// `d` : le nom par défaut de la session (groupe de l'app desktop, sinon projet).
+// `d` : le nom par défaut de la session (le dossier du projet).
 // `i` : l'événement vient de l'historique de Claude Code (scripts/importer.mjs), pas du journal tenu par le mod.
 type EvenementActivite = { t: number; s: string; e: Activite; k: string | null; d?: string; i?: 1 }
 type EvenementClassement = { t: number; s: string; e: 'classement'; session: string; debut: number; choix: Choix }
@@ -522,20 +522,4 @@ export function libellePuce(item: string | null, minutes: number, enPause: boole
   // Le terminal dessine ⏱ et ⏸ sur deux colonnes sans les compter : ils mordraient sur le nom.
   const signe = terminal ? (enPause ? '‖' : '◷') : enPause ? '⏸' : '⏱'
   return `${signe} ${nom}${formatDuree(minutes)}`
-}
-
-/** Le nom du groupe de l'app desktop où se trouve la session `hote`, lu dans la config de l'app. */
-export function nomDuGroupe(config: string, hote: string): string | null {
-  type Portee = { groups?: { id?: unknown; name?: unknown }[]; assignments?: Record<string, unknown> }
-  try {
-    const portees = JSON.parse(config)?.preferences?.epitaxyPrefs?.['dframe-group-scopes'] as Record<string, Portee> | undefined
-    for (const portee of Object.values(portees ?? {})) {
-      const id = portee.assignments?.[`code:${hote}`]
-      const nom = portee.groups?.find(g => g.id === id)?.name
-      if (id !== undefined && typeof nom === 'string' && nom.trim() !== '') return nom.trim()
-    }
-  } catch {
-    // Config illisible : pas de groupe.
-  }
-  return null
 }
