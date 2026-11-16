@@ -492,6 +492,18 @@ describe("l'historique importé", () => {
     expect(parItem).toEqual({ 'FLO-I1': 20 })
   })
 
+  test("un repère (ID d'un message recopié dans une conversation reprise) nomme la session, sans compter de temps", async () => {
+    // La reprise B : le repère FLO-I168 à l'heure du message d'origine, puis son propre travail, sans ID.
+    const evenements = [
+      { t: h(9, 50), s: 'B', e: 'repere', k: 'FLO-I168', d: 'projet', i: 1 } as Evenement,
+      imp(h(10), 'B', 'message'),
+      imp(h(10, 30), 'B', 'reponse'),
+      jet(h(10, 30), 'B', 500, true),
+    ]
+    const { parItem } = minutesDuJour(fusionner(evenements, 0), h(12))
+    expect(parItem).toEqual({ 'FLO-I168': 30 })
+  })
+
   test("une session de l'historique n'est jamais en cours : un message resté sans réponse ne court pas jusqu'à maintenant", async () => {
     const { parItem } = minutesDuJour(fusionner([imp(h(9), 'A', 'message', 'FLO-I1'), imp(h(9, 30), 'B', 'message', 'FLO-I2'), imp(h(9, 40), 'B', 'reponse')], 0), h(18))
     expect(parItem).toEqual({ 'FLO-I2': 10 })

@@ -133,6 +133,70 @@ test("une fois, les tokens déjà importés reçoivent le détail de leurs répo
   }
 })
 
+/** Tous les événements importés du jour, de toutes les sessions. */
+const tousImportes = (sortie) =>
+  fs
+    .readdirSync(path.join(sortie, jour(T)))
+    .filter(f => f.endsWith('.jsonl'))
+    .flatMap(f => fs.readFileSync(path.join(sortie, jour(T), f), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)))
+
+test("un message recopié dans une conversation reprise ne compte qu'une fois, dans la session qui a sa réponse ; son ID nomme la reprise", () => {
+  const { racine, projets, sortie } = monde()
+  try {
+    // La conversation, puis sa reprise par l'app : une autre session, qui recopie le même message (même uuid) et la même
+    // réponse, à la même heure.
+    const message = (s) => ligne({ type: 'user', sessionId: s, uuid: 'u1', cwd: 'D:\\proj', timestamp: new Date(T).toISOString(), origin: { kind: 'human' }, message: { content: 'PROJ-1 : on avance' } })
+    fs.writeFileSync(path.join(projets, 'D--proj', 'abc.jsonl'), message('abc') + reponse(1, 'D:\\proj', 'r1'))
+    fs.writeFileSync(path.join(projets, 'D--proj', 'aaa.jsonl'), message('aaa') + reponse(1, 'D:\\proj', 'r1').replace('"sessionId":"abc"', '"sessionId":"aaa"'))
+    importer(projets, sortie)
+    const evenements = tousImportes(sortie)
+    const messages = evenements.filter(ev => ev.e === 'message')
+    assert.equal(messages.length, 1)
+    assert.deepEqual(evenements.filter(ev => ev.e === 'jetons').map(ev => ev.s), [messages[0].s])
+    // L'autre session, la reprise, garde l'ID en repère, sans temps.
+    assert.deepEqual(
+      evenements.filter(ev => ev.e === 'repere').map(ev => [ev.k, ev.t === T, ev.s !== messages[0].s]),
+      [['PROJ-1', true, true]],
+    )
+  } finally {
+    fs.rmSync(racine, { recursive: true, force: true })
+  }
+})
+
+test("une fois, les messages déjà importés en double dans une copie de la conversation sont retirés ; leur ID y reste en repère", () => {
+  const { racine, projets, sortie } = monde()
+  try {
+    // Un import d'une version passée : la copie `aaa` a les messages sans leurs réponses ; `abc` a tout.
+    fs.mkdirSync(path.join(sortie, jour(T)), { recursive: true })
+    fs.writeFileSync(
+      path.join(sortie, jour(T), 'abc.jsonl'),
+      ligne({ t: T, s: 'abc', e: 'message', k: 'PROJ-1', d: 'proj', i: 1 }) +
+        ligne({ t: T + 60_000, s: 'abc', e: 'message', k: null, d: 'proj', i: 1 }) +
+        ligne({ t: T + 60_000, s: 'abc', e: 'jetons', n: 15, k: null, d: 'proj', i: 1 }),
+    )
+    fs.writeFileSync(
+      path.join(sortie, jour(T), 'aaa.jsonl'),
+      ligne({ t: T, s: 'aaa', e: 'message', k: 'PROJ-1', d: 'proj', i: 1 }) +
+        ligne({ t: T + 60_000, s: 'aaa', e: 'message', k: null, d: 'proj', i: 1 }) +
+        ligne({ t: T + 3_600_000, s: 'aaa', e: 'message', k: null, d: 'proj', i: 1 }),
+    )
+    fs.writeFileSync(path.join(sortie, 'etat.json'), JSON.stringify({ version: 3, positions: {}, vus: {}, tours: {}, dossiers: {}, nomsCorriges: true, details: 2 }))
+    importer(projets, sortie)
+    // Le message en double quitte la copie ; son message à elle reste.
+    assert.deepEqual(
+      tousImportes(sortie).filter(ev => ev.e === 'message').map(ev => `${ev.s}@${ev.t - T}`).sort(),
+      ['aaa@3600000', 'abc@0', 'abc@60000'],
+    )
+    assert.deepEqual(tousImportes(sortie).filter(ev => ev.e === 'repere').map(ev => `${ev.s}@${ev.t - T}:${ev.k}`), ['aaa@0:PROJ-1'])
+    // La fois suivante, rien ne change.
+    const avant = fs.readFileSync(path.join(sortie, jour(T), 'aaa.jsonl'), 'utf8')
+    importer(projets, sortie)
+    assert.equal(fs.readFileSync(path.join(sortie, jour(T), 'aaa.jsonl'), 'utf8'), avant)
+  } finally {
+    fs.rmSync(racine, { recursive: true, force: true })
+  }
+})
+
 test("une réponse recopiée dans une conversation reprise donne son détail à la minute où l'import l'a comptée", () => {
   const { racine, projets, sortie } = monde()
   try {

@@ -52,7 +52,7 @@ const lireEtat = () => {
     const etat = JSON.parse(fs.readFileSync(fichierEtat, 'utf8'))
     if (etat.version === VERSION) return etat
   } catch {}
-  return { version: VERSION, positions: {}, vus: {}, tours: {}, dossiers: {}, nomsCorriges: true, details: DETAILS }
+  return { version: VERSION, positions: {}, vus: {}, tours: {}, dossiers: {}, nomsCorriges: true, details: DETAILS, copiesRetirees: true }
 }
 const etat = lireEtat()
 // Le nom de chaque session : le dossier où elle a démarré. Claude se déplace parfois dans un sous-dossier du projet
@@ -92,6 +92,8 @@ const sorties = new Map()
 const minutes = new Map()
 // Les messages lus : leur nom se décide à la fin, quand le dossier de départ de chaque session est connu.
 const messages = []
+// Les ID des messages qu'une conversation reprise a recopiés : ils nomment la reprise, sans temps.
+const reperes = []
 const ajouter = (t, s, ev) => {
   const fichier = path.join(sortie, jourDe(t), `${s}.jsonl`)
   if (!sorties.has(fichier)) sorties.set(fichier, [])
@@ -167,8 +169,17 @@ function lire(ligne, sousAgent) {
     const texte = texteDe(contenu).trim()
     if (texte === '') return
     if (estHumain(ev, texte)) {
+      const k = idDe.exec(texte)?.[0] ?? null
+      // Une conversation reprise par l'app recopie les messages déjà vus, sous le même uuid : chacun ne compte qu'une fois,
+      // dans la conversation qui a aussi ses réponses. Recopié sans elles, il ouvrirait un tour sans fin. L'ID qu'il cite
+      // reste à la reprise, en repère : elle garde son nom.
+      if (ev.uuid !== undefined && vus.has(ev.uuid)) {
+        if (k !== null) reperes.push({ t, s, cwd, k })
+        return
+      }
+      if (ev.uuid !== undefined) vus.set(ev.uuid, Math.floor(t / JOUR))
       tours.add(s)
-      messages.push({ t, s, cwd, k: idDe.exec(texte)?.[0] ?? null })
+      messages.push({ t, s, cwd, k })
     } else if (ev.isMeta !== true) tours.delete(s)
   }
 }
@@ -292,6 +303,55 @@ async function ajouterDetails() {
   }
 }
 
+/** Une fois : les messages qu'une version passée importait en double dans une copie de la conversation (reprise par
+ * l'app), sans leurs réponses, sont retirés ; l'ID qu'ils citent y reste en repère. Un message présent dans plusieurs
+ * sessions à la même milliseconde reste dans celle qui a les tokens de sa réponse, sinon dans celle qui a le plus de
+ * tokens. */
+function retirerCopies() {
+  const lus = []
+  for (const jour of fs.readdirSync(sortie, { withFileTypes: true })) {
+    if (!jour.isDirectory()) continue
+    for (const nom of fs.readdirSync(path.join(sortie, jour.name))) {
+      if (!nom.endsWith('.jsonl')) continue
+      const fichier = path.join(sortie, jour.name, nom)
+      lus.push({ fichier, lignes: fs.readFileSync(fichier, 'utf8').split('\n') })
+    }
+  }
+  const analyser = ligne => {
+    try {
+      return JSON.parse(ligne)
+    } catch {
+      return null
+    }
+  }
+  const sessionsParT = new Map()
+  const jetonsParSession = new Map()
+  for (const { lignes } of lus) {
+    for (const ev of lignes.map(analyser)) {
+      if (ev?.e === 'message' && ev.i === 1) sessionsParT.set(ev.t, new Set([...(sessionsParT.get(ev.t) ?? []), ev.s]))
+      if (ev?.e === 'jetons') jetonsParSession.set(ev.s, [...(jetonsParSession.get(ev.s) ?? []), ev.t])
+    }
+  }
+  const garder = new Map()
+  for (const [t, sessions] of sessionsParT) {
+    if (sessions.size < 2) continue
+    const liste = [...sessions].sort()
+    const avecReponse = liste.find(s => (jetonsParSession.get(s) ?? []).some(x => x >= t && x <= t + 10 * MINUTE))
+    garder.set(t, avecReponse ?? liste.reduce((a, b) => ((jetonsParSession.get(b)?.length ?? 0) > (jetonsParSession.get(a)?.length ?? 0) ? b : a)))
+  }
+  for (const { fichier, lignes } of lus) {
+    let change = false
+    // Un message en double quitte la copie ; l'ID qu'il cite y reste en repère : la reprise garde son nom.
+    const restent = lignes.flatMap(ligne => {
+      const ev = analyser(ligne)
+      if (!(ev?.e === 'message' && ev.i === 1 && garder.has(ev.t) && garder.get(ev.t) !== ev.s)) return [ligne]
+      change = true
+      return ev.k === null ? [] : [JSON.stringify({ ...ev, e: 'repere' })]
+    })
+    if (change) fs.writeFileSync(fichier, restent.join('\n'))
+  }
+}
+
 const fichiers = []
 const parcourir = dossier => {
   for (const entree of fs.readdirSync(dossier, { withFileTypes: true })) {
@@ -316,6 +376,10 @@ try {
     const d = nomDe(s, cwd)
     ajouter(t, s, { t, s, e: 'message', k, ...(d === undefined ? {} : { d }), i: 1 })
   }
+  for (const { t, s, cwd, k } of reperes) {
+    const d = nomDe(s, cwd)
+    ajouter(t, s, { t, s, e: 'repere', k, ...(d === undefined ? {} : { d }), i: 1 })
+  }
   for (const { t, s, cwd, n, details, actif } of minutes.values()) {
     const d = nomDe(s, cwd)
     const defaut = d === undefined ? {} : { d }
@@ -336,6 +400,11 @@ try {
   if (etat.details !== DETAILS) {
     await ajouterDetails()
     etat.details = DETAILS
+  }
+  // Une fois : les messages importés en double dans une copie de la conversation sont retirés.
+  if (etat.copiesRetirees !== true) {
+    retirerCopies()
+    etat.copiesRetirees = true
   }
   const oubli = Math.floor(Date.now() / JOUR) - MEMOIRE_JOURS
   etat.vus = Object.fromEntries([...vus].filter(([, jour]) => jour >= oubli))

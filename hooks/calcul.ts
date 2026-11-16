@@ -95,7 +95,10 @@ type EvenementActivite = { t: number; s: string; e: Activite; k: string | null; 
 type EvenementClassement = { t: number; s: string; e: 'classement'; session: string; debut: number; choix: Choix }
 // `p` : le détail des réponses, par modèle, pour leur prix API ; `c` : ce prix, en dollars, ajouté à la lecture (avecCouts).
 type EvenementJetons = { t: number; s: string; e: 'jetons'; n: number; k: string | null; d?: string; i?: 1; p?: Detail[]; c?: number }
-export type Evenement = EvenementActivite | EvenementClassement | EvenementJetons
+// Un ID cité dans un message qu'une conversation reprise par l'app a recopié (scripts/importer.mjs) : il nomme la session
+// reprise, sans temps.
+type EvenementRepere = { t: number; s: string; e: 'repere'; k: string; d?: string; i: 1 }
+export type Evenement = EvenementActivite | EvenementClassement | EvenementJetons | EvenementRepere
 
 /**
  * Réunit le journal du mod et l'historique importé de Claude Code.
@@ -107,7 +110,7 @@ export type Evenement = EvenementActivite | EvenementClassement | EvenementJeton
 export function fusionner(evenements: readonly Evenement[], importeJusqua: number): Evenement[] {
   const suivis = new Map<string, EvenementActivite[]>()
   for (const ev of [...evenements].sort((a, b) => a.t - b.t)) {
-    if (ev.e === 'classement' || ev.e === 'jetons' || ev.i === 1) continue
+    if (ev.e === 'classement' || ev.e === 'jetons' || ev.e === 'repere' || ev.i === 1) continue
     const liste = suivis.get(ev.s)
     if (liste === undefined) suivis.set(ev.s, [ev])
     else liste.push(ev)
@@ -118,7 +121,7 @@ export function fusionner(evenements: readonly Evenement[], importeJusqua: numbe
   }
   // Une session venue de l'historique seul n'est jamais en cours : elle se ferme à son dernier moment.
   const fins = new Map<string, number>()
-  for (const ev of evenements) if (ev.e !== 'classement' && ev.i === 1 && !suivis.has(ev.s)) fins.set(ev.s, Math.max(fins.get(ev.s) ?? 0, ev.t))
+  for (const ev of evenements) if (ev.e !== 'classement' && ev.e !== 'repere' && ev.i === 1 && !suivis.has(ev.s)) fins.set(ev.s, Math.max(fins.get(ev.s) ?? 0, ev.t))
   const fermetures = [...fins].map(([s, t]): Evenement => ({ t, s, e: 'fermeture', k: null, i: 1 }))
   return [...evenements.flatMap((ev): Evenement[] => {
     if (ev.e === 'classement') return [ev]
@@ -268,6 +271,8 @@ export function calculer(
   for (const ev of [...evenements].sort((a, b) => a.t - b.t)) {
     if (ev.e === 'classement') choix.set(`${ev.session}@${ev.debut}`, ev.choix)
     else if (ev.e === 'jetons') consos.push(ev)
+    // Un repère ne fait que nommer sa session (premiers, plus bas) : il n'ouvre ni ne ferme aucun temps.
+    else if (ev.e === 'repere') continue
     else if (sessions.has(ev.s)) sessions.get(ev.s)!.push(ev)
     else sessions.set(ev.s, [ev])
   }
