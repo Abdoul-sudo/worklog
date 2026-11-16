@@ -48,7 +48,7 @@ function monde(
   // Ces tests lisent les textes en français ; celui en anglais garde la langue par défaut.
   mock.store(on, { ...(langue === 'fr' ? { options: { langue: 'fr' } } : {}), ...magasin })
   mock.env(on, { USERPROFILE: 'C:\\Users\\test', ...env })
-  const etat = { session: 'S1', branche: 'main', agents: [] as { id: string; status: string }[], fonds: [] as (string | undefined)[] }
+  const etat = { session: 'S1', branche: 'main', dossier: 'D:/WORK/FSY', agents: [] as { id: string; status: string }[], fonds: [] as (string | undefined)[] }
   const fichiers = new Map<string, string>()
   const toasts: string[] = []
   const statuts: (string | undefined)[] = []
@@ -76,7 +76,7 @@ function monde(
   }))
   on('agent.list', () => ({ value: etat.agents.map(a => ({ ...a, description: 'agent', type: 'general-purpose' })) as never }))
   on('session.id', () => ({ value: etat.session }))
-  on('session.cwd', () => ({ value: 'D:/WORK/FSY' }))
+  on('session.cwd', () => ({ value: etat.dossier }))
   on('session.repo', () => ({ value: null }))
   on('session.surfaces', () => ({ value: surfaces }))
   on('command.register', (_, e) => ({ value: { command: e.name } }))
@@ -218,6 +218,18 @@ test("sans item, le temps va au dossier du projet, même dans un groupe de l'app
   await puceAffiche(puce, 'Refonte menu', '0 min')
   await puce.unmount()
   await bande.unmount()
+})
+
+test("une session lancée dans un dossier d'attente prend le nom de son vrai dossier dès son premier message", async ($, on) => {
+  const { horloge, etat } = monde(on)
+  // L'app desktop démarre la session dans un dossier d'attente, puis lui donne son dossier.
+  etat.dossier = 'C:/Users/moi/AppData/Local/Temp/spare-jvM1jf'
+  await $.session.start({ cwd: etat.dossier, surface: 'terminal', isInteractive: true })
+  await horloge.settle()
+  etat.dossier = 'D:/WORK/FSY'
+  await travailler($, horloge, 'nettoie les fichiers', 10)
+  expect(await ligneDe($, 'FSY')).toContain('10 min')
+  expect(await ligneDe($, 'spare-jvM1jf')).toBeUndefined()
 })
 
 test("un item choisi à la main ne change plus tout seul ; deux sessions sur un même ID sont regroupées", async ($, on) => {

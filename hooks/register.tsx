@@ -355,7 +355,8 @@ async function itemDeNouvelleBranche($: Moteur, motif: string): Promise<string |
 async function noterActivite($: Moteur, e: Activite, instant?: number): Promise<number> {
   const s = await $.session.id()
   const t = instant ?? (await $.clock.now())
-  nomParDefaut ??= await calculerNomParDefaut($)
+  // Relu à chaque événement : l'app desktop lance une session dans un dossier d'attente avant de lui donner le sien.
+  nomParDefaut = await calculerNomParDefaut($)
   const d = nomParDefaut ?? undefined
   await noter($, { t, s, e, k: await itemDe($, s), ...(d === undefined ? {} : { d }) })
   return t
@@ -363,7 +364,8 @@ async function noterActivite($: Moteur, e: Activite, instant?: number): Promise<
 
 async function noterJetons($: Moteur, n: number): Promise<void> {
   const s = await $.session.id()
-  nomParDefaut ??= await calculerNomParDefaut($)
+  // Relu à chaque événement : l'app desktop lance une session dans un dossier d'attente avant de lui donner le sien.
+  nomParDefaut = await calculerNomParDefaut($)
   const d = nomParDefaut ?? undefined
   await noter($, { t: await $.clock.now(), s, e: 'jetons', n, k: await itemDe($, s), ...(d === undefined ? {} : { d }) })
 }
