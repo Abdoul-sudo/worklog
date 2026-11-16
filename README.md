@@ -5,11 +5,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Claude%20Code-mod-4FD1C5?style=flat-square&labelColor=0B1220&logo=claude&logoColor=4FD1C5" alt="Claude Code mod">
-  <img src="https://img.shields.io/badge/license-MIT-4FD1C5?style=flat-square&labelColor=0B1220" alt="MIT license">
-  <img src="https://img.shields.io/badge/data-stays%20local-4FD1C5?style=flat-square&labelColor=0B1220" alt="Data stays local">
-  <img src="https://img.shields.io/badge/runs%20in-desktop%20%2B%20terminal-4FD1C5?style=flat-square&labelColor=0B1220" alt="Runs in the desktop app and the terminal">
-  <img src="https://img.shields.io/badge/lang-English%20%C2%B7%20Fran%C3%A7ais-4FD1C5?style=flat-square&labelColor=0B1220" alt="English and French">
+  <img src="https://img.shields.io/badge/Claude%20Code-mod-0F766E?style=flat-square&labelColor=334155&logo=claude&logoColor=white" alt="Claude Code mod">
+  <img src="https://img.shields.io/badge/license-MIT-0F766E?style=flat-square&labelColor=334155" alt="MIT license">
+  <img src="https://img.shields.io/badge/runs%20in-desktop%20%2B%20terminal-0F766E?style=flat-square&labelColor=334155" alt="Runs in the desktop app and the terminal">
 </p>
 
 <p align="center">
