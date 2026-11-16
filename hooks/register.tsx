@@ -510,7 +510,11 @@ async function toutLeJournal($: Moteur, maintenant: number) {
 function bornesFrise(etat: Interface, maintenant: number, contenu: Vue | null): { debut: number; fin: number } {
   const courante = new Date(maintenant).getFullYear()
   const annee =
-    etat.onglet === 'annee' ? courante + etat.decalage : etat.onglet === 'tout' || contenu === null ? courante : new Date(contenu.debut).getFullYear()
+    etat.onglet === 'annee'
+      ? courante + etat.decalage
+      : etat.onglet === 'tout' || contenu === null || (contenu.debut <= maintenant && maintenant < contenu.fin)
+        ? courante
+        : new Date(contenu.debut).getFullYear()
   return { debut: new Date(annee, 0, 1).getTime(), fin: new Date(annee, 11, 31).getTime() }
 }
 
