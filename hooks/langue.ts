@@ -23,6 +23,8 @@ const FR = {
   unites: { mille: ' k', million: ' M', milliard: ' Md' },
   cout: (montant: string) => `${montant} $`,
   centimes: (x: number) => x.toFixed(2).replace('.', ','),
+  // Une espace insécable : « 3 162 $ » ne se coupe pas en fin de ligne.
+  milliers: '\u00a0',
   date: (jour: string, quantieme: number, mois: string) => `${jour} ${quantieme === 1 ? '1er' : quantieme} ${mois}`,
   aujourdhui: "Aujourd'hui",
   hier: 'Hier',
@@ -100,6 +102,7 @@ const EN: typeof FR = {
   unites: { mille: 'k', million: 'M', milliard: 'B' },
   cout: (montant: string) => `$${montant}`,
   centimes: (x: number) => x.toFixed(2),
+  milliers: ',',
   date: (jour: string, quantieme: number, mois: string) => `${jour}, ${mois.slice(0, 3)} ${quantieme}`,
   aujourdhui: 'Today',
   hier: 'Yesterday',

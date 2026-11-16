@@ -913,11 +913,11 @@ describe('le prix API', () => {
   })
 
   test('le prix suit la langue', async () => {
-    const montants = [0.004, 0.42, 3.4, 9.996, 31.4, 312.6]
-    expect(montants.map(formatCout)).toEqual(['< 0,01 $', '0,42 $', '3,40 $', '10 $', '31 $', '313 $'])
+    const montants = [0.004, 0.42, 3.4, 9.996, 31.4, 312.6, 3_161.8, 1_234_567]
+    expect(montants.map(formatCout)).toEqual(['< 0,01 $', '0,42 $', '3,40 $', '10 $', '31 $', '313 $', '3\u00a0162 $', '1\u00a0234\u00a0567 $'])
     choisirLangue('en')
     try {
-      expect(montants.map(formatCout)).toEqual(['< $0.01', '$0.42', '$3.40', '$10', '$31', '$313'])
+      expect(montants.map(formatCout)).toEqual(['< $0.01', '$0.42', '$3.40', '$10', '$31', '$313', '$3,162', '$1,234,567'])
     } finally {
       choisirLangue('fr')
     }
