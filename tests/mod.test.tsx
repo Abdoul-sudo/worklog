@@ -394,6 +394,8 @@ test("dans le terminal, la frise prend la place qu'il y a, et la liste remplit s
   // pas de frise, deux lignes de liste.
   expect(await bande({ bodyColumns: 80 })).toMatchObject({ raster: { columns: 27 } })
   expect(await bande({ bodyColumns: 60 })).toMatchObject({ raster: undefined, pages: '1–2 sur 8' })
+  // Très large : deux colonnes par semaine, des cases carrées.
+  expect(await bande({ bodyColumns: 200 })).toMatchObject({ raster: { rows: 7, columns: 106 } })
   await puce.unmount()
 })
 

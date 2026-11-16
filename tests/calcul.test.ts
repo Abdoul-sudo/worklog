@@ -625,6 +625,13 @@ describe('corrections, tokens et périodes', () => {
     const etroite = cellulesActivite(liste, 'tout', 'cases', 20)
     expect(etroite.colonnes).toBe(20)
     expect(etroite.mois.length).toBeLessThanOrEqual(20)
+    // Large : deux colonnes par semaine, une case puis un blanc ; les noms courts des mois.
+    const large = cellulesActivite(liste, 'tout', 'cases', Infinity, 2)
+    expect(large.colonnes).toBe(106)
+    const motsLarges = new Uint32Array(Uint8Array.from(atob(large.cellules), c => c.charCodeAt(0)).buffer)
+    expect([motsLarges[(3 * 106) * 3], motsLarges[(3 * 106 + 1) * 3]]).toEqual([0x25a0, 0x20])
+    expect(large.mois.trim().split(/\s+/).slice(0, 3)).toEqual(['janv.', 'févr.', 'mars'])
+    expect(large.mois.length).toBeLessThanOrEqual(106)
   })
 
   test("le titre de l'onglet Tout part du premier jour du journal", async () => {

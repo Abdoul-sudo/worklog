@@ -155,18 +155,20 @@ function melanger(dessus: string, dessous: string, opacite: number): string {
 const COULEURS_TERMINAL = [0x3a3a3a, 0x7a4a3a, 0xa85a42, 0xc8684b, 0xe07a5a]
 const DEFAUT = 0x01000000
 
-/** Le dessin de la frise dans le terminal. En cases : un ■ par jour, une colonne par semaine, sept lignes, comme sur
- * GitHub. Serré, pour une bande trop basse : deux jours par caractère, l'un au-dessus de l'autre (▀ et sa couleur de
- * fond), sur quatre lignes. */
+/** Le dessin de la frise dans le terminal. En cases : un ■ par jour, sept lignes, comme sur GitHub ; une colonne par
+ * semaine, ou deux quand la place le permet (un ■ puis un blanc : des cases carrées et espacées). Serré, pour une bande
+ * trop basse : deux jours par caractère, l'un au-dessus de l'autre (▀ et sa couleur de fond), sur quatre lignes. */
 export type DessinTerminal = 'cases' | 'serre'
 
 /** La frise pour le terminal, en base64 pour un Raster, et `mois`, la ligne des mois à écrire au-dessus. Au plus
- * `semainesMax` colonnes : quand l'année ne tient pas, les semaines jusqu'à celle du dernier jour passé. */
+ * `semainesMax` semaines : quand l'année ne tient pas, les semaines jusqu'à celle du dernier jour passé. `pas` : les
+ * colonnes de chaque semaine, en cases. */
 export function cellulesActivite(
   toutes: readonly Case[],
   mesure: Reglages['mesure'] = 'tout',
   dessin: DessinTerminal = 'cases',
   semainesMax = Infinity,
+  pas: 1 | 2 = 1,
 ): { cellules: string; colonnes: number; lignes: number; mois: string } {
   let liste = toutes
   if (Math.ceil(toutes.length / 7) > semainesMax) {
@@ -175,20 +177,24 @@ export function cellulesActivite(
     const fin = Math.floor(dernier / 7) + 1
     liste = toutes.slice(Math.max(0, fin - semainesMax) * 7, fin * 7)
   }
-  const colonnes = Math.ceil(liste.length / 7)
+  const semaines = Math.ceil(liste.length / 7)
+  const largeur = dessin === 'cases' ? pas : 1
+  const colonnes = semaines * largeur
   const lignes = dessin === 'cases' ? 7 : 4
   const niveauDe = niveaux(liste, mesure === 'jetons')
   // Les jours hors de l'année et ceux à venir restent vides.
   const couleur = (c: Case | undefined) => (c === undefined || c.minutes < 0 ? null : COULEURS_TERMINAL[niveauDe(c)]!)
   const mots = new Uint32Array(colonnes * lignes * 3)
   for (let ligne = 0; ligne < lignes; ligne++) {
-    for (let semaine = 0; semaine < colonnes; semaine++) {
-      const i = (ligne * colonnes + semaine) * 3
+    for (let semaine = 0; semaine < semaines; semaine++) {
+      const i = (ligne * colonnes + semaine * largeur) * 3
       if (dessin === 'cases') {
         const jour = couleur(liste[semaine * 7 + ligne])
         mots[i] = jour === null ? 0x20 : 0x25a0
         mots[i + 1] = jour ?? DEFAUT
         mots[i + 2] = DEFAUT
+        // Le blanc qui suit la case, quand une semaine a deux colonnes.
+        if (largeur === 2) mots.set([0x20, DEFAUT, DEFAUT], i + 3)
         continue
       }
       const haut = couleur(liste[semaine * 7 + ligne * 2])
@@ -199,23 +205,24 @@ export function cellulesActivite(
       mots[i + 2] = haut !== null && bas !== null ? bas : DEFAUT
     }
   }
-  return { cellules: base64(new Uint8Array(mots.buffer)), colonnes, lignes, mois: ligneMois(liste, colonnes) }
+  return { cellules: base64(new Uint8Array(mots.buffer)), colonnes, lignes, mois: ligneMois(liste, semaines, largeur) }
 }
 
-/** Le nom de chaque mois au-dessus de la semaine où il commence, un espace au moins entre deux noms. Le premier mois,
- * souvent tronqué, cède sa place au suivant s'ils se touchent ; le dernier, trop près du bord droit, s'aligne sur ce
- * bord s'il y a la place. */
-function ligneMois(liste: readonly Case[], semaines: number): string {
+/** Le nom de chaque mois au-dessus de la semaine où il commence, un espace au moins entre deux noms ; avec deux colonnes
+ * par semaine, le nom court du mois a la place. Le premier mois, souvent tronqué, cède sa place au suivant s'ils se
+ * touchent ; le dernier, trop près du bord droit, s'aligne sur ce bord s'il y a la place. */
+function ligneMois(liste: readonly Case[], semaines: number, pas: number): string {
   const ECART = 1
+  const noms = pas === 2 ? t().moisCourts : t().moisTerminal
   const etiquettes: { x: number; nom: string }[] = []
   for (let semaine = 0; semaine < semaines; semaine++) {
     const mois = new Date(liste[semaine * 7]!.t).getMonth()
-    if (semaine === 0 || mois !== new Date(liste[(semaine - 1) * 7]!.t).getMonth()) etiquettes.push({ x: semaine, nom: t().moisTerminal[mois]! })
+    if (semaine === 0 || mois !== new Date(liste[(semaine - 1) * 7]!.t).getMonth()) etiquettes.push({ x: semaine * pas, nom: noms[mois]! })
   }
   if (etiquettes.length > 1 && etiquettes[1]!.x - etiquettes[0]!.x < etiquettes[0]!.nom.length + ECART) etiquettes.shift()
   let ligne = ''
   for (const etiquette of etiquettes) {
-    const x = Math.min(etiquette.x, semaines - etiquette.nom.length)
+    const x = Math.min(etiquette.x, semaines * pas - etiquette.nom.length)
     if (ligne !== '' && x < ligne.length + ECART) continue
     ligne = ligne.padEnd(x) + etiquette.nom
   }

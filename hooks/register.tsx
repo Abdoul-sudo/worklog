@@ -976,7 +976,7 @@ function dessinFrise($: Moteur, e: Site, activite: Frise, place: PlaceFrise | nu
   if (e.surface === 'terminal') {
     if (place === null) return null
     const { Box, Raster, Text } = $.ui.resolve(e)
-    const { cellules, colonnes, lignes, mois } = cellulesActivite(activite.cases, activite.mesure, place.dessin, place.semaines)
+    const { cellules, colonnes, lignes, mois } = cellulesActivite(activite.cases, activite.mesure, place.dessin, place.semaines, place.pas)
     return (
       <Box key="frise" flexDirection="column">
         <Text dimColor>{mois}</Text>
@@ -1013,15 +1013,17 @@ function vueFrise($: Moteur, e: Site, activite: Frise, place: PlaceFrise | null)
 }
 
 /** La place de la frise dans le terminal, à côté de la liste (`liste`, sa largeur) : toute l'année quand elle tient,
- * sinon les semaines les plus récentes ; en cases quand la bande a la hauteur, serrée sinon. Null sous un trimestre. */
-type PlaceFrise = { dessin: DessinTerminal; semaines: number; liste: number }
+ * sinon les semaines les plus récentes ; en cases quand la bande a la hauteur, serrée sinon ; deux colonnes par semaine
+ * quand toute l'année tient ainsi. Null sous un trimestre. */
+type PlaceFrise = { dessin: DessinTerminal; pas: 1 | 2; semaines: number; liste: number }
 function placeFriseTerminal(colonnes: number, rangees: number, liste: number, activite: Frise): PlaceFrise | null {
   // Le cadre et ses marges prennent six colonnes.
   const place = colonnes - 6 - liste - FRISE_TERMINAL.ecart
   if (place < FRISE_TERMINAL.semainesMin) return null
   const annee = Math.ceil(activite.cases.length / 7)
   const dessin: DessinTerminal = rangees >= FRISE_TERMINAL.hauteurCases ? 'cases' : 'serre'
-  return { dessin, semaines: Math.min(annee, place), liste }
+  const pas = dessin === 'cases' && place >= 2 * annee ? 2 : 1
+  return { dessin, pas, semaines: Math.min(annee, place), liste }
 }
 
 /** Le résumé d'une période. Là où la surface sait dessiner : l'anneau et le total en haut, la frise d'activité à côté,
@@ -1233,8 +1235,9 @@ function resume(
     </Box>
   )
   if (frise === null) return gauche
+  // La carte prend toute la largeur : la frise va au bord droit, sous les onglets.
   return (
-    <Box flexDirection="row" alignItems="stretch" gap={FRISE_TERMINAL.ecart}>
+    <Box flexDirection="row" alignItems="stretch" justifyContent="space-between" gap={FRISE_TERMINAL.ecart}>
       {gauche}
       {frise}
     </Box>
@@ -1377,7 +1380,8 @@ function vueReglagesTerminal($: Moteur, e: Site, options: Reglages, aCote: boole
   const titre = (texte: string) => <Text {...encre(e, 'faible')}>{texte}</Text>
   return (
     <Box flexDirection={aCote ? 'row' : 'column'} gap={aCote ? 4 : 0}>
-      <Box flexDirection="column">
+      {/* L'affichage prend la place libre : les pauses vont au bord droit de la carte, sous les onglets. */}
+      <Box flexDirection="column" {...(aCote ? { flexGrow: 1 } : {})}>
         {titre(t().sections.affichage)}
         {caseACocher('activite', t().bascules.activite)}
         {reglage('mesure', t().mesure, choix('mesure', MESURES, options.mesure, m => t().mesures[m], mesure => changerReglage($, { mesure })))}
@@ -1431,8 +1435,8 @@ async function popover($: Moteur, e: Site, colonnes: number, rangees: number, en
     )
   if (!riche(e)) {
     return (
-      // Le cadre épouse son contenu, au lieu de prendre toute la largeur : rien ne flotte loin du reste.
-      <Box flexDirection="column" alignSelf="flex-start" borderStyle="round" borderColor="inactive" paddingX={2}>
+      // Le cadre prend toute la largeur de la bande, comme la saisie sous lui.
+      <Box flexDirection="column" borderStyle="round" borderColor="inactive" paddingX={2}>
         {entete}
         {corps}
       </Box>
