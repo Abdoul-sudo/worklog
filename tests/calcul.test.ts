@@ -22,6 +22,7 @@ import {
   jourSuivant,
   libellePuce,
   lireLignes,
+  nommer,
 } from '../hooks/calcul'
 import { casesEntre, cellulesActivite, serie, svgActivite } from '../hooks/activite'
 import { choisirTheme, couleurs, svgCiel } from '../hooks/dessins'
@@ -679,5 +680,11 @@ describe('corrections, tokens et périodes', () => {
 
   test('le format des tokens', async () => {
     expect([850, 12_400, 245_000, 1_200_000, 3_000_000, 245_000_000, 4_898_300_000].map(formatJetons)).toEqual(['850', '12,4 k', '245 k', '1,2 M', '3 M', '245 M', '4,9 Md'])
+  })
+})
+
+describe("l'affichage", () => {
+  test("un nom comme « constructor » ou « toString » reste lui-même", async () => {
+    expect([nommer('constructor', {}), nommer('toString', {}), nommer('__proto__', {})]).toEqual(['constructor', 'toString', '__proto__'])
   })
 })

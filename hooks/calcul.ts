@@ -161,7 +161,7 @@ export function detecterItem(texte: string, motif: string): string | null {
 export function nommer(item: string, renommages: Readonly<Record<string, string>>): string {
   let nom = item
   for (let i = 0; i < 20; i++) {
-    const suivant = renommages[nom]
+    const suivant = Object.hasOwn(renommages, nom) ? renommages[nom] : undefined
     if (suivant === undefined || suivant === nom) break
     nom = suivant
   }
