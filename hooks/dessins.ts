@@ -40,19 +40,39 @@ function cielNuit(): string {
   return (
     ouvrirCiel(
       '.g{animation:g 46s ease-in-out infinite alternate}@keyframes g{from{transform:translate(0,0)}to{transform:translate(520px,40px)}}',
-      trame('#C9D4FF', 0.09) + lueur('h', '#6E8BFF', 0.1),
+      trame('#C9D4FF', 0.07) + lueur('h', '#6E8BFF', 0.08),
     ) +
     `<rect width="${CIEL.largeur}" height="${CIEL.hauteur}" fill="url(#p)"/>` +
     '<ellipse class="g" cx="260" cy="90" rx="460" ry="190" fill="url(#h)"/></svg>'
   )
 }
 
-/** Aurore : un voile sarcelle, fixe, en haut à gauche ; il ne bouge ni ne change de couleur. */
+/** Aurore : quatre lueurs, sarcelle, vert, cyan et violet, glissent lentement en haut et se mêlent comme de la
+ * lumière (fusion « screen ») ; elles s'étirent et se tassent un peu. Pas de flou : de simples dégradés, légers à
+ * animer. Le bas reste sombre, et le texte lisible. */
 function cielAurore(): string {
+  const lueurs = [
+    { couleur: '#2DD4BF', cx: 300, cy: 40, rx: 560, ry: 120, force: 0.2, dx: 220, duree: 38 },
+    { couleur: '#34D399', cx: 860, cy: 74, rx: 480, ry: 92, force: 0.14, dx: -260, duree: 46 },
+    { couleur: '#A78BFA', cx: 1200, cy: 26, rx: 500, ry: 104, force: 0.15, dx: -200, duree: 42 },
+    { couleur: '#22D3EE', cx: 620, cy: 8, rx: 440, ry: 72, force: 0.11, dx: 180, duree: 52 },
+  ]
   return (
-    ouvrirCiel('', lueur('t', '#2DD4BF', 0.13) + trame('#BFEFF0', 0.04)) +
+    ouvrirCiel(
+      lueurs
+        .map((l, i) => `@keyframes a${i}{from{transform:translateX(0) scaleY(1)}to{transform:translateX(${l.dx}px) scaleY(1.3)}}`)
+        .join('') + '.a{mix-blend-mode:screen;transform-box:fill-box;transform-origin:center top}',
+      trame('#BFEFF0', 0.04) + lueurs.map((l, i) => lueur(`a${i}`, l.couleur, l.force)).join(''),
+    ) +
     `<rect width="${CIEL.largeur}" height="${CIEL.hauteur}" fill="url(#p)"/>` +
-    '<ellipse cx="240" cy="40" rx="520" ry="150" fill="url(#t)"/></svg>'
+    lueurs
+      .map(
+        (l, i) =>
+          `<ellipse class="a" cx="${l.cx}" cy="${l.cy}" rx="${l.rx}" ry="${l.ry}" fill="url(#a${i})" ` +
+          `style="animation:a${i} ${l.duree}s ease-in-out ${-i * 7}s infinite alternate"/>`,
+      )
+      .join('') +
+    '</svg>'
   )
 }
 
@@ -75,22 +95,47 @@ function cielBraise(): string {
   )
 }
 
-/** Forêt : une lueur verte respire en bas ; des lucioles s'allument et s'éteignent, chacune à son rythme. */
+/** Forêt : deux rangées de sapins en ombres, la plus loin plus claire ; une brume verte passe derrière eux ; des lucioles
+ * s'allument et s'éteignent, chacune à son rythme. Sous les sapins, le sol garde leur couleur jusqu'en bas. */
 function cielForet(): string {
-  const lucioles = [[90, 170], [210, 60], [340, 190], [480, 120], [610, 40], [760, 160], [900, 90], [1040, 200], [1180, 70], [1330, 140]]
+  // Une rangée de sapins à trois étages, de hauteurs variées, qui se touchent ; elle glisse lentement de côté.
+  const rangee = (graine: number, base: number, hMin: number, hMax: number, couleur: string, duree: number) => {
+    let d = ''
+    for (let x = -60, i = 0; x < CIEL.largeur + 60; i++) {
+      const h = hMin + (((i * graine) % 7) / 6) * (hMax - hMin)
+      const l = h * 0.42
+      const n = (v: number) => v.toFixed(1)
+      d +=
+        `M${n(x)} ${n(base - h)}l${n(-l * 0.35)} ${n(h * 0.4)}h${n(l * 0.12)}l${n(-l * 0.2)} ${n(h * 0.3)}h${n(l * 0.1)}` +
+        `l${n(-l * 0.25)} ${n(h * 0.3)}h${n(l * 1.16)}l${n(-l * 0.25)} ${n(-h * 0.3)}h${n(l * 0.1)}l${n(-l * 0.2)} ${n(-h * 0.3)}h${n(l * 0.12)}z`
+      x += l * 0.9 + ((i * 3) % 5) * 4
+    }
+    return (
+      `<path d="${d}M-60 ${base}H${CIEL.largeur + 60}V${CIEL.hauteur}H-60z" fill="${couleur}" ` +
+      `style="animation:g ${duree}s ease-in-out infinite alternate"/>`
+    )
+  }
+  const lucioles = [[90, 150], [210, 60], [340, 120], [480, 95], [610, 40], [760, 140], [900, 80], [1040, 160], [1180, 70], [1330, 125]]
     .map(([x, y], i) => {
       const duree = 4 + ((i * 3) % 5)
-      return `<circle cx="${x}" cy="${y}" r="1.5" fill="#D9F99D" opacity="0" style="animation:l ${duree}s ease-in-out ${-((i * 1.7) % duree).toFixed(1)}s infinite"/>`
+      return (
+        `<g opacity="0" style="animation:l ${duree}s ease-in-out ${-((i * 1.7) % duree).toFixed(1)}s infinite">` +
+        `<circle cx="${x}" cy="${y}" r="5" fill="#D9F99D" fill-opacity=".18"/><circle cx="${x}" cy="${y}" r="1.6" fill="#ECFCCB"/></g>`
+      )
     })
     .join('')
   return (
     ouvrirCiel(
-      '@keyframes l{0%,100%{opacity:0;transform:translate(0,0)}50%{opacity:.8;transform:translate(6px,-10px)}}' +
-        '.r{animation:r 12s ease-in-out infinite alternate}@keyframes r{from{opacity:.6}to{opacity:1}}',
-      lueur('v', '#3FA66B', 0.14) + trame('#CDEFD9', 0.04),
+      '@keyframes l{0%,100%{opacity:0;transform:translate(0,0)}50%{opacity:.9;transform:translate(6px,-10px)}}' +
+        '@keyframes g{from{transform:translateX(0)}to{transform:translateX(-40px)}}' +
+        '.m{animation:m 46s ease-in-out infinite alternate}@keyframes m{from{transform:translateX(-160px)}to{transform:translateX(160px)}}',
+      lueur('v', '#3FA66B', 0.16) + lueur('b', '#A7F3D0', 0.1),
     ) +
-    `<rect width="${CIEL.largeur}" height="${CIEL.hauteur}" fill="url(#p)"/>` +
-    `<ellipse class="r" cx="260" cy="320" rx="640" ry="220" fill="url(#v)"/>${lucioles}</svg>`
+    '<ellipse cx="300" cy="230" rx="700" ry="150" fill="url(#v)"/>' +
+    '<ellipse class="m" cx="800" cy="168" rx="900" ry="46" fill="url(#b)"/>' +
+    rangee(5, 196, 34, 64, '#12301F', 70) +
+    rangee(3, 226, 50, 92, '#040B07', 50) +
+    `${lucioles}</svg>`
   )
 }
 
@@ -110,20 +155,28 @@ function cielOcean(): string {
   )
 }
 
-/** Crépuscule : un voile violet en haut à droite, un voile rose en bas à gauche, qui se balancent lentement ; quelques
- * étoiles scintillent. */
+/** Crépuscule : en bas, l'horizon rose et orangé, et le soleil qui se couche et respire ; en haut, des étoiles
+ * scintillent, et une étoile filante passe de temps en temps. */
 function cielCrepuscule(): string {
-  const etoiles = [[120, 40], [330, 75], [520, 30], [700, 95], [880, 55], [1060, 25], [1250, 80], [1420, 45]]
-    .map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="1" fill="#EDE4FF" style="animation:e ${5 + (i % 4)}s ease-in-out ${-i}s infinite alternate"/>`)
+  const etoiles = [[90, 30], [240, 70], [380, 22], [520, 58], [660, 34], [800, 84], [930, 18], [1080, 62], [1210, 28], [1340, 76], [1470, 40], [170, 112], [610, 118], [1150, 120]]
+    .map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${(0.8 + (i % 3) * 0.25).toFixed(2)}" fill="#F3EDFF" style="animation:e ${4 + (i % 5)}s ease-in-out ${-i * 0.7}s infinite alternate"/>`)
     .join('')
+  // Une étoile filante : la tête claire, la queue qui s'efface ; elle traverse en une seconde, toutes les quatorze.
+  const filante =
+    '<g style="animation:f 14s linear 3s infinite;opacity:0"><line x1="0" y1="0" x2="96" y2="32" stroke="url(#q)" stroke-width="1.6" stroke-linecap="round"/></g>'
   return (
     ouvrirCiel(
-      '@keyframes e{from{opacity:.15}to{opacity:.7}}' +
-        '.v{animation:v 40s ease-in-out infinite alternate}@keyframes v{from{transform:translate(0,0)}to{transform:translate(-260px,30px)}}',
-      lueur('u', '#8B5CF6', 0.14) + lueur('o', '#EC4899', 0.08),
+      '@keyframes e{from{opacity:.12}to{opacity:.75}}' +
+        '@keyframes f{0%{transform:translate(260px,6px);opacity:0}1%{opacity:1}7%{transform:translate(680px,146px);opacity:0}100%{transform:translate(680px,146px);opacity:0}}' +
+        '.s{animation:s 10s ease-in-out infinite alternate}@keyframes s{from{opacity:.7}to{opacity:1}}',
+      lueur('h', '#EC4899', 0.22) +
+        lueur('o', '#FB923C', 0.2) +
+        lueur('u', '#FDBA74', 0.34) +
+        '<linearGradient id="q"><stop offset="0" stop-color="#F3EDFF" stop-opacity="0"/><stop offset="1" stop-color="#FFFFFF"/></linearGradient>',
     ) +
-    '<ellipse class="v" cx="900" cy="30" rx="560" ry="170" fill="url(#u)"/>' +
-    `<ellipse cx="160" cy="330" rx="520" ry="170" fill="url(#o)"/>${etoiles}</svg>`
+    '<ellipse cx="760" cy="235" rx="1000" ry="130" fill="url(#h)"/>' +
+    '<ellipse class="s" cx="1120" cy="215" rx="420" ry="95" fill="url(#o)"/>' +
+    `<circle class="s" cx="1120" cy="205" r="62" fill="url(#u)"/>${etoiles}${filante}</svg>`
   )
 }
 
@@ -150,7 +203,7 @@ function cielSakura(): string {
 /** Les thèmes du popover. Simple n'a ni fond propre ni mouvement : le gris de l'app et un cadre fin. */
 export const THEMES: Record<Theme, { encres: Encres; ciel: (() => string) | null }> = {
   nuit: {
-    encres: { fond: '#090D1A', bord: '#242E4D', texte: '#E6E9F2', vif: '#F7F8FC', gris: '#8A93B2', faible: '#5B6585', legende: '#6E7897', accent: ARGILE, vide: '#C9D4FF', ...BLANCS },
+    encres: { fond: '#05070F', bord: '#1C243D', texte: '#E6E9F2', vif: '#F7F8FC', gris: '#8A93B2', faible: '#5B6585', legende: '#6E7897', accent: ARGILE, vide: '#C9D4FF', ...BLANCS },
     ciel: cielNuit,
   },
   simple: {
@@ -209,11 +262,11 @@ export function svgApercu(theme: Theme, choisi: boolean): string {
     nuit: [8, 20, 32, 44, 56].flatMap(x => [8, 20, 32].map(y => `<circle cx="${x}" cy="${y}" r=".6" fill="${e.vide}" fill-opacity=".35"/>`)).join('') +
       `<ellipse cx="20" cy="10" rx="28" ry="12" fill="#6E8BFF" fill-opacity=".1"/>`,
     simple: '',
-    aurore: `<ellipse cx="18" cy="8" rx="30" ry="12" fill="#2DD4BF" fill-opacity=".15"/>`,
+    aurore: `<ellipse cx="16" cy="6" rx="26" ry="10" fill="#2DD4BF" fill-opacity=".2"/><ellipse cx="38" cy="10" rx="20" ry="8" fill="#34D399" fill-opacity=".14"/><ellipse cx="54" cy="4" rx="20" ry="9" fill="#A78BFA" fill-opacity=".18"/>`,
     braise: `<ellipse cx="22" cy="40" rx="40" ry="16" fill="${ARGILE}" fill-opacity=".18"/><circle cx="14" cy="22" r=".9" fill="#FFB38A"/><circle cx="34" cy="16" r=".7" fill="#FFB38A"/><circle cx="52" cy="26" r=".8" fill="#FFB38A"/>`,
-    foret: `<ellipse cx="20" cy="40" rx="40" ry="16" fill="#3FA66B" fill-opacity=".2"/><circle cx="12" cy="30" r=".9" fill="#D9F99D"/><circle cx="33" cy="20" r=".8" fill="#D9F99D"/><circle cx="54" cy="34" r=".9" fill="#D9F99D"/>`,
+    foret: `<ellipse cx="24" cy="36" rx="40" ry="10" fill="#3FA66B" fill-opacity=".22"/><path d="M6 40l5-13 5 13zM14 40l6-16 6 16zM24 40l4-10 4 10zM38 40l6-15 6 15zM48 40l5-12 5 12zM56 40l5-14 5 14z" fill="#12301F"/><circle cx="12" cy="18" r=".9" fill="#D9F99D"/><circle cx="33" cy="22" r=".8" fill="#D9F99D"/><circle cx="54" cy="16" r=".9" fill="#D9F99D"/>`,
     ocean: `<ellipse cx="20" cy="4" rx="34" ry="12" fill="#38BDF8" fill-opacity=".12"/><path d="M0 35q8-3 16 0t16 0 16 0 16 0" fill="none" stroke="#7DD3FC" stroke-opacity=".35"/>`,
-    crepuscule: `<ellipse cx="50" cy="4" rx="30" ry="12" fill="#8B5CF6" fill-opacity=".2"/><ellipse cx="10" cy="40" rx="28" ry="12" fill="#EC4899" fill-opacity=".12"/>`,
+    crepuscule: `<ellipse cx="32" cy="42" rx="44" ry="13" fill="#EC4899" fill-opacity=".22"/><circle cx="48" cy="40" r="8" fill="#FDBA74" fill-opacity=".45"/><circle cx="10" cy="7" r=".7" fill="#F3EDFF"/><circle cx="27" cy="13" r=".6" fill="#F3EDFF"/><circle cx="58" cy="6" r=".7" fill="#F3EDFF"/>`,
     sakura: `<ellipse cx="18" cy="6" rx="30" ry="12" fill="#F472B6" fill-opacity=".12"/><ellipse cx="13" cy="31" rx="1.8" ry="1.1" fill="#F9C6DA" transform="rotate(30 13 31)"/><ellipse cx="34" cy="19" rx="1.8" ry="1.1" fill="#F9C6DA" transform="rotate(-20 34 19)"/><ellipse cx="55" cy="33" rx="1.8" ry="1.1" fill="#F9C6DA" transform="rotate(50 55 33)"/>`,
   }[theme]
   const cases = [0, 1, 2, 3].map(i => `<rect x="${37 + i * 6}" y="27" width="4.5" height="4.5" rx="1" fill="${i === 2 ? e.accent : e.vide}" fill-opacity="${i === 2 ? 1 : 0.18}"/>`).join('')
