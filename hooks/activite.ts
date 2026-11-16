@@ -30,6 +30,11 @@ export function casesEntre(
 /** Les jours de travail d'affilée jusqu'à aujourd'hui. Un samedi ou un dimanche sans travail ne coupe pas la série,
  * ni aujourd'hui tant que rien n'y est compté. */
 export function serie(liste: readonly Case[]): number {
+  return compterSerie(liste).jours
+}
+
+/** La série, et `ouverte` quand elle remonte jusqu'à la première case de `liste` : elle peut continuer avant. */
+export function compterSerie(liste: readonly Case[]): { jours: number; ouverte: boolean } {
   let jours = 0
   let aujourdhui = true
   for (let i = liste.length - 1; i >= 0; i--) {
@@ -37,10 +42,10 @@ export function serie(liste: readonly Case[]): number {
     if (c.minutes < 0) continue
     const semaine = new Date(c.t).getDay()
     if (c.minutes > 0) jours++
-    else if (!aujourdhui && semaine !== 0 && semaine !== 6) break
+    else if (!aujourdhui && semaine !== 0 && semaine !== 6) return { jours, ouverte: false }
     aujourdhui = false
   }
-  return jours
+  return { jours, ouverte: jours > 0 }
 }
 
 /** 0 : rien ; 1 : moins d'une heure ; 2 : moins de 3 h ; 3 : moins de 5 h ; 4 : 5 h ou plus. */

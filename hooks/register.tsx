@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren, RenderNode } from 'claude-code'
 
 import type { Ecart, Frise, Interface, Ligne, Onglet, Reglages, Session, Vue } from '../types'
-import { type DessinTerminal, casesEntre, cellulesActivite, serie, svgActivite } from './activite'
+import { type DessinTerminal, casesEntre, cellulesActivite, compterSerie, svgActivite } from './activite'
 import {
   type Activite,
   type Choix,
@@ -116,7 +116,7 @@ const question = atom({ plugin: 'worklog', key: 'question' } as const, null, { s
 const deplie = atom({ plugin: 'worklog', key: 'deplie' } as const, false)
 const ui = atom({ plugin: 'worklog', key: 'ui' } as const, INTERFACE_INITIALE, { shape: 'ui-6' })
 const vue = atom({ plugin: 'worklog', key: 'vue' } as const, null, { shape: 'vue-4' })
-const frise = atom({ plugin: 'worklog', key: 'frise' } as const, null, { shape: 'frise-6' })
+const frise = atom({ plugin: 'worklog', key: 'frise' } as const, null, { shape: 'frise-7' })
 const reglages = atom({ plugin: 'worklog', key: 'reglages' } as const, null, { shape: 'reglages-2' })
 
 let chemins: { journal: string; importe: string; projets: string } | null = null
@@ -541,7 +541,20 @@ async function calculerFrise($: Moteur): Promise<void> {
   // La période de l'onglet est mise en avant dans la frise ; l'année et Tout la couvrent déjà entière.
   const enAvant = etat.onglet === 'jour' || etat.onglet === 'semaine' || etat.onglet === 'mois'
   const periode = enAvant && regardee !== null ? { debut: regardee.debut, fin: regardee.fin } : null
-  await update($, frise, () => ({ cases: liste, aujourdhui: contientAujourdhui, periode, mesure: options.mesure }))
+  // La série compte jusqu'à aujourd'hui. Quand elle remonte au 1er janvier, elle continue dans l'année d'avant.
+  let suite: number | null = null
+  if (contientAujourdhui) {
+    const { jours, ouverte } = compterSerie(liste)
+    suite = jours
+    if (ouverte) {
+      const veille = decalerJours(debut, -1)
+      const debutAvant = new Date(new Date(veille).getFullYear(), 0, 1).getTime()
+      const { b } = await bilanDe($, debutAvant, debut)
+      const avant = casesEntre(debutAvant, veille, new Map(b.jours.map(j => [cleJour(j.debut), j.total])), aujourdhui)
+      suite = compterSerie([...avant, ...liste]).jours
+    }
+  }
+  await update($, frise, () => ({ cases: liste, aujourdhui: contientAujourdhui, periode, mesure: options.mesure, serie: suite }))
 }
 
 async function apresMessage($: Moteur, texte: string, chercherItem: boolean, instant: number): Promise<void> {
@@ -1086,7 +1099,7 @@ function resume(
   const chiffres = [options.mesure !== 'temps' && largeurs.jetons, options.mesure !== 'jetons' && largeurs.temps].filter(n => n !== false)
   const largeurLigne = 3 + TERMINAL.nom + chiffres.reduce((a, b) => a + b, 0) + 2 * (chiffres.length - 1)
   // La série compte jusqu'à aujourd'hui : une année passée n'en a pas.
-  const jours = activite === null || !activite.aujourdhui ? null : serie(activite.cases)
+  const jours = activite === null || !activite.aujourdhui ? null : activite.serie
   // Les stats du terminal sur une ligne (« Temps 2 h 29 · Tokens 203 M · Série 5 jours ») : la bande y est basse.
   const statsLigne = [
     options.mesure !== 'jetons' && [t().stats.temps, formatDuree(contenu.total)],

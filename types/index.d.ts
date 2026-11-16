@@ -45,6 +45,8 @@ export type Frise = {
   /** Le réglage « Afficher » : avec « Tokens », les cases suivent les tokens, et non le temps ; l'infobulle d'une case ne
    * donne que ce qui est affiché. */
   mesure: Reglages['mesure']
+  /** La série de jours travaillés jusqu'à aujourd'hui, celle de l'année d'avant comprise ; null sans aujourd'hui. */
+  serie: number | null
 }
 
 /** Les réglages du popover. */

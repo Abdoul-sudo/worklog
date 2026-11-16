@@ -24,7 +24,7 @@ import {
   lireLignes,
   nommer,
 } from '../hooks/calcul'
-import { casesEntre, cellulesActivite, serie, svgActivite } from '../hooks/activite'
+import { casesEntre, cellulesActivite, compterSerie, serie, svgActivite } from '../hooks/activite'
 import { choisirTheme, couleurs, svgCiel } from '../hooks/dessins'
 import { choisirLangue, t } from '../hooks/langue'
 
@@ -715,5 +715,19 @@ describe("l'affichage", () => {
     ]
     const b = bilan([...s(h(9), 'A', 'X'), ...s(h(9) + 10 * MINUTE + 32_000, 'B', 'Y')], R, h(12), JOUR, jourSuivant(JOUR))
     expect(b.total).toBe(b.reel)
+  })
+
+  test("la série continue avant le 1er janvier", async () => {
+    // Tous les jours travaillés du 1er décembre 2025 au 3 janvier 2026.
+    const aujourdhui = new Date(2026, 0, 3).getTime()
+    const jours = (debut: Date, fin: Date) => {
+      const m = new Map<string, number>()
+      for (let d = new Date(debut); d <= fin; d.setDate(d.getDate() + 1)) m.set(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`, 30)
+      return m
+    }
+    const avant = casesEntre(new Date(2025, 0, 1).getTime(), new Date(2025, 11, 31).getTime(), jours(new Date(2025, 11, 1), new Date(2025, 11, 31)), aujourdhui)
+    const annee = casesEntre(new Date(2026, 0, 1).getTime(), new Date(2026, 11, 31).getTime(), jours(new Date(2026, 0, 1), new Date(2026, 0, 3)), aujourdhui)
+    expect(compterSerie(annee)).toEqual({ jours: 3, ouverte: true })
+    expect(compterSerie([...avant, ...annee]).jours).toBe(34)
   })
 })
