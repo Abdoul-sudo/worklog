@@ -15,7 +15,7 @@ export type Options = {
   /** En minutes : une pause plus courte compte comme du travail, au retour. */
   seuilPause: number
   /** En minutes : une pause plus longue que le seuil, et pas plus que ceci, devient une question ; au-delà, elle ne
-   * compte pas. */
+   * compte pas. 0 : jamais de question. */
   pauseMax: number
   activite: boolean
   langue: Langue
@@ -40,9 +40,14 @@ export const OPTIONS_PAR_DEFAUT: Options = {
   theme: 'nuit',
 }
 
-/** Les choix des réglages des pauses, en minutes : « Compter jusqu'à » et « Demander jusqu'à ». */
+/** Les choix des réglages des pauses, en minutes : « Rester actif pendant » et « Puis demander » (0 : jamais). */
 export const SEUILS = [15, 30, 60, 120]
-export const PAUSES_MAX = [60, 120, 240, 480]
+export const PAUSES_MAX = [0, 60, 120, 240, 480]
+
+/** Les choix de « Puis demander » : jamais, ou une durée plus longue que « Rester actif pendant ». */
+export const choixDemande = (o: Options): number[] => PAUSES_MAX.filter(m => m === 0 || m > o.seuilPause)
+/** « Puis demander » tel qu'il agit : une durée pas plus longue que « Rester actif pendant » ne pose jamais de question. */
+export const demandeEffective = (o: Options): number => (o.pauseMax > o.seuilPause ? o.pauseMax : 0)
 
 /** Le format des ID de tickets : une clé en majuscules, un tiret, puis un numéro, comme PROJ-142, ENG-42 ou FSY-I478.
  * Un numéro d'un seul chiffre ne suffit pas (UTF-8, GPT-4), et des sigles techniques courants sont écartés (ISO-8601,

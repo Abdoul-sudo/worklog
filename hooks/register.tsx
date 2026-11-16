@@ -17,7 +17,8 @@ import {
   MOTIF_ID,
   SANS_ITEM,
   SEUILS,
-  PAUSES_MAX,
+  choixDemande,
+  demandeEffective,
   ajouterRecent,
   bilan,
   bornes,
@@ -1297,7 +1298,7 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
     const interrupteur = <Svg alt={options[b.cle] ? t().alt.active : t().alt.desactive} source={svgInterrupteur(options[b.cle])} width={28} height={16} />
     return ligneReglage(b.cle, bouton($, e, `reglage-${b.cle}`, b.libelle, 'texte', basculer), cliquable($, e, `interrupteur-${b.cle}`, interrupteur, basculer))
   })
-  const duree = (cle: string, libelle: string, valeurs: readonly number[], actuelle: number, choisir: (m: number) => unknown) =>
+  const duree = (cle: string, libelle: string, valeurs: readonly number[], actuelle: number, nommer: (m: number) => string, choisir: (m: number) => unknown) =>
     ligneReglage(
       cle,
       <Text size="footnote" {...encre(e, 'texte')}>
@@ -1307,19 +1308,14 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
         <Select
           key={cle}
           value={String(actuelle)}
-          options={valeurs.map(m => ({ value: String(m), label: t().seuilChoix(m) }))}
+          options={valeurs.map(m => ({ value: String(m), label: nommer(m) }))}
           onSelect={valeur => choisir(Number(valeur))}
         />,
       ),
     )
-  const comptage = [
-    duree('seuil', t().seuil, SEUILS, options.seuilPause, seuilPause => changerReglage($, { seuilPause })),
-    duree('pause-max', t().pauseMax, PAUSES_MAX, options.pauseMax, pauseMax => changerReglage($, { pauseMax })),
-    <Box key="seuil-aide" paddingX="sm">
-      <Text size="caption" {...encre(e, 'faible')}>
-        {t().seuilAide}
-      </Text>
-    </Box>,
+  const pauses = [
+    duree('seuil', t().seuil, SEUILS, options.seuilPause, t().seuilChoix, seuilPause => changerReglage($, { seuilPause })),
+    duree('pause-max', t().pauseMax, choixDemande(options), demandeEffective(options), t().pauseMaxChoix, pauseMax => changerReglage($, { pauseMax })),
   ]
   return (
     <Box flexDirection={aCote ? 'row' : 'column'} alignItems="stretch" gap={aCote ? 4 : 'md'}>
@@ -1355,7 +1351,7 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
             ),
           ),
         ], false)}
-        {section(t().sections.comptage, comptage, false)}
+        {section(t().sections.comptage, pauses, false)}
       </Box>
       {section(t().sections.theme, choixTheme($, e, options))}
     </Box>
@@ -1401,8 +1397,7 @@ function vueReglagesTerminal($: Moteur, e: Site, options: Reglages, aCote: boole
         <Text>{t().seuil}</Text>
         {choix('seuil', SEUILS, options.seuilPause, t().seuilChoix, seuilPause => changerReglage($, { seuilPause }))}
         <Text>{t().pauseMax}</Text>
-        {choix('pause-max', PAUSES_MAX, options.pauseMax, t().seuilChoix, pauseMax => changerReglage($, { pauseMax }))}
-        <Text dimColor>{t().seuilAide}</Text>
+        {choix('pause-max', choixDemande(options), demandeEffective(options), t().pauseMaxChoix, pauseMax => changerReglage($, { pauseMax }))}
       </Box>
     </Box>
   )

@@ -310,8 +310,13 @@ test('les tokens, les onglets, les réglages et la frise', async ($, on) => {
       expect((await bande.find({ key: 'seuil-60' }))?.text).toBe('○ 1 h')
       await bande.press({ key: 'seuil-60' })
       await bande.press({ key: 'pause-max-480' })
-      expect((await bande.find({ key: 'pause-max-480' }))?.text).toBe('● 8 h')
+      expect((await bande.find({ key: 'pause-max-480' }))?.text).toBe("● Jusqu'à 8 h")
       await bande.press({ key: 'pause-max-240' })
+      // « Puis demander » ne propose que « Jamais » et des durées plus longues que « Rester actif pendant ».
+      await bande.press({ key: 'seuil-120' })
+      expect([await bande.find({ key: 'pause-max-60' }), await bande.find({ key: 'pause-max-120' })]).toEqual([undefined, undefined])
+      expect([(await bande.find({ key: 'pause-max-0' }))?.text, (await bande.find({ key: 'pause-max-240' }))?.text]).toEqual(['○ Jamais', "● Jusqu'à 4 h"])
+      await bande.press({ key: 'seuil-60' })
     } else expect([await bande.find({ key: 'seuil' }), await bande.find({ key: 'pause-max' })]).not.toContain(undefined)
     // Les tokens s'affichent toujours : plus de réglage pour les cacher.
     expect(await bande.find({ key: 'reglage-jetons' })).toBeUndefined()
@@ -527,12 +532,12 @@ test('un long silence demande « Du travail ? », et la réponse compte', async 
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const bande = await $.ui.mount({ ...BANDE, surface })
-    expect(await bande.find({ type: 'Text', text: /1 h 10 sans activité sur FLO-I165/ })).toBeDefined()
+    expect(await bande.find({ type: 'Text', text: /Pause de 1 h 10 sur FLO-I165/ })).toBeDefined()
     await bande.unmount()
   }
   const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
   await bande.press({ key: 'ecart-oui' })
-  expect(await bande.find({ type: 'Text', text: /sans activité/ })).toBeUndefined()
+  expect(await bande.find({ type: 'Text', text: /Pause de/ })).toBeUndefined()
   await bande.unmount()
   expect(await ligneDe($, 'FLO-I165')).toContain('1 h 15')
 })
@@ -564,7 +569,7 @@ test("une pause ne compte qu'au retour : courte, elle s'ajoute ; plus longue, un
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
   const question = async () => {
     const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
-    const texte = (await bande.find({ type: 'Text', text: /sans activité/ }))?.text
+    const texte = (await bande.find({ type: 'Text', text: /Pause de/ }))?.text
     await bande.unmount()
     return texte
   }
@@ -583,9 +588,9 @@ test("une pause ne compte qu'au retour : courte, elle s'ajoute ; plus longue, un
   // 30 minutes de pause : une question au retour.
   await horloge.advance(30 * 60_000)
   await travailler($, horloge, 'je reviens', 1)
-  expect(await question()).toContain('30 min sans activité')
+  expect(await question()).toContain('Pause de 30 min')
 
-  // 1 h 30 : rien ne compte, pas de question. Avec « Demander jusqu'à 2 h », la même pause pose la question.
+  // 1 h 30 : rien ne compte, pas de question. Avec « Puis demander : jusqu'à 2 h », la même pause pose la question.
   await horloge.advance(90 * 60_000)
   await travailler($, horloge, 'plus tard', 1)
   expect(await question()).toBeUndefined()
@@ -596,7 +601,7 @@ test("une pause ne compte qu'au retour : courte, elle s'ajoute ; plus longue, un
   await bande.unmount()
   await horloge.advance(90 * 60_000)
   await travailler($, horloge, 'encore', 1)
-  expect(await question()).toContain('1 h 30 sans activité')
+  expect(await question()).toContain('Pause de 1 h 30')
 })
 
 test("les agents d'un workflow (Ultracode), absents de la liste des agents, font compter le temps", async ($, on) => {
@@ -614,7 +619,7 @@ test("les agents d'un workflow (Ultracode), absents de la liste des agents, font
   expect(ligne).toContain('●')
   expect(ligne).toContain('2 h 01')
   const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
-  expect(await bande.find({ type: 'Text', text: /sans activité/ })).toBeUndefined()
+  expect(await bande.find({ type: 'Text', text: /Pause de/ })).toBeUndefined()
   await bande.unmount()
 })
 
@@ -630,7 +635,7 @@ test('quand des sous-agents travaillent deux heures, le temps compte et aucune q
   await horloge.settle()
 
   const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
-  expect(await bande.find({ type: 'Text', text: /sans activité/ })).toBeUndefined()
+  expect(await bande.find({ type: 'Text', text: /Pause de/ })).toBeUndefined()
   await bande.unmount()
   expect(await ligneDe($, 'FLO-I165')).toContain('2 h 02')
 })
@@ -661,7 +666,7 @@ test("après une longue pause, la question vient aussi quand on nomme la session
   await $.prompt.submit({ ...PROMPT, text: 'suite' })
   await horloge.settle()
   const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
-  expect((await bande.find({ type: 'Text', text: /sans activité/ }))?.text).toContain('2 h 00 sans activité sur FLO-I165')
+  expect((await bande.find({ type: 'Text', text: /Pause de/ }))?.text).toContain('Pause de 2 h 00 sur FLO-I165')
   await bande.unmount()
 })
 

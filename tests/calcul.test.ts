@@ -13,7 +13,9 @@ import {
   SANS_ITEM,
   bilan,
   calculer,
+  choixDemande,
   debutJour,
+  demandeEffective,
   detecterItem,
   formatDuree,
   jourSuivant,
@@ -87,6 +89,12 @@ describe('écart court ou long', () => {
     )
     expect(parItem).toEqual({ 'FLO-I1': 60 })
     expect(b.ecarts).toEqual([])
+  })
+
+  test("« Puis demander : jamais » : une pause plus longue que « Rester actif pendant » ne compte pas, sans question", async () => {
+    const evts = [ev(h(9), 'A', 'message', 'X'), ev(h(9, 5), 'A', 'reponse', 'X'), ev(h(11, 5), 'A', 'message', 'X')]
+    expect(calculer(evts, { ...R, pauseMax: 0 }, h(11, 6)).ecarts).toEqual([])
+    expect(calculer(evts, R, h(11, 6)).ecarts).toHaveLength(1)
   })
 
   test("une pause encore ouverte ne compte pas : elle compte au retour, ou à la fermeture, si elle reste courte", async () => {
@@ -459,6 +467,10 @@ describe('fichiers et textes', () => {
     expect(lireOptions({ langue: 'de' }).langue).toBe('en')
     expect(OPTIONS_PAR_DEFAUT.seuilPause).toBe(60)
     expect([OPTIONS_PAR_DEFAUT.pauseMax, lireOptions({ pauseMax: 480 }).pauseMax, lireOptions({ pauseMax: 300 }).pauseMax]).toEqual([240, 480, 240])
+    expect(lireOptions({ pauseMax: 0 }).pauseMax).toBe(0)
+    // « Puis demander » : jamais, ou plus long que « Rester actif pendant ». Plus court ou égal, il ne demande jamais.
+    expect(choixDemande(OPTIONS_PAR_DEFAUT)).toEqual([0, 120, 240, 480])
+    expect([demandeEffective(OPTIONS_PAR_DEFAUT), demandeEffective({ ...OPTIONS_PAR_DEFAUT, pauseMax: 60 }), demandeEffective({ ...OPTIONS_PAR_DEFAUT, seuilPause: 120, pauseMax: 60 })]).toEqual([240, 0, 0])
     // Une durée qui n'est plus un choix du réglage reprend la valeur par défaut.
     expect(lireOptions({ seuilPause: 45 }).seuilPause).toBe(60)
     expect([OPTIONS_PAR_DEFAUT.theme, lireOptions({ theme: 'sakura' }).theme, lireOptions({ theme: 'rose' }).theme]).toEqual(['nuit', 'sakura', 'nuit'])
