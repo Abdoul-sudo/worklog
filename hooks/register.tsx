@@ -123,6 +123,8 @@ let chemins: { journal: string; importe: string; projets: string } | null = null
 let ecritures: Promise<unknown> = Promise.resolve()
 let tourCompte = true
 let heritageClear: { item: string; manuel: boolean } | null = null
+// La session qu'un /clear vient de fermer : sa dernière pause se juge au premier message de la suivante.
+let avantClear: string | null = null
 let brancheVue: string | null = null
 let nomParDefaut: string | null = null
 // Dernier état connu des sous-agents de la session : null tant qu'il n'est pas lu.
@@ -544,10 +546,13 @@ async function apresMessage($: Moteur, texte: string, chercherItem: boolean, ins
   // Depuis la veille : une pause qui passe minuit pose aussi sa question.
   const jour = debutJour(await $.clock.now())
   const { b, evenements } = await bilanDe($, decalerJours(jour, -1), jourSuivant(jour))
-  // La pause qui finit à ce message, ou juste avant lui quand on a d'abord nommé la session ou changé d'item. Une pause
-  // laissée sans réponse avant un message précédent ne revient pas.
-  const ecart = b.ecarts.filter(x => x.session === s && x.fin <= instant).at(-1)
-  const repondue = ecart !== undefined && evenements.some(ev => ev.s === s && ev.e === 'message' && ev.t >= ecart.fin && ev.t < instant)
+  // La pause qui finit à ce message, ou juste avant lui quand on a d'abord nommé la session ou changé d'item, ou la
+  // dernière de la session qu'un /clear vient de fermer. Une pause laissée sans réponse avant un message précédent ne
+  // revient pas.
+  const miennes = new Set([s, ...(avantClear === null ? [] : [avantClear])])
+  avantClear = null
+  const ecart = b.ecarts.filter(x => miennes.has(x.session) && x.fin <= instant).at(-1)
+  const repondue = ecart !== undefined && evenements.some(ev => miennes.has(ev.s) && ev.e === 'message' && ev.t >= ecart.fin && ev.t < instant)
   await update($, question, () => (ecart === undefined || repondue ? null : ecart))
 }
 
@@ -1564,6 +1569,7 @@ export const register: Register = on => {
 
   on('session.end', async ($, e, next) => {
     const item = await itemDe($, e.sessionId)
+    if (e.reason === 'clear') avantClear = e.sessionId
     if (e.reason === 'clear' && item !== null) heritageClear = { item, manuel: await estManuel($, e.sessionId) }
     await noter($, { t: await $.clock.now(), s: e.sessionId, e: 'fermeture', k: item })
     return next(e)

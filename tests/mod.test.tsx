@@ -279,6 +279,23 @@ test("une pause qui passe minuit pose sa question au retour, et ne compte pas d'
   await bande.unmount()
 })
 
+test("après /clear, la pause d'avant pose sa question au premier message", async ($, on) => {
+  const { horloge, etat } = monde(on)
+  on('session.end', (_, e) => ({ sessionId: e.sessionId }))
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await travailler($, horloge, 'FLO-I1 : une tâche', 10)
+  await horloge.advance(2 * 60 * 60_000)
+  await $.session.end({ reason: 'clear', sessionId: 'S1', resume: { id: 'S1' } } as never)
+  etat.session = 'S2'
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await $.prompt.submit({ ...PROMPT, text: 'la suite' })
+  await horloge.settle()
+  await $.command.run({ ...COMMANDE, args: '' })
+  const bande = await $.ui.mount({ ...BANDE, surface: 'terminal' })
+  expect(await bande.find({ type: 'Text', text: /Pause de 2 h 00 sur FLO-I1/ })).toBeDefined()
+  await bande.unmount()
+})
+
 test("un item choisi à la main ne change plus tout seul ; deux sessions sur un même ID sont regroupées", async ($, on) => {
   const { horloge, etat } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
