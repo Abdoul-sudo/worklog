@@ -190,9 +190,11 @@ export function debutJour(t: number): number {
 }
 
 export function decalerJours(debut: number, jours: number): number {
+  // Depuis midi : un jour où minuit n'existe pas (l'heure d'été à minuit) garde le même début que debutJour.
   const d = new Date(debut)
+  d.setHours(12, 0, 0, 0)
   d.setDate(d.getDate() + jours)
-  return d.getTime()
+  return debutJour(d.getTime())
 }
 
 export function jourSuivant(debut: number): number {
