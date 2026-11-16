@@ -69,7 +69,7 @@ const RAFRAICHISSEMENT_MS = 30_000
 const couper = (texte: string, n: number) => [...texte].slice(0, n).join('')
 
 /** Après ce délai sans frappe, le champ se quitte seul : l'app ne signale pas un clic ailleurs. */
-const CHAMP_INACTIF_MS = 6_000
+const CHAMP_INACTIF_MS = 2_000
 /** Deux clics plus proches que ce délai font un double-clic. */
 const DOUBLE_CLIC_MS = 450
 // L'heure du dernier clic sur le nom de chaque item.

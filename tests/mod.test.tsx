@@ -338,18 +338,18 @@ test('renommer depuis le popover : le crayon, ou un double-clic sur le nom', asy
   await bande.input({ key: 'renommer', text: 'FSY-I47' })
   expect(await bande.find({ key: 'renommer' })).toBeUndefined()
 
-  // L'app ne signale pas un clic hors de la bande : quelques secondes sans frappe, le champ se quitte seul. Un nom
-  // inchangé le referme ; un nouveau nom s'enregistre.
+  // L'app ne signale pas un clic hors de la bande : deux secondes sans frappe, le champ se quitte seul. Un nom inchangé
+  // le referme ; un nouveau nom s'enregistre.
   await bande.press({ key: 'crayon' })
-  await horloge.advance(3_000)
+  await horloge.advance(1_000)
   expect(await bande.find({ key: 'renommer' })).toBeDefined()
-  await horloge.advance(4_000)
+  await horloge.advance(1_500)
   await horloge.settle()
   expect(await bande.find({ key: 'renommer' })).toBeUndefined()
   await puceAffiche(puce, 'FSY-I47', '20 min')
   await bande.press({ key: 'crayon' })
   await bande.input({ key: 'renommer', text: 'FSY-I477', kind: 'change' })
-  await horloge.advance(7_000)
+  await horloge.advance(2_500)
   await horloge.settle()
   expect(await bande.find({ key: 'renommer' })).toBeUndefined()
   await puceAffiche(puce, 'FSY-I477', '20 min')
