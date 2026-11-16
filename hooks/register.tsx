@@ -65,6 +65,9 @@ type Site = Parameters<Moteur['ui']['resolve']>[0] & { requestId: string }
 const PANNEAU = 'worklog'
 const DOSSIER_DONNEES = 'worklog'
 const RAFRAICHISSEMENT_MS = 30_000
+/** Les `n` premiers caractères de `texte`, sans couper un emoji ou un caractère en deux. */
+const couper = (texte: string, n: number) => [...texte].slice(0, n).join('')
+
 /** Un champ vide se ferme seul après ce délai sans frappe. */
 const CHAMP_VIDE_MS = 6_000
 /** Deux clics plus proches que ce délai font un double-clic. */
@@ -672,7 +675,7 @@ async function commande($: Moteur, args: string): Promise<string> {
   }
   // Ces mots demandent d'arrêter ou de reprendre le temps, ce qui n'existe pas : ils ne deviennent pas le nom.
   if (MOTS_SANS_ARRET.includes(texte.toLowerCase())) return textes.sansArret
-  const nom = texte.slice(0, 60)
+  const nom = couper(texte, 60)
   await changerItem($, nom)
   return textes.item(nom)
 }
@@ -930,7 +933,7 @@ function ligne(
       value={sansNom ? '' : l.item}
       placeholder={t().renommerPlaceholder}
       onInput={texte => noterFrappe($, texte)}
-      onSubmit={texte => renommer($, l.item, texte.trim().slice(0, 60))}
+      onSubmit={texte => renommer($, l.item, couper(texte.trim(), 60))}
     />
   ) : sansNom || estActuel ? (
     // L'item en cours se renomme par le crayon, ou d'un double-clic sur son nom là où la surface dessine.
@@ -970,7 +973,7 @@ function ligne(
   if (!riche(e)) {
     // Pas de survol dans le terminal : pas d'icône ; le nom est le bouton, en colonnes fixes avec les chiffres.
     const libelle = affichage(l.item)
-    const court = libelle.length > TERMINAL.nom ? `${libelle.slice(0, TERMINAL.nom - 1)}…` : libelle
+    const court = [...libelle].length > TERMINAL.nom ? `${couper(libelle, TERMINAL.nom - 1)}…` : libelle
     const presser = estActuel || sansNom ? ouvrirRenommage : () => choisirItem($, l.item)
     return (
       <Box key={groupe} flexDirection="row" alignItems="center" gap={1}>
@@ -1201,7 +1204,7 @@ function resume(
           placeholder={t().autrePlaceholder}
           onInput={texte => noterFrappe($, texte)}
           onSubmit={texte => {
-            const item = texte.trim().slice(0, 60)
+            const item = couper(texte.trim(), 60)
             return item === '' ? update($, ui, x => ({ ...x, edition: null })) : choisirItem($, item)
           }}
         />
