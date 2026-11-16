@@ -264,6 +264,33 @@ describe('écart court ou long', () => {
     expect(b.ecarts.length).toBe(1)
   })
 
+  test("dans une longue pause, les moments où les tokens partent encore comptent : un Ultracode lancé avant de partir", async () => {
+    const jet = (t: number, s: string): Evenement => ({ t, s, e: 'jetons', n: 100, k: null, i: 1 })
+    const toutesLes10Min = (s: string, debut: number, fin: number) =>
+      Array.from({ length: (fin - debut) / (10 * MINUTE) + 1 }, (_, i) => jet(debut + i * 10 * MINUTE, s))
+    // A : un Ultracode tourne de 9 h 05 à 13 h 05, puis plus rien jusqu'au retour à 20 h (pause de 15 h, trop longue
+    // pour une question) : ses 4 h comptent quand même.
+    // B : un travail de 9 h 05 à 10 h 05, puis le retour à 12 h : la pause pose sa question, et l'heure de travail compte
+    // déjà.
+    const { b, parItem } = minutesDuJour(
+      [
+        ev(h(9), 'A', 'message', 'FLO-I1'),
+        ev(h(9, 5), 'A', 'reponse', 'FLO-I1'),
+        ...toutesLes10Min('A', h(9, 15), h(13, 5)),
+        ev(h(20), 'A', 'message', 'FLO-I1'),
+        ev(h(20, 5), 'A', 'reponse', 'FLO-I1'),
+        ev(h(9), 'B', 'message', 'FSY-I2'),
+        ev(h(9, 5), 'B', 'reponse', 'FSY-I2'),
+        ...toutesLes10Min('B', h(9, 15), h(10, 5)),
+        ev(h(12), 'B', 'message', 'FSY-I2'),
+        ev(h(12, 5), 'B', 'reponse', 'FSY-I2'),
+      ],
+      h(20, 5),
+    )
+    expect(parItem).toEqual({ 'FLO-I1': 5 + 240 + 5, 'FSY-I2': 5 + 60 + 5 })
+    expect(b.ecarts).toEqual([{ item: 'FSY-I2', debut: h(9, 5), fin: h(12), session: 'B' }])
+  })
+
   test('la pause arrête le compteur, sans écart à confirmer', async () => {
     const { b, parItem } = minutesDuJour(
       [

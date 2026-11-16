@@ -275,6 +275,19 @@ export function calculer(
     const points = [debut, ...(depenses.get(session) ?? []).filter(x => x > debut && x < fin), fin]
     return Math.max(...points.slice(1).map((x, i) => x - points[i]!))
   }
+  /** Les moments de travail de [debut, fin] : là où les dépenses de tokens de la session se suivent à moins de
+   * SILENCE_TRAVAIL. Un moment de moins d'une minute (les tokens d'une seule réponse) n'en est pas un. */
+  const travauxDans = (session: string, debut: number, fin: number) => {
+    const points = [debut, ...(depenses.get(session) ?? []).filter(x => x > debut && x < fin), fin]
+    const travaux: Array<{ debut: number; fin: number }> = []
+    let depart = debut
+    for (let i = 1; i <= points.length; i++) {
+      if (i < points.length && points[i]! - points[i - 1]! <= SILENCE_TRAVAIL) continue
+      if (points[i - 1]! - depart >= MINUTE) travaux.push({ debut: depart, fin: points[i - 1]! })
+      if (i < points.length) depart = points[i]!
+    }
+    return travaux
+  }
 
   const plages: Ecart[] = []
   const ecarts: Ecart[] = []
@@ -337,10 +350,17 @@ export function calculer(
       if (claudeTravaille || attente || (!ouverte && travailAgents)) {
         plages.push(plage)
         if (ouverte) actives.set(session, plage.item)
-      } else if (b !== undefined && fin - a.t <= pauseMax) {
-        const classe = choix.get(`${session}@${a.t}`)
+      } else {
+        // Une longue pause se juge en entier : une question si elle n'est pas trop longue, et la réponse vaut pour toute
+        // la pause. Sans réponse « travail », les moments où les tokens partaient encore comptent quand même : Claude ou
+        // ses agents travaillaient (un Ultracode lancé avant de partir, par exemple).
+        const aJuger = b !== undefined && fin - a.t <= pauseMax
+        const classe = aJuger ? choix.get(`${session}@${a.t}`) : undefined
         if (classe === 'travail') plages.push(plage)
-        else if (classe === undefined) ecarts.push(plage)
+        else {
+          if (aJuger && classe === undefined) ecarts.push(plage)
+          if (!ouverte) for (const travail of travauxDans(session, a.t, fin)) plages.push({ ...plage, ...travail })
+        }
       }
     }
     if (arrete && !actives.has(session)) enPause.add(session)
