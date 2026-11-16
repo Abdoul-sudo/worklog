@@ -3,21 +3,17 @@ import { describe, expect, test } from 'claude-code/testing'
 import {
   type Activite,
   type Evenement,
-  type Prix,
   OPTIONS_PAR_DEFAUT,
   bornes,
   depuis,
-  formatCout,
   formatJetons,
   fusionner,
   MINUTE,
   MOTIF_ID,
   lireOptions,
   SANS_ITEM,
-  avecCouts,
   bilan,
   calculer,
-  coutReponse,
   choixDemande,
   debutJour,
   demandeEffective,
@@ -161,7 +157,7 @@ describe('écart court ou long', () => {
     const evts = [ev(h(9), 'A', 'message', 'FLO-I1')]
     const vivants = new Map([['A', h(9, 10)]])
     const b = bilan(evts, R, h(11), JOUR, jourSuivant(JOUR), vivants)
-    expect(b.jours[0]?.lignes).toEqual([{ item: 'FLO-I1', minutes: 12, enCours: false, jetons: 0, cout: 0 }])
+    expect(b.jours[0]?.lignes).toEqual([{ item: 'FLO-I1', minutes: 12, enCours: false, jetons: 0 }])
     expect(calculer(evts, R, h(9, 11), vivants).actives.get('A')).toBe('FLO-I1')
   })
 
@@ -395,7 +391,7 @@ describe('items', () => {
     ]
     const b = bilan(evts, R, h(10, 30, 13), JOUR, jourSuivant(jourSuivant(JOUR)))
     expect(b.jours.map(j => [j.debut, j.total])).toEqual([[JOUR, 20], [jourSuivant(JOUR), 50]])
-    expect(b.lignes).toEqual([{ item: 'FLO-I1', minutes: 70, enCours: false, jetons: 0, cout: 0 }])
+    expect(b.lignes).toEqual([{ item: 'FLO-I1', minutes: 70, enCours: false, jetons: 0 }])
   })
 
   test('un changement de item dans la session coupe le temps au bon moment', async () => {
@@ -632,7 +628,7 @@ describe('fichiers et textes', () => {
       { t: h(10), s: 'A', e: 'jetons', n: 245_000, k: 'FLO-I165' },
     ]
     const b = bilan(evts, R, h(11), JOUR, jourSuivant(JOUR))
-    expect(b.lignes).toEqual([{ item: 'FLO-I165', minutes: 60, enCours: false, jetons: 245_000, cout: 0 }])
+    expect(b.lignes).toEqual([{ item: 'FLO-I165', minutes: 60, enCours: false, jetons: 245_000 }])
     expect(b.jetons).toBe(245_000)
   })
 })
@@ -846,90 +842,5 @@ describe("l'affichage", () => {
     const annee = casesEntre(new Date(2026, 0, 1).getTime(), new Date(2026, 11, 31).getTime(), jours(new Date(2026, 0, 1), new Date(2026, 0, 3)), aujourdhui)
     expect(compterSerie(annee)).toEqual({ jours: 3, ouverte: true })
     expect(compterSerie([...avant, ...annee]).jours).toBe(34)
-  })
-})
-
-
-// Les prix de LiteLLM, en dollars par token, tels que le mod les garde.
-const PRIX: Prix = {
-  'claude-opus-5-5': {
-    input_cost_per_token: 4e-6,
-    output_cost_per_token: 2e-5,
-    cache_creation_input_token_cost: 5e-6,
-    cache_creation_input_token_cost_above_1hr: 8e-6,
-    cache_read_input_token_cost: 2e-7,
-    provider_specific_entry: { us: 1.1, fast: 2 },
-    search_context_cost_per_query: { search_context_size_low: 0.01, search_context_size_medium: 0.01, search_context_size_high: 0.01 },
-  },
-  'claude-haiku-5-5': {
-    input_cost_per_token: 1e-7,
-    output_cost_per_token: 5e-7,
-    cache_creation_input_token_cost: 1.25e-7,
-    cache_creation_input_token_cost_above_1hr: 2e-7,
-    cache_read_input_token_cost: 1e-8,
-    input_cost_per_token_above_100k_tokens: 5e-7,
-    output_cost_per_token_above_100k_tokens: 2.5e-6,
-    cache_creation_input_token_cost_above_100k_tokens: 6.25e-7,
-    cache_creation_input_token_cost_above_1hr_above_100k_tokens: 1e-6,
-    cache_read_input_token_cost_above_100k_tokens: 5e-8,
-  },
-  'claude-sans-cache': { input_cost_per_token: 1e-6, output_cost_per_token: 2e-6 },
-}
-
-/** Un prix arrondi au milliardième de dollar : les calculs en virgule flottante laissent des restes minuscules. */
-const arrondi = (x: number | null) => (x === null ? null : Math.round(x * 1e9) / 1e9)
-
-describe('le prix API', () => {
-  test('chaque sorte de token a son prix ; le mode rapide, les États-Unis et les recherches web aussi', async () => {
-    const d = { m: 'claude-opus-5-5', in: 1_000, out: 2_000, c5: 1_000, c1: 10_000, cr: 100_000 }
-    expect(arrondi(coutReponse(d, PRIX))).toBe(0.149)
-    expect(arrondi(coutReponse({ ...d, rapide: 1 }, PRIX))).toBe(0.298)
-    expect(arrondi(coutReponse({ ...d, us: 1 }, PRIX))).toBe(0.1639)
-    expect(arrondi(coutReponse({ ...d, web: 3 }, PRIX))).toBe(0.179)
-    // Un identifiant daté prend le prix de son modèle.
-    expect(arrondi(coutReponse({ ...d, m: 'claude-opus-5-5-20260101' }, PRIX))).toBe(0.149)
-  })
-
-  test('au-delà de 100 k tokens de contexte, Haiku 5.5 prend ses autres prix', async () => {
-    expect(arrondi(coutReponse({ m: 'claude-haiku-5-5', in: 50_000, out: 1_000, c5: 0, c1: 0, cr: 40_000 }, PRIX))).toBe(0.0059)
-    expect(arrondi(coutReponse({ m: 'claude-haiku-5-5', in: 50_000, out: 1_000, c5: 0, c1: 0, cr: 60_000 }, PRIX))).toBe(0.0305)
-  })
-
-  test("sans prix de cache, ceux d'Anthropic ; un modèle inconnu n'a pas de prix", async () => {
-    expect(arrondi(coutReponse({ m: 'claude-sans-cache', in: 0, out: 0, c5: 1_000, c1: 1_000, cr: 1_000 }, PRIX))).toBe(0.00335)
-    expect(coutReponse({ m: 'claude-inconnu', in: 1_000, out: 0, c5: 0, c1: 0, cr: 0 }, PRIX)).toBeNull()
-  })
-
-  test('le prix suit la langue', async () => {
-    const montants = [0.004, 0.42, 3.4, 31.4, 312.6]
-    expect(montants.map(formatCout)).toEqual(['< 0,01 $', '0,42 $', '3,40 $', '31 $', '313 $'])
-    choisirLangue('en')
-    try {
-      expect(montants.map(formatCout)).toEqual(['< $0.01', '$0.42', '$3.40', '$31', '$313'])
-    } finally {
-      choisirLangue('fr')
-    }
-  })
-
-  test('le prix des tokens se calcule à la lecture, et s\'additionne par item, par jour et au total', async () => {
-    const detail = (out: number) => [{ m: 'claude-opus-5-5', in: 0, out, c5: 0, c1: 0, cr: 0 }]
-    const evenements = avecCouts(
-      [
-        ev(h(9), 'A', 'message', 'FLO-I1'),
-        { t: h(9, 5), s: 'A', e: 'jetons', n: 1_000, k: 'FLO-I1', p: detail(1_000) } as Evenement,
-        { t: h(9, 6), s: 'A', e: 'jetons', n: 500, k: 'FLO-I1', p: detail(500) } as Evenement,
-        // Des tokens sans détail (un historique que Claude Code a effacé) restent sans prix.
-        { t: h(9, 7), s: 'A', e: 'jetons', n: 300, k: 'FLO-I1' } as Evenement,
-        ev(h(9, 10), 'A', 'reponse', 'FLO-I1'),
-      ],
-      PRIX,
-    )
-    const b = bilan(evenements, R, h(12), JOUR, jourSuivant(JOUR))
-    expect(b.lignes[0]!.jetons).toBe(1_800)
-    expect(arrondi(b.lignes[0]!.cout)).toBe(0.03)
-    expect(arrondi(b.jours[0]!.cout)).toBe(0.03)
-    expect(arrondi(b.cout)).toBe(0.03)
-    // Sans prix connus, les tokens restent sans prix.
-    expect(bilan(avecCouts(evenements.map(e => ({ ...e, c: undefined }) as Evenement), null), R, h(12), JOUR, jourSuivant(JOUR)).cout).toBe(0)
   })
 })

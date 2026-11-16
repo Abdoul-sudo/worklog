@@ -190,17 +190,6 @@ Yes, if Node.js is installed. On the first start, Worklog reads your Claude Code
 </details>
 
 <details>
-<summary><strong>What is the dollar amount next to the tokens?</strong></summary>
-
-It is the API cost: the price of these tokens at the Anthropic API list prices. With a Pro or Max plan, it is not what you pay.
-
-Worklog takes the prices from the public [LiteLLM price list](https://github.com/BerriAI/litellm). It gets the list again once a day.
-
-For your past work, Worklog reads the details of each answer in your Claude Code history. If Claude Code deleted an old conversation, the tokens of that conversation have no cost.
-
-</details>
-
-<details>
 <summary><strong>What does Worklog not count?</strong></summary>
 
 Work outside Claude Code: meetings, calls and other tools.
@@ -209,9 +198,7 @@ Work outside Claude Code: meetings, calls and other tools.
 
 ## Privacy
 
-Worklog keeps its data on your computer, in `~/.claude/worklog/`. It does not keep your messages. It sends no data about you or your work over the network.
-
-Once a day, Worklog downloads the public LiteLLM price list to show the API cost. To stop this download, set the environment variable `WORKLOG_PRICES` to `off`.
+Worklog keeps its data on your computer, in `~/.claude/worklog/`. It does not keep your messages. It sends nothing over the network.
 
 To keep the data in another folder, set the environment variable `WORKLOG_DATA_DIR`.
 

@@ -93,8 +93,7 @@ export type Activite =
 // `i` : l'événement vient de l'historique de Claude Code (scripts/importer.mjs), pas du journal tenu par le mod.
 type EvenementActivite = { t: number; s: string; e: Activite; k: string | null; d?: string; i?: 1 }
 type EvenementClassement = { t: number; s: string; e: 'classement'; session: string; debut: number; choix: Choix }
-// `p` : le détail des réponses, par modèle, pour leur prix API ; `c` : ce prix, en dollars, ajouté à la lecture (avecCouts).
-type EvenementJetons = { t: number; s: string; e: 'jetons'; n: number; k: string | null; d?: string; i?: 1; p?: Detail[]; c?: number }
+type EvenementJetons = { t: number; s: string; e: 'jetons'; n: number; k: string | null; d?: string; i?: 1 }
 // Un ID cité dans un message qu'une conversation reprise par l'app a recopié (scripts/importer.mjs) : il nomme la session
 // reprise, sans temps.
 type EvenementRepere = { t: number; s: string; e: 'repere'; k: string; d?: string; i: 1 }
@@ -145,7 +144,7 @@ export type Retrait = { item: string; debut: number; fin: number }
 export type Corrections = { renommages: Readonly<Record<string, string>>; retraits: readonly Retrait[] }
 export const SANS_CORRECTION: Corrections = { renommages: {}, retraits: [] }
 
-export type Jour = { debut: number; lignes: Ligne[]; total: number; reel: number; jetons: number; cout: number }
+export type Jour = { debut: number; lignes: Ligne[]; total: number; reel: number; jetons: number }
 /** `parSession` : les minutes de chaque session sur la période, item par item. */
 export type Bilan = {
   jours: Jour[]
@@ -153,8 +152,6 @@ export type Bilan = {
   total: number
   reel: number
   jetons: number
-  /** Le prix API des tokens, en dollars : ceux dont le détail est connu. */
-  cout: number
   ecarts: Ecart[]
   parSession: Map<string, Map<string, number>>
   /** La dernière activité de chaque item sur la période : la fin de son dernier temps, ou sa dernière dépense de tokens. */
@@ -389,7 +386,7 @@ export function calculer(
     }
     if (arrete && !actives.has(session)) enPause.add(session)
   }
-  const jetons = consos.map(ev => ({ item: itemDe(ev), t: ev.t, n: ev.n, c: ev.c ?? 0, session: ev.s }))
+  const jetons = consos.map(ev => ({ item: itemDe(ev), t: ev.t, n: ev.n, session: ev.s }))
   return { plages, ecarts, actives, jetons, enPause }
 }
 
@@ -459,15 +456,14 @@ export function bilan(
     items.set(item, unir(plages.filter(p => p.item === item)))
   }
   const tous = unir(plages)
-  const jetonsParJour = new Map<string, { n: number; c: number }>()
+  const jetonsParJour = new Map<string, number>()
   for (const j of jetons) {
     const cle = `${debutJour(j.t)}|${j.item}`
-    const cumul = jetonsParJour.get(cle) ?? { n: 0, c: 0 }
-    jetonsParJour.set(cle, { n: cumul.n + j.n, c: cumul.c + j.c })
+    jetonsParJour.set(cle, (jetonsParJour.get(cle) ?? 0) + j.n)
   }
 
   const jours: Jour[] = []
-  const totaux = new Map<string, { minutes: number; jetons: number; cout: number }>()
+  const totaux = new Map<string, { minutes: number; jetons: number }>()
   // Le total et le temps réel de la période, en millisecondes : arrondis une seule fois, ils ne diffèrent que d'un vrai
   // temps en parallèle.
   let totalBrut = 0
@@ -480,11 +476,11 @@ export function bilan(
       const duree = recouvrement(segments, jour, lendemain)
       brut += duree
       const minutes = Math.round(duree / MINUTE)
-      const { n, c } = jetonsParJour.get(`${jour}|${item}`) ?? { n: 0, c: 0 }
+      const n = jetonsParJour.get(`${jour}|${item}`) ?? 0
       if (minutes === 0 && n === 0) continue
-      lignes.push({ item, minutes, enCours: enCours.has(item), jetons: n, cout: c })
-      const cumul = totaux.get(item) ?? { minutes: 0, jetons: 0, cout: 0 }
-      totaux.set(item, { minutes: cumul.minutes + minutes, jetons: cumul.jetons + n, cout: cumul.cout + c })
+      lignes.push({ item, minutes, enCours: enCours.has(item), jetons: n })
+      const cumul = totaux.get(item) ?? { minutes: 0, jetons: 0 }
+      totaux.set(item, { minutes: cumul.minutes + minutes, jetons: cumul.jetons + n })
     }
     if (lignes.length === 0) continue
     const reel = recouvrement(tous, jour, lendemain)
@@ -496,11 +492,10 @@ export function bilan(
       total: Math.round(brut / MINUTE),
       reel: Math.round(reel / MINUTE),
       jetons: lignes.reduce((s, l) => s + l.jetons, 0),
-      cout: lignes.reduce((s, l) => s + l.cout, 0),
     })
   }
 
-  const lignes = [...totaux].map(([item, t]) => ({ item, minutes: t.minutes, enCours: enCours.has(item), jetons: t.jetons, cout: t.cout }))
+  const lignes = [...totaux].map(([item, t]) => ({ item, minutes: t.minutes, enCours: enCours.has(item), jetons: t.jetons }))
   // Un écart déjà couvert par une autre session sur le même item n'a rien à confirmer.
   const aConfirmer = calcul.ecarts
     .map(e => ({ ...e, item: nom(e.item) }))
@@ -527,7 +522,6 @@ export function bilan(
     total: Math.round(totalBrut / MINUTE),
     reel: Math.round(reelBrut / MINUTE),
     jetons: lignes.reduce((s, l) => s + l.jetons, 0),
-    cout: lignes.reduce((s, l) => s + l.cout, 0),
     ecarts: aConfirmer,
     derniere,
     enPause: calcul.enPause,
@@ -547,77 +541,6 @@ export function formatJetons(n: number): string {
   if (n < 100_000_000) return `${nombre(n / 1_000_000)}${unites.million}`
   if (n < 999_500_000) return `${Math.round(n / 1_000_000)}${unites.million}`
   return `${nombre(n / 1_000_000_000)}${unites.milliard}`
-}
-
-/** Ce que des réponses d'un modèle ont lu et écrit, en tokens : `in` hors cache, `c5` et `c1` écrits en cache pour 5 min
- * et pour 1 h, `cr` relus du cache, `out` générés ; `web` : les recherches web ; `rapide` : le mode rapide ; `us` :
- * l'inférence gardée aux États-Unis. */
-export type Detail = { m: string; in: number; out: number; c5: number; c1: number; cr: number; web?: number; rapide?: 1; us?: 1 }
-/** Les prix de LiteLLM des modèles Claude, en dollars par token, tels que le mod les garde (prix.json). */
-export type Prix = Readonly<Record<string, Readonly<Record<string, unknown>>>>
-
-/** De la liste de LiteLLM (tous les fournisseurs, tous les modèles), les modèles Claude vendus par Anthropic et leurs
- * prix ; sans les prix des lots (Batch API), que Claude Code n'utilise pas. */
-export function prixClaude(liste: unknown): Prix {
-  const garde: Record<string, Record<string, unknown>> = {}
-  if (typeof liste !== 'object' || liste === null) return garde
-  for (const [modele, entree] of Object.entries(liste)) {
-    if (!modele.startsWith('claude-') || typeof entree !== 'object' || entree === null) continue
-    const champs = entree as Record<string, unknown>
-    if (champs.litellm_provider !== 'anthropic') continue
-    garde[modele] = Object.fromEntries(
-      Object.entries(champs).filter(([cle]) => (cle.includes('cost') && !cle.endsWith('_batches')) || cle === 'provider_specific_entry'),
-    )
-  }
-  return garde
-}
-
-/** Le prix API de réponses en dollars, d'après les prix de LiteLLM ; null pour un modèle sans prix connu. */
-export function coutReponse(d: Detail, prix: Prix): number | null {
-  const entree = prix[d.m] ?? prix[d.m.replace(/-\d{8}$/, '')]
-  if (entree === undefined) return null
-  const valeur = (cle: string) => (typeof entree[cle] === 'number' ? (entree[cle] as number) : undefined)
-  // Au-delà d'un seuil de contexte (100 k pour Haiku 5.5, 200 k pour d'anciens Sonnet), tous les tokens ont d'autres prix.
-  const contexte = d.in + d.c5 + d.c1 + d.cr
-  const seuil = Math.max(
-    0,
-    ...Object.keys(entree)
-      .map(cle => Number(/^input_cost_per_token_above_(\d+)k_tokens$/.exec(cle)?.[1] ?? 0))
-      .filter(k => contexte > k * 1_000),
-  )
-  const prixDe = (cle: string) => (seuil > 0 ? valeur(`${cle}_above_${seuil}k_tokens`) : undefined) ?? valeur(cle)
-  const lecture = prixDe('input_cost_per_token')
-  const ecriture = prixDe('output_cost_per_token')
-  if (lecture === undefined || ecriture === undefined) return null
-  // Sans prix de cache, ceux d'Anthropic : écrire coûte 1,25 fois la lecture pour 5 min, 2 fois pour 1 h ; relire, 0,1 fois.
-  const tokens =
-    d.in * lecture +
-    d.out * ecriture +
-    d.c5 * (prixDe('cache_creation_input_token_cost') ?? lecture * 1.25) +
-    d.c1 * (prixDe('cache_creation_input_token_cost_above_1hr') ?? lecture * 2) +
-    d.cr * (prixDe('cache_read_input_token_cost') ?? lecture * 0.1)
-  const facteurs = (entree.provider_specific_entry ?? {}) as Readonly<Record<string, unknown>>
-  const facteur = (cle: string) => (typeof facteurs[cle] === 'number' ? (facteurs[cle] as number) : 1)
-  const recherche = entree.search_context_cost_per_query as Readonly<Record<string, unknown>> | undefined
-  const parRecherche = typeof recherche?.search_context_size_medium === 'number' ? recherche.search_context_size_medium : 0.01
-  return tokens * (d.rapide === 1 ? facteur('fast') : 1) * (d.us === 1 ? facteur('us') : 1) + (d.web ?? 0) * parRecherche
-}
-
-/** Le prix API de chaque dépense de tokens (`c`), d'après le détail de ses réponses ; sans prix connu, rien ne change. */
-export function avecCouts(evenements: readonly Evenement[], prix: Prix | null): Evenement[] {
-  if (prix === null) return [...evenements]
-  return evenements.map(ev => {
-    if (ev.e !== 'jetons' || ev.p === undefined) return ev
-    const couts = ev.p.map(d => coutReponse(d, prix)).filter((c): c is number => c !== null)
-    return couts.length === 0 ? ev : { ...ev, c: couts.reduce((a, b) => a + b, 0) }
-  })
-}
-
-/** `3,40 $`, `31 $`, `< 0,01 $` ; en anglais `$3.40`, `$31`, `< $0.01`. */
-export function formatCout(usd: number): string {
-  const { cout, centimes } = texte()
-  if (usd < 0.005) return `< ${cout(centimes(0.01))}`
-  return cout(usd < 10 ? centimes(usd) : String(Math.round(usd)))
 }
 
 export function dureeEcart(ecart: Plage): string {
