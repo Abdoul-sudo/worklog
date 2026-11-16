@@ -11,7 +11,9 @@ import {
   MESURES,
   THEMES_IDS,
   type Corrections,
+  type Detail,
   type Evenement,
+  type Prix,
   type Retrait,
   MARGE_VIE,
   MOTIF_ID,
@@ -21,6 +23,7 @@ import {
   choixDemande,
   demandeEffective,
   ajouterRecent,
+  avecCouts,
   bilan,
   bornes,
   cleJour,
@@ -29,6 +32,7 @@ import {
   decalerJours,
   detecterItem,
   dureeEcart,
+  formatCout,
   formatDuree,
   formatHeure,
   formatJetons,
@@ -38,6 +42,7 @@ import {
   lireLignes,
   lireOptions,
   nommer,
+  prixClaude,
 } from './calcul'
 import {
   CIEL,
@@ -112,6 +117,10 @@ async function quitterChamp($: Moteur): Promise<void> {
 }
 /** L'historique de Claude Code est relu au plus toutes les cinq minutes. */
 const IMPORT_MS = 5 * 60_000
+/** La liste publique des prix de LiteLLM : le prix API de chaque modèle, tenu à jour par ses auteurs. */
+const LITELLM = 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json'
+/** Les prix se téléchargent au plus une fois par jour. */
+const PRIX_MS = 24 * 60 * 60_000
 // Les tours qui partent seuls (tâche planifiée, observateur, notification d'une tâche de fond, message d'une autre
 // session, avis sans origine) ne comptent pas : ils ne sont pas un retour de la personne.
 const AUTOMATIQUES = ['scheduled-trigger', 'observer', 'observer-activity', 'task-notification', 'peer', 'peer-send-message', 'unclassified']
@@ -128,7 +137,9 @@ const vue = atom({ plugin: 'worklog', key: 'vue' } as const, null, { shape: 'vue
 const frise = atom({ plugin: 'worklog', key: 'frise' } as const, null, { shape: 'frise-7' })
 const reglages = atom({ plugin: 'worklog', key: 'reglages' } as const, null, { shape: 'reglages-2' })
 
-let chemins: { journal: string; importe: string; projets: string } | null = null
+let chemins: { journal: string; importe: string; projets: string; prix: string } | null = null
+// Les prix API des modèles Claude (prix.json) ; null tant que le mod n'en a pas.
+let prix: Prix | null = null
 let ecritures: Promise<unknown> = Promise.resolve()
 let tourCompte = true
 let heritageClear: { item: string; manuel: boolean } | null = null
@@ -197,7 +208,7 @@ async function dossiers($: Moteur) {
     const config = ((await $.env.get('CLAUDE_CONFIG_DIR')) ?? `${maison}/.claude`).replace(/\\/g, '/')
     // Le dossier des données se règle (un dossier synchronisé, des données de démonstration) ; par défaut, ~/.claude/worklog.
     const donnees = ((await $.env.get('WORKLOG_DATA_DIR')) ?? `${config}/${DOSSIER_DONNEES}`).replace(/\\/g, '/')
-    chemins = { journal: `${donnees}/journal`, importe: `${donnees}/import`, projets: `${config}/projects` }
+    chemins = { journal: `${donnees}/journal`, importe: `${donnees}/import`, projets: `${config}/projects`, prix: `${donnees}/prix.json` }
   }
   return chemins
 }
@@ -281,7 +292,7 @@ async function lireJournal($: Moteur, debut: number, fin: number) {
       }
     }
   }
-  return { evenements: fusionner(evenements, await importeJusqua($, importe)), vivants }
+  return { evenements: avecCouts(fusionner(evenements, await importeJusqua($, importe)), prix), vivants }
 }
 
 /** L'heure de fin de la dernière importation de l'historique ; 0 sans importation. */
@@ -305,12 +316,36 @@ async function importerHistorique($: Moteur): Promise<void> {
   const maintenant = await $.clock.now()
   if (maintenant - importLance < IMPORT_MS) return
   importLance = maintenant
+  await mettreAJourPrix($).catch(() => undefined)
   const { importe, projets } = await dossiers($)
   const fin = await $.process
     .run(['node', `${$.plugin.root}/scripts/importer.mjs`, projets, importe, MOTIF_ID], { timeoutMs: 10 * 60_000 })
     .catch(() => null)
   if (fin === null || fin.exitCode !== 0) return
   cacheFrise = null
+  await rafraichir($)
+}
+
+/** Lit les prix gardés (prix.json). Une fois par jour, sauf avec WORKLOG_PRICES=off, les télécharge de LiteLLM : un
+ * fichier public, sans rien envoyer de la personne. Sans réseau, les derniers prix gardés restent. */
+async function mettreAJourPrix($: Moteur): Promise<void> {
+  const { prix: fichier } = await dossiers($)
+  let maj = -Infinity
+  if (await $.fs.exists(fichier)) {
+    try {
+      const garde = JSON.parse(await $.fs.read(fichier)) as { maj?: unknown; modeles?: unknown }
+      if (typeof garde.maj === 'number') maj = garde.maj
+      if (typeof garde.modeles === 'object' && garde.modeles !== null) prix = garde.modeles as Prix
+    } catch {}
+  }
+  const maintenant = await $.clock.now()
+  if (maintenant - maj < PRIX_MS || (await $.env.get('WORKLOG_PRICES')) === 'off') return
+  const reponse = await $.http.fetch(LITELLM).catch(() => null)
+  if (reponse === null || !reponse.ok) return
+  const modeles = prixClaude(JSON.parse(reponse.text))
+  if (Object.keys(modeles).length === 0) return
+  await $.fs.write(fichier, JSON.stringify({ maj: maintenant, modeles }))
+  prix = modeles
   await rafraichir($)
 }
 
@@ -392,12 +427,12 @@ async function noterActivite($: Moteur, e: Activite, instant?: number): Promise<
   return t
 }
 
-async function noterJetons($: Moteur, n: number): Promise<void> {
+async function noterJetons($: Moteur, n: number, detail: Detail): Promise<void> {
   const s = await $.session.id()
   // Relu à chaque événement : l'app desktop lance une session dans un dossier d'attente avant de lui donner le sien.
   nomParDefaut = await calculerNomParDefaut($)
   const d = nomParDefaut ?? undefined
-  await noter($, { t: await $.clock.now(), s, e: 'jetons', n, k: await itemDe($, s), ...(d === undefined ? {} : { d }) })
+  await noter($, { t: await $.clock.now(), s, e: 'jetons', n, p: [detail], k: await itemDe($, s), ...(d === undefined ? {} : { d }) })
 }
 
 /** Note quand des sous-agents (workflows, Ultracode) commencent ou cessent de travailler : ce temps compte. */
@@ -917,7 +952,8 @@ function ordonner(toutes: Ligne[], actuel: string | null, derniere: Readonly<Rec
  * juste après le nom : ⇄ pour passer sur l'item (exprès, pour qu'un clic distrait ne déplace pas le temps), ou le crayon
  * pour renommer l'item de la session (un double-clic sur son nom aussi). */
 /** Les textes des chiffres d'une ligne, un tiret quand il n'y a rien : leur longueur fait la largeur des colonnes. */
-const texteJetons = (l: Ligne) => (l.jetons > 0 ? t().tokens(formatJetons(l.jetons)) : '—')
+const avecCout = (jetons: string, cout: number) => (cout > 0 ? `${jetons} · ${formatCout(cout)}` : jetons)
+const texteJetons = (l: Ligne) => (l.jetons > 0 ? avecCout(t().tokens(formatJetons(l.jetons)), l.cout) : '—')
 const texteTemps = (l: Ligne) => (l.minutes > 0 ? formatDuree(l.minutes) : '—')
 
 function ligne(
@@ -1031,7 +1067,7 @@ function ligne(
       </Box>
       <Box flexDirection="row" gap="xs" alignItems="center" flexShrink={0}>
         {mesure !== 'temps' && (
-          <Box width={COLONNES.jetons} flexDirection="row" justifyContent="flex-end">
+          <Box width={Math.max(COLONNES.jetons, largeurs.jetons)} flexDirection="row" justifyContent="flex-end">
             {jetons}
           </Box>
         )}
@@ -1136,10 +1172,12 @@ function resume(
   const largeurLigne = 3 + TERMINAL.nom + chiffres.reduce((a, b) => a + b, 0) + 2 * (chiffres.length - 1)
   // La série compte jusqu'à aujourd'hui : une année passée n'en a pas.
   const jours = activite === null || !activite.aujourdhui ? null : activite.serie
+  // Les tokens de la période, puis leur prix API.
+  const valeurJetons = contenu.jetons > 0 ? avecCout(formatJetons(contenu.jetons), contenu.cout) : '—'
   // Les stats du terminal sur une ligne (« Temps 2 h 29 · Tokens 203 M · Série 5 jours ») : la bande y est basse.
   const statsLigne = [
     options.mesure !== 'jetons' && [t().stats.temps, formatDuree(contenu.total)],
-    options.mesure !== 'temps' && [t().stats.jetons, contenu.jetons > 0 ? formatJetons(contenu.jetons) : '—'],
+    options.mesure !== 'temps' && [t().stats.jetons, valeurJetons],
     jours !== null && options.activite && [t().stats.serie, t().joursSerie(jours)],
   ].filter((s): s is string[] => s !== false)
   const largeurStats = statsLigne.map(([nom, valeur]) => `${nom} ${valeur}`).join(' · ').length
@@ -1207,7 +1245,20 @@ function resume(
         </Box>
       ),
     ),
-    options.mesure !== 'temps' && stat('jetons', t().stats.jetons, contenu.jetons > 0 ? formatJetons(contenu.jetons) : '—'),
+    options.mesure !== 'temps' &&
+      stat(
+        'jetons',
+        t().stats.jetons,
+        valeurJetons,
+        // Au survol, sous la valeur : ce prix est celui de l'API, pas ce que la personne paie avec son abonnement.
+        contenu.cout > 0 && (
+          <Box position="absolute" top={empilees ? 1 : 2} left={0} width={32} display="none" hover={{ scope: 'stat-jetons', display: 'flex' }}>
+            <Text size="caption" {...encre(e, 'gris')}>
+              {t().prixApi}
+            </Text>
+          </Box>
+        ),
+      ),
     jours !== null && options.activite && stat('serie', t().stats.serie, t().joursSerie(jours)),
   ].filter(c => c !== false)
   // Dans le terminal, la frise ne va qu'à côté de la liste, quand la largeur le permet : dessous, la bande défilerait.
@@ -1629,7 +1680,9 @@ export const register: Register = on => {
     const u = e.usage
     if (u !== undefined) {
       const n = u.input_tokens + u.output_tokens + u.cache_creation_input_tokens + u.cache_read_input_tokens
-      if (n > 0) enFond(noterJetons($, n))
+      // Claude Code écrit son cache pour une heure. L'import suivant remplace ces chiffres par ceux de l'historique.
+      const detail: Detail = { m: u.model, in: u.input_tokens, out: u.output_tokens, c5: 0, c1: u.cache_creation_input_tokens, cr: u.cache_read_input_tokens }
+      if (n > 0) enFond(noterJetons($, n, detail))
     }
     return next(e)
   })

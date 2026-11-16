@@ -551,6 +551,22 @@ export type Detail = { m: string; in: number; out: number; c5: number; c1: numbe
 /** Les prix de LiteLLM des modèles Claude, en dollars par token, tels que le mod les garde (prix.json). */
 export type Prix = Readonly<Record<string, Readonly<Record<string, unknown>>>>
 
+/** De la liste de LiteLLM (tous les fournisseurs, tous les modèles), les modèles Claude vendus par Anthropic et leurs
+ * prix ; sans les prix des lots (Batch API), que Claude Code n'utilise pas. */
+export function prixClaude(liste: unknown): Prix {
+  const garde: Record<string, Record<string, unknown>> = {}
+  if (typeof liste !== 'object' || liste === null) return garde
+  for (const [modele, entree] of Object.entries(liste)) {
+    if (!modele.startsWith('claude-') || typeof entree !== 'object' || entree === null) continue
+    const champs = entree as Record<string, unknown>
+    if (champs.litellm_provider !== 'anthropic') continue
+    garde[modele] = Object.fromEntries(
+      Object.entries(champs).filter(([cle]) => (cle.includes('cost') && !cle.endsWith('_batches')) || cle === 'provider_specific_entry'),
+    )
+  }
+  return garde
+}
+
 /** Le prix API de réponses en dollars, d'après les prix de LiteLLM ; null pour un modèle sans prix connu. */
 export function coutReponse(d: Detail, prix: Prix): number | null {
   const entree = prix[d.m] ?? prix[d.m.replace(/-\d{8}$/, '')]
