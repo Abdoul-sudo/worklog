@@ -1267,8 +1267,9 @@ function choixTheme($: Moteur, e: Site, options: Reglages) {
   )
 }
 
-/** Les réglages là où la surface dessine : l'affichage et les pauses à gauche, le thème à droite, ou tout l'un sous
- * l'autre quand la place manque ; une ligne par réglage, la commande à droite. */
+/** Les réglages là où la surface dessine : une ligne par réglage, la commande à droite, puis les thèmes ; côte à côte
+ * quand la place le permet, l'un sous l'autre sinon. Pas de titres de section : la carte au-dessus de la saisie a une
+ * hauteur limitée, et chaque libellé dit seul ce qu'il règle. */
 function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
   if (!riche(e)) return null
   const { Box, Select, Text } = $.ui.resolve(e)
@@ -1281,14 +1282,9 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
       {aDroite}
     </Box>
   )
-  // Côte à côte, chaque colonne prend la moitié de la largeur ; une section rangée dans une colonne en prend toute la largeur.
-  const section = (titre: string, lignes: RenderChildren, colonne = aCote) => (
-    <Box flexDirection="column" alignItems="stretch" gap="xs" {...(colonne ? { flexGrow: 1, width: 0 } : {})}>
-      <Box paddingX="sm">
-        <Text size="caption" {...encre(e, 'faible')}>
-          {titre}
-        </Text>
-      </Box>
+  // Côte à côte, chaque colonne prend la moitié de la largeur.
+  const colonne = (lignes: RenderChildren) => (
+    <Box flexDirection="column" alignItems="stretch" gap="xs" {...(aCote ? { flexGrow: 1, width: 0 } : {})}>
       {lignes}
     </Box>
   )
@@ -1313,47 +1309,46 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
         />,
       ),
     )
+  const jusqua = (m: number) => t().jusqua(t().seuilChoix(m))
   const pauses = [
-    duree('seuil', t().seuil, SEUILS, options.seuilPause, t().seuilChoix, seuilPause => changerReglage($, { seuilPause })),
-    duree('pause-max', t().pauseMax, choixDemande(options), demandeEffective(options), t().pauseMaxChoix, pauseMax => changerReglage($, { pauseMax })),
+    duree('seuil', t().seuil, SEUILS, options.seuilPause, jusqua, seuilPause => changerReglage($, { seuilPause })),
+    duree('pause-max', t().pauseMax, choixDemande(options), demandeEffective(options), m => (m === 0 ? t().jamais : jusqua(m)), pauseMax => changerReglage($, { pauseMax })),
   ]
   return (
     <Box flexDirection={aCote ? 'row' : 'column'} alignItems="stretch" gap={aCote ? 4 : 'md'}>
-      <Box flexDirection="column" alignItems="stretch" gap="md" {...(aCote ? { flexGrow: 1, width: 0 } : {})}>
-        {section(t().sections.affichage, [
-          ...affichageLignes,
-          ligneReglage(
-            'mesure',
-            <Text size="footnote" {...encre(e, 'texte')}>
-              {t().mesure}
-            </Text>,
-            surFond(
-              <Select
-                key="mesure"
-                value={options.mesure}
-                options={MESURES.map(m => ({ value: m, label: t().mesures[m] }))}
-                onSelect={valeur => changerReglage($, { mesure: MESURES.find(m => m === valeur) ?? 'tout' })}
-              />,
-            ),
+      {colonne([
+        ...affichageLignes,
+        ligneReglage(
+          'mesure',
+          <Text size="footnote" {...encre(e, 'texte')}>
+            {t().mesure}
+          </Text>,
+          surFond(
+            <Select
+              key="mesure"
+              value={options.mesure}
+              options={MESURES.map(m => ({ value: m, label: t().mesures[m] }))}
+              onSelect={valeur => changerReglage($, { mesure: MESURES.find(m => m === valeur) ?? 'tout' })}
+            />,
           ),
-          ligneReglage(
-            'langue',
-            <Text size="footnote" {...encre(e, 'texte')}>
-              {t().langue}
-            </Text>,
-            surFond(
-              <Select
-                key="langue"
-                value={options.langue}
-                options={LANGUES.map(l => ({ value: l.id, label: l.nom }))}
-                onSelect={valeur => changerReglage($, { langue: valeur === 'fr' ? 'fr' : 'en' })}
-              />,
-            ),
+        ),
+        ligneReglage(
+          'langue',
+          <Text size="footnote" {...encre(e, 'texte')}>
+            {t().langue}
+          </Text>,
+          surFond(
+            <Select
+              key="langue"
+              value={options.langue}
+              options={LANGUES.map(l => ({ value: l.id, label: l.nom }))}
+              onSelect={valeur => changerReglage($, { langue: valeur === 'fr' ? 'fr' : 'en' })}
+            />,
           ),
-        ], false)}
-        {section(t().sections.comptage, pauses, false)}
-      </Box>
-      {section(t().sections.theme, choixTheme($, e, options))}
+        ),
+        ...pauses,
+      ])}
+      {colonne(choixTheme($, e, options))}
     </Box>
   )
 }
@@ -1397,7 +1392,7 @@ function vueReglagesTerminal($: Moteur, e: Site, options: Reglages, aCote: boole
         <Text>{t().seuil}</Text>
         {choix('seuil', SEUILS, options.seuilPause, t().seuilChoix, seuilPause => changerReglage($, { seuilPause }))}
         <Text>{t().pauseMax}</Text>
-        {choix('pause-max', choixDemande(options), demandeEffective(options), t().pauseMaxChoix, pauseMax => changerReglage($, { pauseMax }))}
+        {choix('pause-max', choixDemande(options), demandeEffective(options), m => (m === 0 ? t().jamais : t().seuilChoix(m)), pauseMax => changerReglage($, { pauseMax }))}
       </Box>
     </Box>
   )

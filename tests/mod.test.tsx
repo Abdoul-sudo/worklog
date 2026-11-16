@@ -310,12 +310,12 @@ test('les tokens, les onglets, les réglages et la frise', async ($, on) => {
       expect((await bande.find({ key: 'seuil-60' }))?.text).toBe('○ 1 h')
       await bande.press({ key: 'seuil-60' })
       await bande.press({ key: 'pause-max-480' })
-      expect((await bande.find({ key: 'pause-max-480' }))?.text).toBe("● Jusqu'à 8 h")
+      expect((await bande.find({ key: 'pause-max-480' }))?.text).toBe('● 8 h')
       await bande.press({ key: 'pause-max-240' })
       // « Puis demander » ne propose que « Jamais » et des durées plus longues que « Rester actif pendant ».
       await bande.press({ key: 'seuil-120' })
       expect([await bande.find({ key: 'pause-max-60' }), await bande.find({ key: 'pause-max-120' })]).toEqual([undefined, undefined])
-      expect([(await bande.find({ key: 'pause-max-0' }))?.text, (await bande.find({ key: 'pause-max-240' }))?.text]).toEqual(['○ Jamais', "● Jusqu'à 4 h"])
+      expect([(await bande.find({ key: 'pause-max-0' }))?.text, (await bande.find({ key: 'pause-max-240' }))?.text]).toEqual(['○ Jamais', '● 4 h'])
       await bande.press({ key: 'seuil-60' })
     } else expect([await bande.find({ key: 'seuil' }), await bande.find({ key: 'pause-max' })]).not.toContain(undefined)
     // Les tokens s'affichent toujours : plus de réglage pour les cacher.
