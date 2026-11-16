@@ -4,8 +4,8 @@ export type Plage = { item: string; debut: number; fin: number }
 /** Une plage d'une session ; sert aussi pour un écart long, ni compté ni classé. */
 export type Ecart = Plage & { session: string }
 
-/** Le temps et les tokens d'un item sur une période, et s'il compte en ce moment. */
-export type Ligne = { item: string; minutes: number; enCours: boolean; jetons: number }
+/** Le temps, les tokens et leur prix API (en dollars) d'un item sur une période, et s'il compte en ce moment. */
+export type Ligne = { item: string; minutes: number; enCours: boolean; jetons: number; cout: number }
 
 /** Ce que la puce affiche : le nom de la session et son temps du jour. */
 export type Session = { item: string | null; minutes: number; enPause: boolean }
@@ -31,6 +31,7 @@ export type Vue = {
   total: number
   reel: number
   jetons: number
+  cout: number
   lignes: Ligne[]
   /** La dernière activité de chaque item sur la période : la liste va du plus récent au plus ancien. */
   derniere: Record<string, number>

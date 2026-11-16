@@ -1,5 +1,6 @@
 // Importe l'historique de Claude Code dans le journal du mod, rangé par jour et par session :
-// - les tokens de chaque réponse, sous-agents compris, une seule fois chacune ;
+// - les tokens de chaque réponse, sous-agents compris, une seule fois chacune, avec leur détail par modèle (lus, écrits
+//   en cache, relus du cache, générés) : le mod en tire leur prix API ;
 // - le temps des tours lancés par une personne : son message, puis les réponses de Claude jusqu'au message suivant.
 //   Un message automatique (notification, autre session, plugin) clôt le tour : un agent qui tourne seul ne compte pas.
 // Le mod le lance en tâche de fond ; il ne relit que la partie nouvelle de chaque conversation.
@@ -15,6 +16,9 @@ const MINUTE = 60_000
 const VERROU_MS = 15 * MINUTE
 const JOUR = 24 * 60 * MINUTE
 // Une réponse revue dans une conversation reprise est reconnue pendant 90 jours ; au-delà, son numéro est oublié.
+// La version du rattrapage des détails (ajouterDetails) : la monter le relance une fois. Il ne touche qu'aux lignes encore
+// sans détail.
+const DETAILS = 2
 const MEMOIRE_JOURS = 90
 
 const fichierEtat = path.join(sortie, 'etat.json')
@@ -48,7 +52,7 @@ const lireEtat = () => {
     const etat = JSON.parse(fs.readFileSync(fichierEtat, 'utf8'))
     if (etat.version === VERSION) return etat
   } catch {}
-  return { version: VERSION, positions: {}, vus: {}, tours: {}, dossiers: {}, nomsCorriges: true, copiesRetirees: true }
+  return { version: VERSION, positions: {}, vus: {}, tours: {}, dossiers: {}, nomsCorriges: true, details: DETAILS, copiesRetirees: true }
 }
 const etat = lireEtat()
 // Le nom de chaque session : le dossier où elle a démarré. Claude se déplace parfois dans un sous-dossier du projet
@@ -96,6 +100,36 @@ const ajouter = (t, s, ev) => {
   sorties.get(fichier).push(JSON.stringify(ev))
 }
 
+/** Tous les tokens d'une réponse. */
+const jetonsDe = u => (u.input_tokens ?? 0) + (u.output_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0)
+
+/** Ajoute une réponse au détail de sa minute, par modèle : de quoi calculer son prix API. Sans le partage du cache entre
+ * 5 min et 1 h, tout le cache écrit compte pour 5 min. */
+function ajouterDetail(details, message) {
+  const u = message.usage
+  const rapide = u.speed === 'fast'
+  const us = u.inference_geo === 'us'
+  const cle = `${message.model}|${rapide}|${us}`
+  const d = details.get(cle) ?? { m: message.model ?? '', in: 0, out: 0, c5: 0, c1: 0, cr: 0, web: 0, rapide, us }
+  d.in += u.input_tokens ?? 0
+  d.out += u.output_tokens ?? 0
+  d.c5 += u.cache_creation === undefined ? (u.cache_creation_input_tokens ?? 0) : (u.cache_creation.ephemeral_5m_input_tokens ?? 0)
+  d.c1 += u.cache_creation?.ephemeral_1h_input_tokens ?? 0
+  d.cr += u.cache_read_input_tokens ?? 0
+  d.web += u.server_tool_use?.web_search_requests ?? 0
+  details.set(cle, d)
+}
+
+/** Le détail d'une minute, tel que le journal le garde (`p`) ; `part` le partage entre plusieurs lignes de la minute. */
+const detailsEcrits = (details, part = 1) =>
+  [...details.values()].map(({ m, web, rapide, us, ...tokens }) => ({
+    m,
+    ...Object.fromEntries(Object.entries(tokens).map(([cle, n]) => [cle, n * part])),
+    ...(web > 0 ? { web: web * part } : {}),
+    ...(rapide ? { rapide: 1 } : {}),
+    ...(us ? { us: 1 } : {}),
+  }))
+
 /** Un message écrit par une personne : tapé, une commande slash, une interruption. */
 function estHumain(ev, texte) {
   if (ev.origin !== undefined) return ev.origin?.kind === 'human'
@@ -121,10 +155,10 @@ function lire(ligne, sousAgent) {
     const id = ev.message.id ?? ev.uuid
     if (id === undefined || vus.has(id)) return
     vus.set(id, Math.floor(t / JOUR))
-    const n = (u.input_tokens ?? 0) + (u.output_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0)
     const cle = `${s}|${Math.floor(t / MINUTE)}`
-    const minute = minutes.get(cle) ?? { t, s, cwd, n: 0, actif: false }
-    minute.n += n
+    const minute = minutes.get(cle) ?? { t, s, cwd, n: 0, details: new Map(), actif: false }
+    minute.n += jetonsDe(u)
+    ajouterDetail(minute.details, ev.message)
     minute.actif ||= !sousAgent && tours.has(s)
     minutes.set(cle, minute)
     return
@@ -207,6 +241,68 @@ function corrigerNoms() {
   }
 }
 
+/** Une fois : les tokens importés par une version passée reçoivent le détail de leurs réponses, relu dans les
+ * conversations encore là. Rien n'est effacé : les tokens d'une conversation que Claude Code a supprimée restent, sans
+ * prix. Quand une minute a plusieurs lignes, chacune reçoit sa part du détail. */
+async function ajouterDetails() {
+  const jsonl = []
+  for (const jour of fs.readdirSync(sortie, { withFileTypes: true })) {
+    if (!jour.isDirectory()) continue
+    for (const nom of fs.readdirSync(path.join(sortie, jour.name))) if (nom.endsWith('.jsonl')) jsonl.push(path.join(sortie, jour.name, nom))
+  }
+  const minuteDe = ev => `${ev.s}|${Math.floor(ev.t / MINUTE)}`
+  const importees = new Set()
+  for (const fichier of jsonl) {
+    for (const ligne of fs.readFileSync(fichier, 'utf8').split('\n')) {
+      try {
+        const ev = JSON.parse(ligne)
+        if (ev.e === 'jetons') importees.add(minuteDe(ev))
+      } catch {}
+    }
+  }
+  // Une conversation reprise recopie des réponses déjà vues : chacune va à la minute où l'import l'a comptée.
+  const reponses = new Map()
+  for (const fichier of fichiers) {
+    for await (const texte of readline.createInterface({ input: fs.createReadStream(fichier) })) {
+      if (!texte.includes('"usage"') || !texte.includes('"sessionId"')) continue
+      let ev
+      try {
+        ev = JSON.parse(texte)
+      } catch {
+        continue
+      }
+      const t = Date.parse(ev.timestamp)
+      const id = ev.message?.id ?? ev.uuid
+      if (ev.type !== 'assistant' || !ev.message?.usage || !(t > 0) || typeof ev.sessionId !== 'string' || id === undefined) continue
+      const cle = minuteDe({ s: ev.sessionId, t })
+      const vue = reponses.get(id)
+      if (vue === undefined || (!importees.has(vue.cle) && importees.has(cle))) reponses.set(id, { cle, message: { model: ev.message.model, usage: ev.message.usage } })
+    }
+  }
+  const parMinute = new Map()
+  for (const { cle, message } of reponses.values()) {
+    const minute = parMinute.get(cle) ?? { n: 0, details: new Map() }
+    minute.n += jetonsDe(message.usage)
+    ajouterDetail(minute.details, message)
+    parMinute.set(cle, minute)
+  }
+  for (const fichier of jsonl) {
+    let change = false
+    const lignes = fs.readFileSync(fichier, 'utf8').split('\n').map(ligne => {
+      try {
+        const ev = JSON.parse(ligne)
+        const minute = ev.e === 'jetons' && ev.p === undefined ? parMinute.get(minuteDe(ev)) : undefined
+        if (minute === undefined || minute.n === 0) return ligne
+        change = true
+        return JSON.stringify({ ...ev, p: detailsEcrits(minute.details, ev.n / minute.n) })
+      } catch {
+        return ligne
+      }
+    })
+    if (change) fs.writeFileSync(fichier, lignes.join('\n'))
+  }
+}
+
 /** Une fois : les messages qu'une version passée importait en double dans une copie de la conversation (reprise par
  * l'app), sans leurs réponses, sont retirés ; l'ID qu'ils citent y reste en repère. Un message présent dans plusieurs
  * sessions à la même milliseconde reste dans celle qui a les tokens de sa réponse, sinon dans celle qui a le plus de
@@ -284,11 +380,11 @@ try {
     const d = nomDe(s, cwd)
     ajouter(t, s, { t, s, e: 'repere', k, ...(d === undefined ? {} : { d }), i: 1 })
   }
-  for (const { t, s, cwd, n, actif } of minutes.values()) {
+  for (const { t, s, cwd, n, details, actif } of minutes.values()) {
     const d = nomDe(s, cwd)
     const defaut = d === undefined ? {} : { d }
     if (actif) ajouter(t, s, { t, s, e: 'reponse', k: null, ...defaut, i: 1 })
-    ajouter(t, s, { t, s, e: 'jetons', n, k: null, ...defaut, i: 1 })
+    ajouter(t, s, { t, s, e: 'jetons', n, k: null, ...defaut, i: 1, p: detailsEcrits(details) })
   }
   for (const [fichier, lignes] of sorties) {
     fs.mkdirSync(path.dirname(fichier), { recursive: true })
@@ -299,6 +395,11 @@ try {
     await connaitreDossiers()
     corrigerNoms()
     etat.nomsCorriges = true
+  }
+  // Une fois : les tokens déjà importés reçoivent le détail de leurs réponses, pour leur prix API.
+  if (etat.details !== DETAILS) {
+    await ajouterDetails()
+    etat.details = DETAILS
   }
   // Une fois : les messages importés en double dans une copie de la conversation sont retirés.
   if (etat.copiesRetirees !== true) {
