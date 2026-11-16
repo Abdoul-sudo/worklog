@@ -22,11 +22,26 @@ const fichierVerrou = path.join(sortie, 'verrou')
 const fichierFait = path.join(sortie, 'fait.json')
 fs.mkdirSync(sortie, { recursive: true })
 
-// Une seule importation à la fois, même si plusieurs sessions la lancent.
-try {
-  if (Date.now() - fs.statSync(fichierVerrou).mtimeMs < VERROU_MS) process.exit(0)
-} catch {}
-fs.writeFileSync(fichierVerrou, String(process.pid))
+// Une seule importation à la fois, même si plusieurs sessions la lancent au même instant : le verrou se crée d'un seul
+// geste, et un verrou trop vieux (une importation morte) se remplace.
+const creerVerrou = () => {
+  try {
+    fs.writeFileSync(fichierVerrou, String(process.pid), { flag: 'wx' })
+    return true
+  } catch (erreur) {
+    if (erreur.code !== 'EEXIST') throw erreur
+    return false
+  }
+}
+if (!creerVerrou()) {
+  let vieux = false
+  try {
+    vieux = Date.now() - fs.statSync(fichierVerrou).mtimeMs >= VERROU_MS
+  } catch {}
+  if (!vieux) process.exit(0)
+  fs.rmSync(fichierVerrou, { force: true })
+  if (!creerVerrou()) process.exit(0)
+}
 
 const lireEtat = () => {
   try {
