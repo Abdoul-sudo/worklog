@@ -527,7 +527,7 @@ async function calculerFrise($: Moteur): Promise<void> {
   await update($, frise, () => ({ cases: liste, aujourdhui: contientAujourdhui, periode, mesure: options.mesure }))
 }
 
-async function apresMessage($: Moteur, texte: string, chercherItem: boolean): Promise<void> {
+async function apresMessage($: Moteur, texte: string, chercherItem: boolean, instant: number): Promise<void> {
   const s = await $.session.id()
   await lireReglages($)
   if (!(await estManuel($, s))) {
@@ -538,7 +538,7 @@ async function apresMessage($: Moteur, texte: string, chercherItem: boolean): Pr
       $.ui.toast(t().toastItem(nouveau))
     }
   }
-  const instant = await noterActivite($, 'message')
+  await noterActivite($, 'message', instant)
   await rafraichir($)
   const jour = debutJour(await $.clock.now())
   const { b, evenements } = await bilanDe($, jour, jourSuivant(jour))
@@ -1522,11 +1522,15 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('prompt.submit', ($, e, next) => {
+  on('prompt.submit', async ($, e, next) => {
     // Ouvrir le popover n'est pas travailler : la commande ne compte pas comme un message.
     if (e.command?.name === 'worklog') return next(e)
     tourCompte = !AUTOMATIQUES.includes(e.origin.kind)
-    if (tourCompte) enFond(apresMessage($, e.text, e.isMeta !== true && ECRITS.includes(e.origin.kind)))
+    // L'heure du message se lit d'abord : une réponse très rapide (Échap, une limite atteinte) ne passe pas devant lui.
+    if (tourCompte) {
+      const instant = await $.clock.now()
+      enFond(apresMessage($, e.text, e.isMeta !== true && ECRITS.includes(e.origin.kind), instant))
+    }
     if (e.origin.kind === 'composer') enFond(fermerChampVide($))
     return next(e)
   })
