@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/desktop.gif" width="880" alt="Worklog: the time, the tokens and the streak, a heatmap of the year, and the time of each name. The pointer clicks Day, Month and Year.">
+  <img src="docs/screenshots/desktop.gif" width="880" alt="Worklog: the time, the tokens and the streak, a heatmap of the year, and the time of each name. The pointer clicks Day, Month and Year, then sets Show to Tokens and price in the settings. The API price then takes the place of the time.">
 </p>
 
 <p align="center">
