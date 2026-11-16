@@ -417,6 +417,19 @@ describe("l'historique importé", () => {
       [h(10, 5), 'FSY-I2', 50],
     ])
   })
+
+  test("les tokens importés prennent le nom par défaut que la session avait à ce moment, pas son premier", async () => {
+    // L'app desktop lance la session dans un dossier d'attente, puis lui donne le sien.
+    const evenements = [
+      { t: h(9), s: 'A', e: 'ouverture', k: null, d: 'spare-x' } as Evenement,
+      { t: h(9, 1), s: 'A', e: 'message', k: null, d: 'spare-x' } as Evenement,
+      { t: h(9, 5), s: 'A', e: 'reponse', k: null, d: '.claude' } as Evenement,
+      { t: h(9, 6), s: 'A', e: 'message', k: null, d: '.claude' } as Evenement,
+      jet(h(9, 10), 'A', 300, true),
+    ]
+    const fusion = fusionner(evenements, h(10))
+    expect(fusion.filter(e => e.e === 'jetons').map(e => ('d' in e ? e.d : null))).toEqual(['.claude'])
+  })
 })
 
 describe('items sans tokens', () => {

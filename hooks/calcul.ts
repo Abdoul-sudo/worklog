@@ -111,7 +111,9 @@ export function fusionner(evenements: readonly Evenement[], importeJusqua: numbe
     const premier = liste[0]!
     if (ev.e === 'jetons') {
       const moment = ev.t < premier.t ? undefined : aCeMoment(ev.s, ev.t)
-      return [{ ...ev, ...(moment === undefined ? {} : { k: moment.k }), ...(premier.d === undefined ? {} : { d: premier.d }) }]
+      // Le nom par défaut de ce moment-là : il change quand l'app desktop donne son dossier à une session lancée en attente.
+      const defaut = (moment ?? premier).d
+      return [{ ...ev, ...(moment === undefined ? {} : { k: moment.k }), ...(defaut === undefined ? {} : { d: defaut }) }]
     }
     return ev.t < premier.t ? [{ ...ev, ...(premier.d === undefined ? {} : { d: premier.d }) }] : []
   }), ...fermetures]
