@@ -176,6 +176,36 @@ describe('écart court ou long', () => {
     expect(b.ecarts).toEqual([])
   })
 
+  test("un travail d'agents de 24 h (Ultracode) compte en entier tant que leur début revient chaque heure, et reste en cours", async () => {
+    const jet = (t: number): Evenement => ({ t, s: 'A', e: 'jetons', n: 100, k: null, i: 1 })
+    // Les agents travaillent d'hier 20 h à aujourd'hui 20 h ; leur début est noté de nouveau chaque heure, et leurs tokens
+    // partent toutes les deux heures seulement.
+    const debut = h(20, 0, 11)
+    const evts = [
+      ev(h(19, 58, 11), 'A', 'message', 'FLO-I1'),
+      ev(debut, 'A', 'reponse', 'FLO-I1'),
+      ...Array.from({ length: 24 }, (_, i) => ev(debut + i * 60 * MINUTE, 'A', 'agents-debut', 'FLO-I1')),
+      ...Array.from({ length: 12 }, (_, i) => jet(debut + (i + 1) * 120 * MINUTE - MINUTE)),
+    ]
+    // Fini à 20 h : toute la journée jusque-là compte, sans question.
+    const { b, parItem } = minutesDuJour([...evts, ev(h(20), 'A', 'agents-fin', 'FLO-I1')], h(21))
+    expect(parItem).toEqual({ 'FLO-I1': 20 * 60 })
+    expect(b.ecarts).toEqual([])
+    // Encore au travail à 14 h : le compteur suit, et la session est en cours.
+    const avant = evts.filter(e => e.t <= h(14))
+    const vivants = new Map([['A', h(14)]])
+    expect(bilan(avant, R, h(14), JOUR, jourSuivant(JOUR), vivants).jours[0]?.lignes.map(l => l.minutes)).toEqual([14 * 60])
+    expect(calculer(avant, R, h(14), vivants).actives.get('A')).toBe('FLO-I1')
+  })
+
+  test("des agents sans nouveau signe depuis plus de 12 h ne comptent plus : leur fin n'a pas été vue", async () => {
+    const evts = [ev(h(19, 58, 11), 'A', 'message', 'FLO-I1'), ev(h(20, 0, 11), 'A', 'reponse', 'FLO-I1'), ev(h(20, 0, 11), 'A', 'agents-debut', 'FLO-I1')]
+    // La session vit encore à 9 h, mais leur début n'est plus revenu depuis 13 h.
+    const c = calculer(evts, R, h(9), new Map([['A', h(9)]]))
+    expect(c.plages.filter(p => p.fin > JOUR)).toEqual([])
+    expect(c.actives.size).toBe(0)
+  })
+
   test("une attente de travail de fond compte quand elle finit avec ce travail ; revenu avant, c'est une pause", async () => {
     const jet = (t: number, s: string): Evenement => ({ t, s, e: 'jetons', n: 100, k: null })
     // A : Claude lance une commande en fond et l'attend 1 h 30 ; la commande finit et le réveille.

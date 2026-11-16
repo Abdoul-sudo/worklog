@@ -4,7 +4,8 @@ import { type Langue, LANGUES, t as texte } from './langue'
 
 export const SANS_ITEM = 'sans nom'
 export const MINUTE = 60_000
-// Un tour de Claude, ou des sous-agents, actifs plus longtemps sans fin notée sont tenus pour abandonnés.
+// Un tour de Claude actif plus longtemps sans fin notée, ou des sous-agents sans nouveau signe pendant ce temps, sont
+// tenus pour abandonnés : leur fin n'a pas été vue.
 const DUREE_MAX_TOUR = 12 * 60 * MINUTE
 // Chaque session vivante donne signe de vie toutes les 30 s ; au-delà de cette marge, elle est tenue pour morte
 // (fenêtre fermée sans fin de session notée).
@@ -73,7 +74,8 @@ export function lireOptions(brut: unknown): Options {
 }
 
 export type Choix = 'travail' | 'pause'
-// `agents-debut` et `agents-fin` : des sous-agents (workflows, Ultracode) travaillent, puis s'arrêtent.
+// `agents-debut` et `agents-fin` : des sous-agents (workflows, Ultracode) travaillent, puis s'arrêtent. Pendant un long
+// travail, `agents-debut` revient chaque heure : les agents travaillent encore.
 // `fond-debut` et `fond-fin` : Claude attend un travail de fond (une commande, un Monitor), puis l'un d'eux finit.
 export type Activite =
   | 'ouverture'
@@ -291,7 +293,8 @@ export function calculer(
 
     // Début du tour de Claude en cours : entre un message et sa réponse, Claude travaille.
     let debutTour: number | null = null
-    // Début du travail des sous-agents : tant qu'ils tournent, Claude travaille aussi, même sans message.
+    // Dernier signe des sous-agents (leur début, noté de nouveau chaque heure) : tant qu'ils tournent, Claude travaille
+    // aussi, même sans message.
     let debutAgents: number | null = null
     // Claude attend un travail de fond (une commande, un Monitor).
     let attenteFond = false
@@ -311,7 +314,7 @@ export function calculer(
       } else if (!['item', 'pause', 'agents-debut', 'agents-fin', 'fond-debut', 'fond-fin'].includes(a.e)) {
         debutTour = null
       }
-      if (a.e === 'agents-debut') debutAgents ??= a.t
+      if (a.e === 'agents-debut') debutAgents = a.t
       if (a.e === 'agents-fin') debutAgents = null
       if (a.e === 'fond-debut') attenteFond = true
       if (a.e === 'fond-fin') attenteFond = false

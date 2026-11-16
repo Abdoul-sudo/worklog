@@ -148,6 +148,11 @@ let derniereActiviteAgents = -Infinity
 const agentsEnTour = new Set<string>()
 /** Sans signe d'un agent pendant ce délai, ses agents ont fini. Un appel au modèle peut durer quelques minutes. */
 const SILENCE_AGENTS_MS = 5 * 60_000
+/** Pendant un long travail des agents, leur début est noté de nouveau à cet intervalle : le calcul sait qu'ils travaillent
+ * encore. */
+const RAPPEL_AGENTS_MS = 60 * 60_000
+// Le dernier `agents-debut` noté par cette session.
+let dernierDebutAgents = -Infinity
 // Les travaux de fond (une commande, un Monitor, un workflow) encore en cours à la fin du dernier tour : Claude les attend.
 let tachesDeFond = new Set<string>()
 // Minutes des jours passés pour la frise, recalculées une fois par jour ou après une correction.
@@ -408,11 +413,15 @@ async function suivreAgents($: Moteur): Promise<void> {
     if (rechargement && (await dernierEtatAgents($)) === 'agents-debut') await noterActivite($, 'agents-fin')
     return
   }
-  if (occupes === agentsOccupes) return
+  if (occupes === agentsOccupes) {
+    if (occupes && maintenant - dernierDebutAgents >= RAPPEL_AGENTS_MS) dernierDebutAgents = await noterActivite($, 'agents-debut')
+    return
+  }
   agentsOccupes = occupes
   // Les agents d'un workflow ont fini à leur dernier signe, pas quand ce silence est remarqué.
   const fin = !occupes && !listes && derniereActiviteAgents > -Infinity ? derniereActiviteAgents : undefined
-  await noterActivite($, occupes ? 'agents-debut' : 'agents-fin', fin)
+  const t = await noterActivite($, occupes ? 'agents-debut' : 'agents-fin', fin)
+  if (occupes) dernierDebutAgents = t
 }
 
 /** Le dernier état des agents noté aujourd'hui dans le journal de la session : `agents-debut`, `agents-fin`, ou null. */

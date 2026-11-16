@@ -740,11 +740,13 @@ test("les agents d'un workflow (Ultracode), absents de la liste des agents, font
 })
 
 test('quand des sous-agents travaillent deux heures, le temps compte et aucune question ne vient', async ($, on) => {
-  const { horloge, etat } = monde(on)
+  const { horloge, etat, fichiers } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
   await travailler($, horloge, 'FLO-I165 : lance le workflow', 1)
   etat.agents = [{ id: 'a1', status: 'running' }]
   await horloge.advance(120 * 60_000)
+  // Pendant ce long travail, leur début est noté de nouveau au bout d'une heure : le signe qu'ils travaillent encore.
+  expect((fichiers.get(JOURNAL) ?? '').split('\n').filter(l => l.includes('"agents-debut"')).length).toBe(2)
   etat.agents = [{ id: 'a1', status: 'completed' }]
   await horloge.advance(60_000)
   await $.prompt.submit({ ...PROMPT, text: 'je regarde le résultat' })
