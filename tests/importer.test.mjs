@@ -215,3 +215,27 @@ test("une réponse recopiée dans une conversation reprise donne son détail à 
     fs.rmSync(racine, { recursive: true, force: true })
   }
 })
+
+test("une reprise faite après la mise à jour reconnaît les messages déjà importés par une version passée", () => {
+  const { racine, projets, sortie } = monde()
+  try {
+    // La conversation, importée par une version passée : son message n'a pas laissé son uuid.
+    const message = (s) => ligne({ type: 'user', sessionId: s, uuid: 'u1', cwd: 'D:\proj', timestamp: new Date(T).toISOString(), origin: { kind: 'human' }, message: { content: 'on avance' } })
+    const conversation = path.join(projets, 'D--proj', 'abc.jsonl')
+    fs.writeFileSync(conversation, message('abc') + reponse(1, 'D:\proj', 'r1'))
+    fs.mkdirSync(path.join(sortie, jour(T)), { recursive: true })
+    fs.writeFileSync(path.join(sortie, jour(T), 'abc.jsonl'), ligne({ t: T, s: 'abc', e: 'message', k: null, d: 'proj', i: 1 }) + ligne({ t: T + 60_000, s: 'abc', e: 'jetons', n: 15, k: null, d: 'proj', i: 1 }))
+    const etat = { version: 3, positions: { [path.join('D--proj', 'abc.jsonl')]: fs.statSync(conversation).size }, vus: { r1: 1 }, tours: {}, dossiers: {}, nomsCorriges: true, details: 4, copiesRetirees: true }
+    fs.writeFileSync(path.join(sortie, 'etat.json'), JSON.stringify(etat))
+    // Plus tard, l'app reprend la conversation : la copie recopie le message, puis l'on écrit un nouveau message.
+    const suite = ligne({ type: 'user', sessionId: 'aaa', uuid: 'u2', cwd: 'D:\proj', timestamp: new Date(T + 3 * 60_000).toISOString(), origin: { kind: 'human' }, message: { content: 'et ensuite' } })
+    fs.writeFileSync(path.join(projets, 'D--proj', 'aaa.jsonl'), message('aaa') + reponse(1, 'D:\proj', 'r1').replace('"sessionId":"abc"', '"sessionId":"aaa"') + suite)
+    importer(projets, sortie)
+    assert.deepEqual(
+      tousImportes(sortie).filter(ev => ev.e === 'message').map(ev => `${ev.s}@${(ev.t - T) / 60_000}`).sort(),
+      ['aaa@3', 'abc@0'],
+    )
+  } finally {
+    fs.rmSync(racine, { recursive: true, force: true })
+  }
+})

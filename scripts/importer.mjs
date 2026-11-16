@@ -52,7 +52,7 @@ const lireEtat = () => {
     const etat = JSON.parse(fs.readFileSync(fichierEtat, 'utf8'))
     if (etat.version === VERSION) return etat
   } catch {}
-  return { version: VERSION, positions: {}, vus: {}, tours: {}, dossiers: {}, nomsCorriges: true, details: DETAILS, copiesRetirees: true }
+  return { version: VERSION, positions: {}, vus: {}, tours: {}, dossiers: {}, nomsCorriges: true, details: DETAILS, copiesRetirees: true, uuidsConnus: true }
 }
 const etat = lireEtat()
 // Le nom de chaque session : le dossier où elle a démarré. Claude se déplace parfois dans un sous-dossier du projet
@@ -352,6 +352,28 @@ function retirerCopies() {
   }
 }
 
+/** Une fois : les uuid des messages écrits par une personne, dans la partie déjà importée de chaque conversation. Une
+ * version passée ne les gardait pas : une reprise faite après la mise à jour les recopierait sans qu'on les reconnaisse. */
+async function connaitreMessages() {
+  for (const fichier of fichiers) {
+    if (fichier.split(path.sep).includes('subagents')) continue
+    const fin = etat.positions[path.relative(projets, fichier)] ?? 0
+    if (fin === 0) continue
+    for await (const ligne of readline.createInterface({ input: fs.createReadStream(fichier, { end: fin - 1 }) })) {
+      if (!ligne.includes('"uuid"') || !ligne.includes('"type":"user"')) continue
+      let ev
+      try {
+        ev = JSON.parse(ligne)
+      } catch {
+        continue
+      }
+      const t = Date.parse(ev.timestamp)
+      const texte = texteDe(ev.message?.content).trim()
+      if (ev.isSidechain !== true && typeof ev.uuid === 'string' && t > 0 && texte !== '' && estHumain(ev, texte)) vus.set(ev.uuid, Math.floor(t / JOUR))
+    }
+  }
+}
+
 const fichiers = []
 const parcourir = dossier => {
   for (const entree of fs.readdirSync(dossier, { withFileTypes: true })) {
@@ -363,6 +385,11 @@ const parcourir = dossier => {
 
 try {
   parcourir(projets)
+  // Une fois, avant de lire : les messages déjà importés sont reconnus dans une reprise.
+  if (etat.uuidsConnus !== true) {
+    await connaitreMessages()
+    etat.uuidsConnus = true
+  }
   for (const fichier of fichiers) {
     const cle = path.relative(projets, fichier)
     const avant = etat.positions[cle] ?? 0
