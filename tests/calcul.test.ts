@@ -23,7 +23,7 @@ import {
   lireLignes,
 } from '../hooks/calcul'
 import { casesEntre, cellulesActivite, serie, svgActivite } from '../hooks/activite'
-import { couleurs } from '../hooks/dessins'
+import { choisirTheme, couleurs, svgCiel } from '../hooks/dessins'
 import { choisirLangue } from '../hooks/langue'
 
 // Ces tests lisent les textes en français ; ceux en anglais choisissent leur langue.
@@ -591,6 +591,19 @@ describe('corrections, tokens et périodes', () => {
     // Une case par jour de l'année, rien sous les jours d'avant le 1er janvier : pas de fond plein sous toute la frise.
     expect([...source.matchAll(/<rect /g)].length).toBe(liste.filter(c => c.minutes !== -1).length)
     expect(source).toMatch(/stroke="#[0-9A-F]{6}" stroke-opacity=".6"><title>Aujourd'hui<\/title>/)
+  })
+
+  test("le fond animé est calé sur l'heure : relancé, il reprend là où il en était", async () => {
+    choisirTheme('ocean')
+    try {
+      const retards = (t: number) => [...svgCiel(t)!.matchAll(/animation:(\w+) ([\d.]+)s [\w-]+ (-?[\d.]+)s infinite( alternate)?/g)].map(m => [m[1], Number(m[3]) + 0])
+      // La première vague fait le tour en 34 s ; sa houle va et vient en 7 s (une période de 14 s).
+      expect(retards(0).slice(0, 2)).toEqual([['d', 0], ['s', 0]])
+      expect(retards(10_000).slice(0, 2)).toEqual([['d', -10], ['s', -10]])
+      expect(retards(40_000).slice(0, 2)).toEqual([['d', -6], ['s', -12]])
+    } finally {
+      choisirTheme('nuit')
+    }
   })
 
   test("dans le terminal, la frise montre toute l'année en cases, les mois au-dessus", async () => {
