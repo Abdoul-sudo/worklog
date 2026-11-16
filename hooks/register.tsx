@@ -330,9 +330,17 @@ async function lireRecents($: Moteur): Promise<string[]> {
 }
 
 /** Fixe l'item de la session et le garde dans les items récents. */
+/** La clé de la conversation dans l'app desktop : elle reste la même quand la session reprend sous un autre id. */
+async function cleConversation($: Moteur): Promise<string | null> {
+  const hote = await $.env.get('CLAUDE_CODE_HOST_SESSION_ID')
+  return hote === undefined ? null : `conversation:${hote}`
+}
+
 async function definirItem($: Moteur, s: string, item: string, manuel: boolean): Promise<void> {
   await $.store.set(`item:${s}`, item)
   await $.store.set(`manuel:${s}`, manuel)
+  const conversation = await cleConversation($)
+  if (conversation !== null) await $.store.set(conversation, { item, manuel })
   await $.store.set('recents', ajouterRecent(await lireRecents($), item))
 }
 
@@ -1492,6 +1500,14 @@ export const register: Register = on => {
     await lireReglages($)
     await $.command.register({ name: 'worklog', description: t().commande.description, argumentHint: t().commande.indice, immediate: true })
     const s = await $.session.id()
+    // Une conversation de l'app desktop reprise (après un redémarrage de l'app, par exemple) continue sous un autre id :
+    // elle garde le nom qu'elle avait.
+    const conversation = await cleConversation($)
+    const reprise = conversation === null ? undefined : await $.store.get(conversation)
+    if (typeof reprise === 'object' && reprise !== null && typeof (reprise as { item?: unknown }).item === 'string' && (await itemDe($, s)) === null) {
+      const { item, manuel } = reprise as { item: string; manuel?: unknown }
+      await definirItem($, s, item, manuel === true)
+    }
     const deBranche = await itemDeNouvelleBranche($, MOTIF_ID)
     if (deBranche !== null && (await itemDe($, s)) === null) await definirItem($, s, deBranche, false)
     // Après /reload-plugins, ce hook revient dans un processus vivant : ce n'est pas une ouverture.

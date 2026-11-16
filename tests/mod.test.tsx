@@ -232,6 +232,20 @@ test("une session lancée dans un dossier d'attente prend le nom de son vrai dos
   expect(await ligneDe($, 'spare-jvM1jf')).toBeUndefined()
 })
 
+test("une conversation de l'app desktop reprise sous un autre id garde le nom choisi", async ($, on) => {
+  const { horloge, etat } = monde(on, ['desktop'], { CLAUDE_CODE_HOST_SESSION_ID: 'local_conv' })
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await $.command.run({ ...COMMANDE, args: 'claude mod' })
+  await travailler($, horloge, 'une tâche', 10)
+  // L'app relance la conversation : le processus repart sous un autre id.
+  etat.session = 'S2'
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await travailler($, horloge, 'la suite', 5)
+  const puce = await $.ui.mount({ ...PIED, surface: 'desktop' })
+  await puceAffiche(puce, 'claude mod', '5 min')
+  await puce.unmount()
+})
+
 test("un item choisi à la main ne change plus tout seul ; deux sessions sur un même ID sont regroupées", async ($, on) => {
   const { horloge, etat } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
