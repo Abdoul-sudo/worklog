@@ -74,7 +74,18 @@ export function lireOptions(brut: unknown): Options {
 
 export type Choix = 'travail' | 'pause'
 // `agents-debut` et `agents-fin` : des sous-agents (workflows, Ultracode) travaillent, puis s'arrêtent.
-export type Activite = 'ouverture' | 'message' | 'reponse' | 'item' | 'pause' | 'fermeture' | 'agents-debut' | 'agents-fin'
+// `fond-debut` et `fond-fin` : Claude attend un travail de fond (une commande, un Monitor), puis l'un d'eux finit.
+export type Activite =
+  | 'ouverture'
+  | 'message'
+  | 'reponse'
+  | 'item'
+  | 'pause'
+  | 'fermeture'
+  | 'agents-debut'
+  | 'agents-fin'
+  | 'fond-debut'
+  | 'fond-fin'
 // `k` : l'item choisi ou trouvé (ID cité, branche Git, choix dans la liste).
 // `d` : le nom par défaut de la session (le dossier du projet).
 // `i` : l'événement vient de l'historique de Claude Code (scripts/importer.mjs), pas du journal tenu par le mod.
@@ -282,6 +293,8 @@ export function calculer(
     let debutTour: number | null = null
     // Début du travail des sous-agents : tant qu'ils tournent, Claude travaille aussi, même sans message.
     let debutAgents: number | null = null
+    // Claude attend un travail de fond (une commande, un Monitor).
+    let attenteFond = false
     // Après une pause notée au journal (versions passées), jusqu'au prochain message : seul le travail de Claude compte encore, jusqu'à sa fin.
     let arrete = false
     for (let i = 0; i < liste.length; i++) {
@@ -290,15 +303,18 @@ export function calculer(
       if (a.relance) {
         debutTour = null
         debutAgents = null
+        attenteFond = false
       }
       if (a.e === 'message') {
         debutTour = debutTour !== null && a.t - debutTour <= DUREE_MAX_TOUR ? debutTour : a.t
         arrete = false
-      } else if (a.e !== 'item' && a.e !== 'agents-debut' && a.e !== 'agents-fin' && a.e !== 'pause') {
+      } else if (!['item', 'pause', 'agents-debut', 'agents-fin', 'fond-debut', 'fond-fin'].includes(a.e)) {
         debutTour = null
       }
       if (a.e === 'agents-debut') debutAgents ??= a.t
       if (a.e === 'agents-fin') debutAgents = null
+      if (a.e === 'fond-debut') attenteFond = true
+      if (a.e === 'fond-fin') attenteFond = false
       if (a.e === 'pause') arrete = true
       if (a.e === 'fermeture') continue
 
@@ -312,7 +328,10 @@ export function calculer(
       // Une pause courte compte au retour. Plus longue, elle compte si les tokens n'ont pas cessé de partir : des agents
       // travaillaient.
       const travailAgents = fin - a.t <= seuil || plusLongSilence(session, a.t, fin) <= SILENCE_TRAVAIL
-      if (claudeTravaille || (!ouverte && travailAgents)) {
+      // Claude attend un travail de fond : l'attente compte pendant qu'elle dure, et au bout si elle finit avec ce travail.
+      // Si la personne revient avant (un serveur qui ne finit jamais, par exemple), c'est une pause comme une autre.
+      const attente = attenteFond && (ouverte || b?.e === 'fond-fin')
+      if (claudeTravaille || attente || (!ouverte && travailAgents)) {
         plages.push(plage)
         if (ouverte) actives.set(session, plage.item)
       } else if (b !== undefined && fin - a.t <= pauseMax) {

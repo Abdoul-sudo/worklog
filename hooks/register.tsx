@@ -148,10 +148,8 @@ let derniereActiviteAgents = -Infinity
 const agentsEnTour = new Set<string>()
 /** Sans signe d'un agent pendant ce délai, ses agents ont fini. Un appel au modèle peut durer quelques minutes. */
 const SILENCE_AGENTS_MS = 5 * 60_000
-// Du travail de fond tournait encore à la fin du dernier tour (une commande, un Monitor, un workflow) : Claude l'attend.
-let travailDeFond = false
-// Quand un tour a vu ce travail de fond fini : son temps s'arrête là.
-let finTravailDeFond = -Infinity
+// Les travaux de fond (une commande, un Monitor, un workflow) encore en cours à la fin du dernier tour : Claude les attend.
+let tachesDeFond = new Set<string>()
 // Minutes des jours passés pour la frise, recalculées une fois par jour ou après une correction.
 let cacheFrise: { cle: string; minutes: Map<string, number>; jetons: Map<string, number> } | null = null
 // Le dernier lancement de l'importation de l'historique, dans cette session.
@@ -398,12 +396,12 @@ async function noterJetons($: Moteur, n: number): Promise<void> {
   await noter($, { t: await $.clock.now(), s, e: 'jetons', n, k: await itemDe($, s), ...(d === undefined ? {} : { d }) })
 }
 
-/** Note quand des sous-agents (workflows, Ultracode) ou du travail de fond commencent ou cessent : ce temps compte. */
+/** Note quand des sous-agents (workflows, Ultracode) commencent ou cessent de travailler : ce temps compte. */
 async function suivreAgents($: Moteur): Promise<void> {
   const maintenant = await $.clock.now()
   const listes = (await $.agent.list()).some(a => a.status === 'running' || a.status === 'pending' || a.status === 'waiting')
   // Un tour d'agent sans fin notée ni signe depuis SILENCE_AGENTS_MS est tenu pour fini (un workflow arrêté, par exemple).
-  const occupes = listes || travailDeFond || (agentsEnTour.size > 0 && maintenant - derniereActiviteAgents < SILENCE_AGENTS_MS)
+  const occupes = listes || (agentsEnTour.size > 0 && maintenant - derniereActiviteAgents < SILENCE_AGENTS_MS)
   if (agentsOccupes === null && !occupes) {
     agentsOccupes = false
     // Après un rechargement des mods, des agents notés au travail avant lui ont pu finir sans que leur fin soit vue.
@@ -412,10 +410,8 @@ async function suivreAgents($: Moteur): Promise<void> {
   }
   if (occupes === agentsOccupes) return
   agentsOccupes = occupes
-  // Les agents d'un workflow ont fini à leur dernier signe, pas quand ce silence est remarqué ; le travail de fond, au
-  // tour qui l'a vu fini.
-  const dernierSigne = Math.max(derniereActiviteAgents, finTravailDeFond)
-  const fin = !occupes && !listes && dernierSigne > -Infinity ? dernierSigne : undefined
+  // Les agents d'un workflow ont fini à leur dernier signe, pas quand ce silence est remarqué.
+  const fin = !occupes && !listes && derniereActiviteAgents > -Infinity ? derniereActiviteAgents : undefined
   await noterActivite($, occupes ? 'agents-debut' : 'agents-fin', fin)
 }
 
@@ -1619,12 +1615,20 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // À la fin de chaque tour, le moteur dit quel travail de fond tourne encore : Claude l'attend, ce temps compte.
-  on('classic.Stop', async ($, e, next) => {
-    const enCours = (e.background_tasks ?? []).length > 0
-    if (travailDeFond && !enCours) finTravailDeFond = await $.clock.now()
-    travailDeFond = enCours
-    enFond(rafraichir($))
+  // À la fin de chaque tour, le moteur dit quels travaux de fond tournent encore : Claude les attend. L'attente compte quand
+  // l'un d'eux finit ; si la personne revient avant (un serveur qui ne finit jamais), c'est une pause.
+  on('classic.Stop', ($, e, next) => {
+    const ids = new Set((e.background_tasks ?? []).map(x => x.id))
+    const fini = [...tachesDeFond].some(id => !ids.has(id))
+    const nouvelleAttente = ids.size > 0 && (tachesDeFond.size === 0 || fini)
+    tachesDeFond = ids
+    enFond(
+      (async () => {
+        if (fini) await noterActivite($, 'fond-fin')
+        if (nouvelleAttente) await noterActivite($, 'fond-debut')
+        await rafraichir($)
+      })(),
+    )
     return next(e)
   })
 

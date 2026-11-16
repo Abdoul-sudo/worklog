@@ -775,9 +775,6 @@ test("quand un sous-agent a fini, la session n'est plus en cours et son temps s'
 test("une commande de fond que Claude attend garde la session en cours ; sa fin arrête le temps", async ($, on) => {
   const { horloge } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
-  // Un agent a travaillé plus tôt : la fin du travail de fond ne recule pas jusqu'à lui.
-  await $.turn.start({ text: '', turnId: 'a1-t', agentId: 'a1' })
-  await $.turn.complete({ ...FIN_DE_TOUR, turnId: 'a1-t', agentId: 'a1' })
   await travailler($, horloge, 'FLO-I165 : lance les extractions', 1)
   // Le tour finit, mais une commande tourne encore en fond : Claude attend sa fin.
   const extraction = { id: 'b1', type: 'shell', status: 'running', description: 'extractions', command: 'node extraire.mjs' }

@@ -178,6 +178,8 @@ Yes, with the default settings. Worklog adds the 30 minutes when you send the me
 
 Yes. The timer runs while they work, even when you do not type. Their tokens count too.
 
+A background command counts while Claude waits for it to end. If you come back before it ends, such as with a dev server that never stops, the wait is a break.
+
 </details>
 
 <details>

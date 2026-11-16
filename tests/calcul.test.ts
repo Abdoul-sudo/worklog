@@ -176,6 +176,39 @@ describe('écart court ou long', () => {
     expect(b.ecarts).toEqual([])
   })
 
+  test("une attente de travail de fond compte quand elle finit avec ce travail ; revenu avant, c'est une pause", async () => {
+    const jet = (t: number, s: string): Evenement => ({ t, s, e: 'jetons', n: 100, k: null })
+    // A : Claude lance une commande en fond et l'attend 1 h 30 ; la commande finit et le réveille.
+    const attendue = [
+      ev(h(9), 'A', 'message', 'FLO-I1'),
+      jet(h(9, 1), 'A'),
+      ev(h(9, 1), 'A', 'reponse', 'FLO-I1'),
+      ev(h(9, 1), 'A', 'fond-debut', 'FLO-I1'),
+    ]
+    // Pendant l'attente, la session est en cours et le temps court.
+    const vivants = new Map([['A', h(10)]])
+    expect(bilan(attendue, R, h(10), JOUR, jourSuivant(JOUR), vivants).jours[0]?.lignes.map(l => l.minutes)).toEqual([60])
+    expect(calculer(attendue, R, h(10), vivants).actives.get('A')).toBe('FLO-I1')
+    // La commande a fini : toute l'attente compte, sans question.
+    const finie = minutesDuJour([...attendue, ev(h(10, 31), 'A', 'fond-fin', 'FLO-I1')], h(11))
+    expect(finie.parItem).toEqual({ 'FLO-I1': 91 })
+    expect(finie.b.ecarts).toEqual([])
+    // B : un serveur lancé en fond ne finit jamais ; la personne revient 2 h plus tard : c'est une pause, avec sa question.
+    const serveur = minutesDuJour(
+      [
+        ev(h(9), 'B', 'message', 'FSY-I2'),
+        jet(h(9, 1), 'B'),
+        ev(h(9, 1), 'B', 'reponse', 'FSY-I2'),
+        ev(h(9, 1), 'B', 'fond-debut', 'FSY-I2'),
+        ev(h(11, 1), 'B', 'message', 'FSY-I2'),
+        ev(h(11, 2), 'B', 'reponse', 'FSY-I2'),
+      ],
+      h(11, 2),
+    )
+    expect(serveur.parItem).toEqual({ 'FSY-I2': 2 })
+    expect(serveur.b.ecarts).toEqual([{ item: 'FSY-I2', debut: h(9, 1), fin: h(11, 1), session: 'B' }])
+  })
+
   test("des tokens dépensés pendant un silence (Ultracode, workflows) prouvent que Claude travaille : pas de question", async () => {
     const jet = (t: number, n: number): Evenement => ({ t, s: 'A', e: 'jetons', n, k: null, i: 1 })
     const { b, parItem } = minutesDuJour(
