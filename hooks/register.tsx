@@ -633,7 +633,8 @@ async function renommer($: Moteur, ancien: string, nouveau: string): Promise<voi
   if (nouveau === '' || nouveau === ancien) return
   const { renommages } = await lireCorrections($)
   const suite: Record<string, string> = { ...renommages, [ancien]: nouveau }
-  delete suite[nouveau]
+  // Revenir à un ancien nom de cet item défait son renommage ; un renommage d'un autre item reste.
+  if (nommer(nouveau, renommages) === ancien) delete suite[nouveau]
   await $.store.set('renommages', suite)
   await $.store.set('recents', (await lireRecents($)).map(t => (t === ancien ? nouveau : t)))
   const s = await $.session.id()
