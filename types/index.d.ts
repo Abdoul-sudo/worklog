@@ -40,11 +40,11 @@ export type Vue = {
 /** La frise d'activité : une case par jour ; `aujourdhui` quand elle contient aujourd'hui ; `periode`, la période que
  * montre l'onglet, mise en avant dans la frise. */
 export type Frise = {
-  cases: { t: number; minutes: number; jetons?: number }[]
+  cases: { t: number; minutes: number; jetons?: number; cout?: number }[]
   aujourdhui: boolean
   periode: { debut: number; fin: number } | null
-  /** Le réglage « Afficher » : avec « Tokens », les cases suivent les tokens, et non le temps ; l'infobulle d'une case ne
-   * donne que ce qui est affiché. */
+  /** Le réglage « Afficher » : avec « Tokens et prix », les cases suivent les tokens, et non le temps ; l'infobulle d'une
+   * case ne donne que ce qui est affiché. */
   mesure: Reglages['mesure']
   /** La série de jours travaillés jusqu'à aujourd'hui, celle de l'année d'avant comprise ; null sans aujourd'hui. */
   serie: number | null
@@ -56,8 +56,8 @@ export type Reglages = {
   pauseMax: number
   activite: boolean
   langue: 'en' | 'fr'
-  /** Ce que le popover montre : le temps et les tokens, ou l'un des deux. */
-  mesure: 'tout' | 'temps' | 'jetons'
+  /** Ce que le popover montre à côté des tokens : le temps (`tout`), ou leur prix API (`jetons`). */
+  mesure: 'tout' | 'jetons'
   /** Le thème du popover : ses couleurs et son fond animé. */
   theme: 'nuit' | 'simple' | 'aurore' | 'braise' | 'foret' | 'ocean' | 'crepuscule' | 'sakura'
 }

@@ -464,7 +464,7 @@ function parentDe(n: Noeud, cle: string): Noeud | undefined {
   return undefined
 }
 
-test('« Afficher : Tokens » : les stats restent groupées, et les tokens prennent la place du temps', async ($, on) => {
+test('« Afficher : Tokens et prix » : le prix prend la place du temps, et les stats restent groupées', async ($, on) => {
   const { horloge } = monde(on, ['desktop'])
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
   await travailler($, horloge, 'FLO-I1', 10)
@@ -475,12 +475,14 @@ test('« Afficher : Tokens » : les stats restent groupées, et les tokens prenn
   await bande.select({ key: 'mesure', value: 'jetons' })
   await bande.press({ key: 'reglages' })
   expect(await bande.find({ type: 'Text', text: /^Temps$/ })).toBeUndefined()
-  // Deux stats sur trois : elles restent côte à côte, sans grand vide entre elles.
+  expect(await bande.find({ type: 'Text', text: /^Prix API$/ })).toBeDefined()
+  // Les stats restent côte à côte, sans grand vide entre elles.
   const stats = parentDe((await bande.drawn()) as Noeud, 'stat-jetons')
   expect(stats?.props).toMatchObject({ flexDirection: 'row' })
   expect(stats?.props?.justifyContent).toBeUndefined()
-  // Dans la ligne, les tokens ont la taille et l'encre du temps.
-  expect(await bande.find({ type: 'Text', text: /^1 k tokens$/ })).toMatchObject({ props: { size: 'footnote' } })
+  // Dans la ligne, les tokens gardent leur place et leur taille ; le prix prend celle du temps.
+  expect(await bande.find({ type: 'Text', text: /^1 k tokens$/ })).toMatchObject({ props: { size: 'caption' } })
+  expect(await bande.find({ type: 'Text', text: /^10 min$/ })).toBeUndefined()
   // La croix des réglages : grise, comme l'engrenage.
   await bande.press({ key: 'reglages' })
   expect(await bande.find({ type: 'Text', text: /^✕$/ })).toBeUndefined()
@@ -491,7 +493,7 @@ test('« Afficher : Tokens » : les stats restent groupées, et les tokens prenn
 const PRIX_FICHIER = 'C:/Users/test/.claude/worklog/prix.json'
 const LITELLM = 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json'
 
-test("le prix API des tokens s'affiche à côté d'eux, dans la ligne et dans les stats", async ($, on) => {
+test("le prix API est toujours calculé ; « Tokens et prix » l'affiche à la place du temps, dans la ligne et dans les stats", async ($, on) => {
   const { horloge, fichiers } = monde(on, ['desktop'])
   // Des prix gardés ce matin : le mod ne les télécharge pas de nouveau.
   fichiers.set(PRIX_FICHIER, JSON.stringify({ maj: h(8), modeles: { 'claude-opus-5-5': { input_cost_per_token: 4e-6, output_cost_per_token: 2e-5 } } }))
@@ -506,10 +508,15 @@ test("le prix API des tokens s'affiche à côté d'eux, dans la ligne et dans le
   const puce = await $.ui.mount({ ...PIED, surface: 'desktop' })
   const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
   await puce.press({ key: 'puce' })
+  // Par défaut, « Temps et tokens » : le prix n'est pas affiché.
+  expect(await bande.find({ type: 'Text', text: /\$/ })).toBeUndefined()
+  await bande.press({ key: 'reglages' })
+  await bande.select({ key: 'mesure', value: 'jetons' })
+  await bande.press({ key: 'reglages' })
   // 1 000 tokens lus à 4 $ le million, 100 000 écrits à 20 $ le million.
-  expect(await bande.find({ type: 'Text', text: /^101 k tokens · 2,00 \$$/ })).toBeDefined()
-  expect(await bande.find({ type: 'Text', text: /^101 k · 2,00 \$$/ })).toBeDefined()
-  expect(await bande.find({ type: 'Text', text: /^Prix API, pas votre facture$/ })).toBeDefined()
+  expect(await bande.find({ type: 'Text', text: /^101 k tokens$/ })).toBeDefined()
+  expect((await bande.findAll({ type: 'Text', text: /^2,00 \$$/ })).length).toBe(2)
+  expect(await bande.find({ type: 'Text', text: /^Au tarif de l'API, pas votre facture$/ })).toBeDefined()
   await puce.unmount()
   await bande.unmount()
 })

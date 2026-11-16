@@ -703,16 +703,23 @@ describe('corrections, tokens et périodes', () => {
     expect(avenir[7]!.minutes).toBe(0)
   })
 
-  test("au survol, une case donne aussi les tokens du jour ; en mode Tokens, sa couleur les suit", async () => {
+  test("au survol, une case donne aussi les tokens du jour ; en mode Tokens et prix, sa couleur les suit et son infobulle a le prix", async () => {
     const debut = new Date(2026, 0, 5).getTime() // un lundi
     const fin = new Date(2026, 0, 6).getTime()
-    const liste = casesEntre(debut, fin, new Map([['2026-01-05', 30], ['2026-01-06', 30]]), Infinity, new Map([['2026-01-05', 1_500_000], ['2026-01-06', 15_000]]))
+    const liste = casesEntre(
+      debut,
+      fin,
+      new Map([['2026-01-05', 30], ['2026-01-06', 30]]),
+      Infinity,
+      new Map([['2026-01-05', 1_500_000], ['2026-01-06', 15_000]]),
+      new Map([['2026-01-05', 3.4]]),
+    )
     expect(liste.map(c => c.jetons)).toEqual([1_500_000, 15_000])
     const { source } = svgActivite(liste, null, null)
     expect(source).toContain('30 min · 1,5 M tokens')
     // L'infobulle ne donne que ce que montre le réglage « Afficher ».
-    expect(svgActivite(liste, null, null, 'temps').source).toContain('<title>Lundi 5 janvier · 30 min</title>')
-    expect(svgActivite(liste, null, null, 'jetons').source).toContain('<title>Lundi 5 janvier · 1,5 M tokens</title>')
+    expect(svgActivite(liste, null, null, 'jetons').source).toContain('<title>Lundi 5 janvier · 1,5 M tokens · 3,40 $</title>')
+    expect(svgActivite(liste, null, null, 'jetons').source).toContain('<title>Mardi 6 janvier · 15 k tokens</title>')
     // Même temps, tokens très différents : par temps, les deux cases ont la même intensité ; par tokens, non.
     const peintures = (svg: string) => [...svg.matchAll(/ rx="[\d.]+" ([^>]*)><title>/g)].map(m => m[1])
     expect(new Set(peintures(source)).size).toBe(1)

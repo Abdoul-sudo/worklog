@@ -134,7 +134,7 @@ To click in Worklog in the terminal, use the fullscreen mode: `/tui fullscreen`.
 | Setting | Default | What it does |
 | --- | --- | --- |
 | Show the activity heatmap | On | Shows one square for each day of the year. |
-| Show | Time and tokens | Shows the time, the tokens, or both. |
+| Show | Time and tokens | Shows the time and the tokens, or the tokens and their API price. |
 | Language | English | English or French. |
 | Stay active during breaks | Up to 1h | A shorter break counts as work. |
 | Then ask | Up to 4h | Worklog asks about a longer break, up to this length. **Never** turns off the question. |
@@ -190,9 +190,11 @@ Yes, if Node.js is installed. On the first start, Worklog reads your Claude Code
 </details>
 
 <details>
-<summary><strong>What is the dollar amount next to the tokens?</strong></summary>
+<summary><strong>What is the API price?</strong></summary>
 
-It is the API cost: the price of these tokens at the Anthropic API list prices. With a Pro or Max plan, it is not what you pay.
+It is the price of your tokens at the Anthropic API list prices. With a Pro or Max plan, it is not what you pay.
+
+To see it, set **Show** to **Tokens and price**. The price then takes the place of the time. Worklog counts the price all the time, also when it does not show it.
 
 Worklog takes the prices from the public [LiteLLM price list](https://github.com/BerriAI/litellm). It gets the list again once a day.
 
@@ -211,7 +213,7 @@ Work outside Claude Code: meetings, calls and other tools.
 
 Worklog keeps its data on your computer, in `~/.claude/worklog/`. It does not keep your messages. It sends no data about you or your work over the network.
 
-Once a day, Worklog downloads the public LiteLLM price list to show the API cost. To stop this download, set the environment variable `WORKLOG_PRICES` to `off`.
+Once a day, Worklog downloads the public LiteLLM price list to count the API price. To stop this download, set the environment variable `WORKLOG_PRICES` to `off`.
 
 To keep the data in another folder, set the environment variable `WORKLOG_DATA_DIR`.
 

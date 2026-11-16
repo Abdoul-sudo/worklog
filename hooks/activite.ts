@@ -1,11 +1,11 @@
 // La frise d'activité, comme celle de GitHub : une case par jour, une colonne par semaine.
 // Logique pure, testée par tests/activite.test.ts.
-import { cleJour, debutJour, debutSemaine, decalerJours, formatDuree, formatJetons, formatJour, majuscule } from './calcul'
+import { cleJour, debutJour, debutSemaine, decalerJours, formatCout, formatDuree, formatJetons, formatJour, majuscule } from './calcul'
 import { ENCRE, aUnCiel } from './dessins'
 import { t } from './langue'
 import type { Reglages } from '../types'
 
-export type Case = { t: number; minutes: number; jetons?: number }
+export type Case = { t: number; minutes: number; jetons?: number; cout?: number }
 
 /** Les jours de `debut` à `fin` (inclus), en semaines qui commencent le lundi. Les jours d'avant `debut` calent la grille
  * avec -1 minute : ils ne sont pas dessinés. Les jours après `aujourdhui` sont à venir : -2 minutes, une case à peine
@@ -16,13 +16,14 @@ export function casesEntre(
   minutesParJour: ReadonlyMap<string, number>,
   aujourdhui = Infinity,
   jetonsParJour: ReadonlyMap<string, number> = new Map(),
+  coutsParJour: ReadonlyMap<string, number> = new Map(),
 ): Case[] {
   const premier = debutJour(debut)
   const dernier = debutJour(fin)
   const liste: Case[] = []
   for (let t = debutSemaine(debut); t <= dernier; t = decalerJours(t, 1)) {
     const minutes = t < premier ? -1 : t > aujourdhui ? -2 : (minutesParJour.get(cleJour(t)) ?? 0)
-    liste.push(minutes < 0 ? { t, minutes } : { t, minutes, jetons: jetonsParJour.get(cleJour(t)) ?? 0 })
+    liste.push(minutes < 0 ? { t, minutes } : { t, minutes, jetons: jetonsParJour.get(cleJour(t)) ?? 0, cout: coutsParJour.get(cleJour(t)) ?? 0 })
   }
   return liste
 }
@@ -137,7 +138,9 @@ export function svgActivite(
     // Aujourd'hui sans son temps : le dessin ne change ainsi qu'au changement de niveau, pas à chaque minute.
     const temps = c.minutes > 0 ? formatDuree(c.minutes) : t().rien
     const jetons = (c.jetons ?? 0) > 0 ? t().tokens(formatJetons(c.jetons!)) : null
-    const valeur = mesure === 'temps' ? temps : mesure === 'jetons' ? (jetons ?? t().rien) : jetons === null ? temps : `${temps} · ${jetons}`
+    const prix = (c.cout ?? 0) > 0 ? formatCout(c.cout!) : null
+    const valeur =
+      mesure === 'jetons' ? (jetons === null ? t().rien : prix === null ? jetons : `${jetons} · ${prix}`) : jetons === null ? temps : `${temps} · ${jetons}`
     const infobulle = estAujourdhui ? t().aujourdhui : `${majuscule(formatJour(c.t))} · ${valeur}`
     const opacite = avenir ? 0.035 : OPACITES[n]!
     // Un jour à venir reste presque transparent : la frise ne montre pas de cases sombres après aujourd'hui.

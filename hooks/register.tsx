@@ -166,7 +166,7 @@ let dernierDebutAgents = -Infinity
 // Les travaux de fond (une commande, un Monitor, un workflow) encore en cours à la fin du dernier tour : Claude les attend.
 let tachesDeFond = new Set<string>()
 // Minutes des jours passés pour la frise, recalculées une fois par jour ou après une correction.
-let cacheFrise: { cle: string; minutes: Map<string, number>; jetons: Map<string, number> } | null = null
+let cacheFrise: { cle: string; minutes: Map<string, number>; jetons: Map<string, number>; couts: Map<string, number> } | null = null
 // Le dernier lancement de l'importation de l'historique, dans cette session.
 let importLance = -Infinity
 /** Les lignes d'une page dans la bande : quatre sur deux colonnes de deux, deux sur une seule (la bande reste basse). Le panneau, lui, remplit sa hauteur : ses rangées, moins celles de l'en-tête, des stats, de la frise et du
@@ -589,18 +589,21 @@ async function calculerFrise($: Moteur): Promise<void> {
       cle,
       minutes: new Map(b.jours.map(j => [cleJour(j.debut), j.total])),
       jetons: new Map(b.jours.map(j => [cleJour(j.debut), j.jetons])),
+      couts: new Map(b.jours.map(j => [cleJour(j.debut), j.cout])),
     }
   }
   const parJour = new Map(cacheFrise.minutes)
   const jetonsParJour = new Map(cacheFrise.jetons)
+  const coutsParJour = new Map(cacheFrise.couts)
   const contientAujourdhui = debut <= aujourdhui && aujourdhui <= fin
   // Aujourd'hui est la seule case qui bouge : elle est recalculée à chaque fois.
   if (contientAujourdhui) {
     const duJour = (await bilanDe($, aujourdhui, jourSuivant(aujourdhui))).b.jours[0]
     parJour.set(cleJour(aujourdhui), duJour?.total ?? 0)
     jetonsParJour.set(cleJour(aujourdhui), duJour?.jetons ?? 0)
+    coutsParJour.set(cleJour(aujourdhui), duJour?.cout ?? 0)
   }
-  const liste = casesEntre(debut, fin, parJour, aujourdhui, jetonsParJour)
+  const liste = casesEntre(debut, fin, parJour, aujourdhui, jetonsParJour, coutsParJour)
   // La période de l'onglet est mise en avant dans la frise ; l'année et Tout la couvrent déjà entière.
   const enAvant = etat.onglet === 'jour' || etat.onglet === 'semaine' || etat.onglet === 'mois'
   const periode = enAvant && regardee !== null ? { debut: regardee.debut, fin: regardee.fin } : null
@@ -948,13 +951,15 @@ function ordonner(toutes: Ligne[], actuel: string | null, derniere: Readonly<Rec
   return [...toutes].sort((a, b) => rang(a) - rang(b) || (derniere[b.item] ?? 0) - (derniere[a.item] ?? 0))
 }
 
-/** Une ligne : pastille (qui bat si l'item est en cours), nom, tokens et temps (selon le réglage « Afficher »). Au survol,
+/** Une ligne : pastille (qui bat si l'item est en cours), nom, tokens, puis le temps ou le prix API (selon le réglage
+ * « Afficher »). Au survol,
  * juste après le nom : ⇄ pour passer sur l'item (exprès, pour qu'un clic distrait ne déplace pas le temps), ou le crayon
  * pour renommer l'item de la session (un double-clic sur son nom aussi). */
 /** Les textes des chiffres d'une ligne, un tiret quand il n'y a rien : leur longueur fait la largeur des colonnes. */
-const avecCout = (jetons: string, cout: number) => (cout > 0 ? `${jetons} · ${formatCout(cout)}` : jetons)
-const texteJetons = (l: Ligne) => (l.jetons > 0 ? avecCout(t().tokens(formatJetons(l.jetons)), l.cout) : '—')
-const texteTemps = (l: Ligne) => (l.minutes > 0 ? formatDuree(l.minutes) : '—')
+const texteJetons = (l: Ligne) => (l.jetons > 0 ? t().tokens(formatJetons(l.jetons)) : '—')
+/** La colonne de droite : le temps, ou avec « Tokens et prix », le prix API des tokens. */
+const texteValeur = (l: Ligne, mesure: Mesure) =>
+  mesure === 'jetons' ? (l.cout > 0 ? formatCout(l.cout) : '—') : l.minutes > 0 ? formatDuree(l.minutes) : '—'
 
 function ligne(
   $: Moteur,
@@ -965,7 +970,7 @@ function ligne(
   etat: Interface,
   nomFixe: boolean,
   mesure: Mesure,
-  largeurs: { jetons: number; temps: number },
+  largeurs: { jetons: number; valeur: number },
 ) {
   const { Box, Input, Text } = $.ui.resolve(e)
   const estActuel = l.item === actuel
@@ -1004,31 +1009,23 @@ function ligne(
   const crayon = estActuel && !enRenommage && icone($, e, 'crayon', 'crayon', '✎', ouvrirRenommage)
   // Pendant le renommage, ✓ l'enregistre tout de suite : l'app ne signale pas un clic hors du champ.
   const valider = enRenommage && icone($, e, 'valider-renommage', 'valider', '✓', () => quitterChamp($))
-  // Pas de temps sur la période : un tiret discret, pour que la colonne ne paraisse pas vide par erreur.
-  const temps =
-    l.minutes > 0 ? (
+  // Sans temps (ou sans prix) sur la période : un tiret discret, pour que la colonne ne paraisse pas vide par erreur.
+  const texte = texteValeur(l, mesure)
+  const valeur =
+    texte !== '—' ? (
       <Text size="footnote" tabular {...encre(e, l.enCours ? 'vif' : 'texte')}>
-        {texteTemps(l)}
+        {texte}
       </Text>
     ) : (
       <Text size="footnote" {...encre(e, 'faible')}>
         —
       </Text>
     )
-  // Seuls affichés, les tokens prennent la place du temps : même taille, même encre, un tiret quand il n'y en a pas.
-  const seulsJetons = mesure === 'jetons'
-  const jetons =
-    l.jetons > 0 ? (
-      <Text size={seulsJetons ? 'footnote' : 'caption'} tabular {...encre(e, seulsJetons ? (l.enCours ? 'vif' : 'texte') : 'faible')}>
-        {texteJetons(l)}
-      </Text>
-    ) : (
-      seulsJetons && (
-        <Text size="footnote" {...encre(e, 'faible')}>
-          —
-        </Text>
-      )
-    )
+  const jetons = l.jetons > 0 && (
+    <Text size="caption" tabular {...encre(e, 'faible')}>
+      {texteJetons(l)}
+    </Text>
+  )
   if (!riche(e)) {
     // Pas de survol dans le terminal : pas d'icône ; le nom est le bouton, en colonnes fixes avec les chiffres.
     const libelle = affichage(l.item)
@@ -1039,14 +1036,10 @@ function ligne(
         {pastille($, e, couleur, l.enCours)}
         <Box width={TERMINAL.nom}>{enRenommage ? nom : bouton($, e, `choisir-${l.item}`, court, ton, presser)}</Box>
         <Box flexDirection="row" gap={2}>
-          {mesure !== 'temps' && (
-            <Box width={largeurs.jetons} justifyContent="flex-end">
-              {jetons}
-            </Box>
-          )}
-          {mesure !== 'jetons' && (
-            <Box width={largeurs.temps}>{temps}</Box>
-          )}
+          <Box width={largeurs.jetons} justifyContent="flex-end">
+            {jetons}
+          </Box>
+          <Box width={largeurs.valeur}>{valeur}</Box>
         </Box>
       </Box>
     )
@@ -1066,16 +1059,12 @@ function ligne(
         )}
       </Box>
       <Box flexDirection="row" gap="xs" alignItems="center" flexShrink={0}>
-        {mesure !== 'temps' && (
-          <Box width={Math.max(COLONNES.jetons, largeurs.jetons)} flexDirection="row" justifyContent="flex-end">
-            {jetons}
-          </Box>
-        )}
-        {mesure !== 'jetons' && (
-          <Box width={largeurs.temps} flexDirection="row">
-            {temps}
-          </Box>
-        )}
+        <Box width={Math.max(COLONNES.jetons, largeurs.jetons)} flexDirection="row" justifyContent="flex-end">
+          {jetons}
+        </Box>
+        <Box width={largeurs.valeur} flexDirection="row">
+          {valeur}
+        </Box>
       </Box>
     </Box>
   )
@@ -1161,23 +1150,25 @@ function resume(
   const { Box, Input, Text } = $.ui.resolve(e)
   const { etat, contenu, options, activite } = d
   const serre = e.surface === 'terminal'
-  // Les colonnes de tokens et de temps prennent la largeur de leur plus long texte, sur toutes les pages. Les tokens sont
-  // alignés à droite, le temps à gauche : l'écart entre eux est le même sur chaque ligne, et petit.
+  // Les colonnes des tokens et du temps (ou du prix) prennent la largeur de leur plus long texte, sur toutes les pages.
+  // Les tokens sont alignés à droite, le temps à gauche : l'écart entre eux est le même sur chaque ligne, et petit.
   const largeurs = {
     jetons: Math.max(1, ...contenu.lignes.map(l => texteJetons(l).length)),
-    temps: Math.max(1, ...contenu.lignes.map(l => texteTemps(l).length)),
+    valeur: Math.max(1, ...contenu.lignes.map(l => texteValeur(l, options.mesure).length)),
   }
   // Dans le terminal, la largeur de la liste : une ligne (pastille, nom, chiffres), ou les stats si elles sont plus longues.
-  const chiffres = [options.mesure !== 'temps' && largeurs.jetons, options.mesure !== 'jetons' && largeurs.temps].filter(n => n !== false)
-  const largeurLigne = 3 + TERMINAL.nom + chiffres.reduce((a, b) => a + b, 0) + 2 * (chiffres.length - 1)
+  const largeurLigne = 3 + TERMINAL.nom + largeurs.jetons + largeurs.valeur + 2
   // La série compte jusqu'à aujourd'hui : une année passée n'en a pas.
   const jours = activite === null || !activite.aujourdhui ? null : activite.serie
-  // Les tokens de la période, puis leur prix API.
-  const valeurJetons = contenu.jetons > 0 ? avecCout(formatJetons(contenu.jetons), contenu.cout) : '—'
-  // Les stats du terminal sur une ligne (« Temps 2 h 29 · Tokens 203 M · Série 5 jours ») : la bande y est basse.
+  const valeurJetons = contenu.jetons > 0 ? formatJetons(contenu.jetons) : '—'
+  const valeurPrix = contenu.cout > 0 ? formatCout(contenu.cout) : '—'
+  const avecPrix = options.mesure === 'jetons'
+  // Les stats du terminal sur une ligne (« Temps 2 h 29 · Tokens 203 M · Série 5 jours ») : la bande y est basse. Avec
+  // « Tokens et prix », le prix prend la place du temps, après les tokens.
   const statsLigne = [
-    options.mesure !== 'jetons' && [t().stats.temps, formatDuree(contenu.total)],
-    options.mesure !== 'temps' && [t().stats.jetons, valeurJetons],
+    !avecPrix && [t().stats.temps, formatDuree(contenu.total)],
+    [t().stats.jetons, valeurJetons],
+    avecPrix && [t().stats.prix, valeurPrix],
     jours !== null && options.activite && [t().stats.serie, t().joursSerie(jours)],
   ].filter((s): s is string[] => s !== false)
   const largeurStats = statsLigne.map(([nom, valeur]) => `${nom} ${valeur}`).join(' · ').length
@@ -1231,7 +1222,7 @@ function resume(
     </Box>
   )
   const cartes = [
-    options.mesure !== 'jetons' &&
+    !avecPrix &&
     stat(
       'temps',
       t().stats.temps,
@@ -1245,14 +1236,15 @@ function resume(
         </Box>
       ),
     ),
-    options.mesure !== 'temps' &&
+    stat('jetons', t().stats.jetons, valeurJetons),
+    avecPrix &&
       stat(
-        'jetons',
-        t().stats.jetons,
-        valeurJetons,
+        'prix',
+        t().stats.prix,
+        valeurPrix,
         // Au survol, sous la valeur : ce prix est celui de l'API, pas ce que la personne paie avec son abonnement.
         contenu.cout > 0 && (
-          <Box position="absolute" top={empilees ? 1 : 2} left={0} width={32} display="none" hover={{ scope: 'stat-jetons', display: 'flex' }}>
+          <Box position="absolute" top={empilees ? 1 : 2} left={0} width={32} display="none" hover={{ scope: 'stat-prix', display: 'flex' }}>
             <Text size="caption" {...encre(e, 'gris')}>
               {t().prixApi}
             </Text>

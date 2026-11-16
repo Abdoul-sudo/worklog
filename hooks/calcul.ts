@@ -23,13 +23,14 @@ export type Options = {
   pauseMax: number
   activite: boolean
   langue: Langue
-  /** Ce que le popover montre : le temps et les tokens, ou l'un des deux. */
+  /** Ce que le popover montre à côté des tokens : le temps, ou leur prix API. */
   mesure: Mesure
   theme: Theme
 }
 
-export type Mesure = 'tout' | 'temps' | 'jetons'
-export const MESURES: readonly Mesure[] = ['tout', 'temps', 'jetons']
+// `tout` : le temps et les tokens ; `jetons` : les tokens et leur prix API, sans le temps.
+export type Mesure = 'tout' | 'jetons'
+export const MESURES: readonly Mesure[] = ['tout', 'jetons']
 /** Les thèmes du popover ; leurs couleurs et leurs fonds sont dans dessins.ts. */
 export type Theme = 'nuit' | 'simple' | 'aurore' | 'braise' | 'foret' | 'ocean' | 'crepuscule' | 'sakura'
 // Dans les réglages, dans cet ordre : le plus sobre d'abord.

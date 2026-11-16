@@ -18,7 +18,7 @@ const JOUR = 24 * 60 * MINUTE
 // Une réponse revue dans une conversation reprise est reconnue pendant 90 jours ; au-delà, son numéro est oublié.
 // La version du rattrapage des détails (ajouterDetails) : la monter le relance une fois. Il ne touche qu'aux lignes encore
 // sans détail.
-const DETAILS = 2
+const DETAILS = 3
 const MEMOIRE_JOURS = 90
 
 const fichierEtat = path.join(sortie, 'etat.json')

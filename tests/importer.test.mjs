@@ -123,7 +123,7 @@ test("une fois, les tokens déjà importés reçoivent le détail de leurs répo
       [{ m: 'claude-opus-5-5', in: 20, out: 10, c5: 0, c1: 0, cr: 0 }],
       [{ m: 'claude-opus-5-5', in: 10, out: 5, c5: 0, c1: 0, cr: 0 }],
     ])
-    assert.equal(JSON.parse(fs.readFileSync(path.join(sortie, 'etat.json'), 'utf8')).details, 2)
+    assert.equal(JSON.parse(fs.readFileSync(path.join(sortie, 'etat.json'), 'utf8')).details, 3)
     // La fois suivante, rien ne change.
     const avant = fs.readFileSync(path.join(sortie, jour(T), 'abc.jsonl'), 'utf8')
     importer(projets, sortie)
@@ -180,7 +180,7 @@ test("une fois, les messages déjà importés en double dans une copie de la con
         ligne({ t: T + 60_000, s: 'aaa', e: 'message', k: null, d: 'proj', i: 1 }) +
         ligne({ t: T + 3_600_000, s: 'aaa', e: 'message', k: null, d: 'proj', i: 1 }),
     )
-    fs.writeFileSync(path.join(sortie, 'etat.json'), JSON.stringify({ version: 3, positions: {}, vus: {}, tours: {}, dossiers: {}, nomsCorriges: true, details: 2 }))
+    fs.writeFileSync(path.join(sortie, 'etat.json'), JSON.stringify({ version: 3, positions: {}, vus: {}, tours: {}, dossiers: {}, nomsCorriges: true, details: 3 }))
     importer(projets, sortie)
     // Le message en double quitte la copie ; son message à elle reste.
     assert.deepEqual(
