@@ -12,14 +12,14 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/desktop.png" width="880" alt="Worklog: the time, the tokens and the streak of today, a heatmap of the year, and the time of each item.">
+  <img src="docs/screenshots/desktop.png" width="880" alt="Worklog: the time, the tokens and the streak of today, a heatmap of the year, and the time of each name.">
 </p>
 
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
   <a href="#how-the-timer-works">How the timer works</a> ·
   <a href="#breaks">Breaks</a> ·
-  <a href="#items">Items</a> ·
+  <a href="#names">Names</a> ·
   <a href="#themes">Themes</a> ·
   <a href="#in-the-terminal">Terminal</a> ·
   <a href="#settings">Settings</a> ·
@@ -39,7 +39,7 @@ claude plugin marketplace add Abdoul-sudo/worklog
 claude plugin install worklog@worklog
 ```
 
-Restart Claude Code, then work as usual. A chip at the bottom shows the item of the session and its time today, for example `⏱ mobile-app · 1h 12`. Click the chip to open Worklog, or type `/worklog`.
+Restart Claude Code, then work as usual. A chip at the bottom shows the name of the session and its time today, for example `⏱ mobile-app · 1h 12`. Click the chip to open Worklog, or type `/worklog`.
 
 Worklog needs Claude Code 2.1.325 or later. Node.js is optional: Worklog uses it once, to read your past history.
 
@@ -76,21 +76,21 @@ When Worklog asks, click **Count** to add the break, or **Ignore** to leave it o
 
 You can change the 1h and the 4h in the settings. To never get the question, set **Then ask** to **Never**.
 
-## Items
+## Names
 
-Each session counts for one item: a ticket, a feature or a project. Worklog finds the item for you, in this order:
+Each session counts for one name, such as a project or a task. Worklog decides on the name in this order:
 
-1. The item that you choose, with `/worklog <name>` or in the list.
-2. A ticket ID in your messages, such as `PROJ-142`.
-3. A ticket ID in the name of your Git branch, such as `feature/PROJ-142-login`.
+1. The name that you choose, with `/worklog <name>` or in the list.
+2. An ID in your messages, such as `PROJ-142`.
+3. An ID in the name of your Git branch, such as `feature/PROJ-142-login`.
 4. The name of the project folder. In a Git worktree, the name of the main project.
 
-When Worklog finds the first ticket ID of a session, the time before it also goes to this ticket.
+When Worklog finds the first ID of a session, the time before it also goes to this ID.
 
-To move a session to another item, point to the item in the list, then click **⇄**.
+To count a session for another name, point to the name in the list, then click **⇄**.
 
 <p align="center">
-  <img src="docs/screenshots/switch.png" width="880" alt="The list of items. The pointer is on the switch icon next to website.">
+  <img src="docs/screenshots/switch.png" width="880" alt="The list of names. The pointer is on the switch icon next to website.">
 </p>
 
 ## Themes
@@ -106,7 +106,7 @@ Worklog has eight themes in the desktop app. Click the gear, then click a theme.
 Worklog works in the terminal too, with the same data. In a wide terminal, the heatmap shows one square for each day.
 
 <p align="center">
-  <img src="docs/screenshots/terminal.png" width="880" alt="Worklog in the terminal: the stats and the items on the left, the heatmap of the year on the right.">
+  <img src="docs/screenshots/terminal.png" width="880" alt="Worklog in the terminal: the stats and the names on the left, the heatmap of the year on the right.">
 </p>
 
 To click in Worklog in the terminal, use the fullscreen mode: `/tui fullscreen`.
@@ -116,9 +116,9 @@ To click in Worklog in the terminal, use the fullscreen mode: `/tui fullscreen`.
 | Task | Action |
 | --- | --- |
 | See another period | Click **Day**, **Week**, **Month**, **Year** or **All**. Click **‹** or **›** to go back or forward. |
-| Move this session to another item | Point to the item, then click **⇄**. In the terminal, click the item. |
-| Count this session for a new item | Click **+ Add item**, type the name, then press Enter. |
-| Rename an item | Click **✎** next to it. The new name also replaces the old one on past days. |
+| Count this session for another name | Point to the name, then click **⇄**. In the terminal, click the name. |
+| Count this session for a new name | Click **+ Add name**, type the name, then press Enter. |
+| Rename | Click **✎** next to the name. The new name also replaces the old one on past days. |
 | Open the settings | Click the gear. In the terminal, click **≡**. |
 
 | Command | What it does |
@@ -161,14 +161,14 @@ Your data stays in `~/.claude/worklog/`. To remove it, delete this folder.
 ## FAQ
 
 <details>
-<summary><strong>Do I need to stop the timer when I leave?</strong></summary>
+<summary><strong>Does the timer stop when I leave?</strong></summary>
 
-No. The timer runs only while Claude works. Worklog decides about your break when you come back.
+Yes. The timer runs only while Claude works. When you come back, Worklog decides if your break counts.
 
 </details>
 
 <details>
-<summary><strong>I stop for 30 minutes, then I send a message. Does the total grow by 30 minutes?</strong></summary>
+<summary><strong>I take a 30-minute break, then I send a message. Does the total grow by 30 minutes?</strong></summary>
 
 Yes, with the default settings. Worklog adds the 30 minutes when you send the message. During the break, the total does not move.
 
