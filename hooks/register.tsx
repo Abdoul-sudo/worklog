@@ -1014,16 +1014,20 @@ function vueFrise($: Moteur, e: Site, activite: Frise, place: PlaceFrise | null)
 
 /** La place de la frise dans le terminal, à côté de la liste (`liste`, sa largeur) : toute l'année quand elle tient,
  * sinon les semaines les plus récentes ; en cases quand la bande a la hauteur, serrée sinon ; deux colonnes par semaine
- * quand toute l'année tient ainsi. Null sous un trimestre. */
+ * quand toutes les semaines passées tiennent ainsi. Null sous un trimestre. */
 type PlaceFrise = { dessin: DessinTerminal; pas: 1 | 2; semaines: number; liste: number }
 function placeFriseTerminal(colonnes: number, rangees: number, liste: number, activite: Frise): PlaceFrise | null {
   // Le cadre et ses marges prennent six colonnes.
   const place = colonnes - 6 - liste - FRISE_TERMINAL.ecart
   if (place < FRISE_TERMINAL.semainesMin) return null
   const annee = Math.ceil(activite.cases.length / 7)
+  // Les semaines jusqu'à celle du dernier jour passé : celles d'après, à venir, sont vides.
+  let dernier = activite.cases.length - 1
+  while (dernier > 0 && activite.cases[dernier]!.minutes < 0) dernier--
+  const passees = Math.floor(dernier / 7) + 1
   const dessin: DessinTerminal = rangees >= FRISE_TERMINAL.hauteurCases ? 'cases' : 'serre'
-  const pas = dessin === 'cases' && place >= 2 * annee ? 2 : 1
-  return { dessin, pas, semaines: Math.min(annee, place), liste }
+  const pas = dessin === 'cases' && place >= 2 * passees ? 2 : 1
+  return { dessin, pas, semaines: Math.min(annee, Math.floor(place / pas)), liste }
 }
 
 /** Le résumé d'une période. Là où la surface sait dessiner : l'anneau et le total en haut, la frise d'activité à côté,
