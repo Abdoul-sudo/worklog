@@ -66,7 +66,7 @@ export function lireOptions(brut: unknown): Options {
     seuilPause: SEUILS.find(m => m === r.seuilPause) ?? d.seuilPause,
     pauseMax: PAUSES_MAX.find(m => m === r.pauseMax) ?? d.pauseMax,
     activite: oui(r.activite, d.activite),
-    langue: LANGUES.find(l => l.id === r.langue)?.id ?? d.langue,
+    langue: LANGUES.find(l => l === r.langue) ?? d.langue,
     mesure: MESURES.find(m => m === r.mesure) ?? d.mesure,
     theme: THEMES_IDS.find(x => x === r.theme) ?? d.theme,
   }

@@ -1391,7 +1391,7 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
           <Select
             key="langue"
             value={options.langue}
-            options={LANGUES.map(l => ({ value: l.id, label: l.nom }))}
+            options={LANGUES.map(l => ({ value: l, label: t().langues[l] }))}
             onSelect={valeur => changerReglage($, { langue: valeur === 'fr' ? 'fr' : 'en' })}
           />,
         ),
@@ -1434,7 +1434,7 @@ function vueReglagesTerminal($: Moteur, e: Site, options: Reglages, aCote: boole
         {reglage(
           'langue',
           t().langue,
-          choix('langue', LANGUES.map(l => l.id), options.langue, id => LANGUES.find(l => l.id === id)?.nom ?? id, langue => changerReglage($, { langue })),
+          choix('langue', LANGUES, options.langue, l => t().langues[l], langue => changerReglage($, { langue })),
         )}
       </Box>
       <Box flexDirection="column">

@@ -1,10 +1,7 @@
 // Les textes du mod en anglais et en français. La langue vient des réglages ; l'anglais par défaut.
 
 export type Langue = 'en' | 'fr'
-export const LANGUES: { id: Langue; nom: string }[] = [
-  { id: 'en', nom: 'English' },
-  { id: 'fr', nom: 'Français' },
-]
+export const LANGUES: readonly Langue[] = ['en', 'fr']
 
 let courante: Langue = 'en'
 export const langue = (): Langue => courante
@@ -55,6 +52,8 @@ const FR = {
   jusqua: (duree: string) => `Jusqu'à ${duree}`,
   jamais: 'Jamais',
   langue: 'Langue',
+  // Les noms des langues, dans la langue de l'interface.
+  langues: { en: 'Anglais', fr: 'Français' },
   mesure: 'Afficher',
   themes: { nuit: 'Nuit', simple: 'Par défaut', aurore: 'Aurore', braise: 'Braise', foret: 'Forêt', ocean: 'Océan', crepuscule: 'Crépuscule', sakura: 'Sakura' },
   mesures: { tout: 'Temps et tokens', temps: 'Temps', jetons: 'Tokens' },
@@ -126,6 +125,7 @@ const EN: typeof FR = {
   jusqua: (duree: string) => `Up to ${duree}`,
   jamais: 'Never',
   langue: 'Language',
+  langues: { en: 'English', fr: 'French' },
   mesure: 'Show',
   themes: { nuit: 'Night', simple: 'Default', aurore: 'Aurora', braise: 'Ember', foret: 'Forest', ocean: 'Ocean', crepuscule: 'Dusk', sakura: 'Sakura' },
   mesures: { tout: 'Time and tokens', temps: 'Time', jetons: 'Tokens' },
