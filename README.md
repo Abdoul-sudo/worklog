@@ -212,6 +212,27 @@ For your past work, Worklog reads the details of each answer in your Claude Code
 </details>
 
 <details>
+<summary><strong>Do all tokens have the same price?</strong></summary>
+
+No. The API gives a different price to each type of token, and Worklog uses each price:
+
+- Input tokens (what Claude reads): the normal price.
+- Output tokens (what Claude writes): about 5 times the input price.
+- Cache writes (Claude saves your conversation for later): 1.25 times the input price for 5 minutes, 2 times for 1 hour.
+- Cache reads (Claude reads the saved conversation again): only 0.1 times the input price.
+
+In long sessions, most tokens are cache reads. They are cheap, so many tokens can still cost little.
+
+</details>
+
+<details>
+<summary><strong>Does a resumed or forked conversation count twice?</strong></summary>
+
+No. When you resume or fork a conversation, Claude Code can copy old messages into the new file. Worklog counts each message only once.
+
+</details>
+
+<details>
 <summary><strong>What does Worklog not count?</strong></summary>
 
 Work outside Claude Code: meetings, calls and other tools.
