@@ -48,7 +48,8 @@ Worklog needs Claude Code 2.1.325 or later. Node.js is optional: Worklog uses it
 - The timer starts with your first message in a session. Opening a session does not count.
 - The timer runs while Claude works: answers, subagents, workflows, Ultracode and background commands, even when they work alone for hours.
 - When Claude is done, a break starts. When you come back, Worklog decides if the break counts as work.
-- When two sessions work at the same time, the time of both sessions counts. Worklog shows how much of the day was in parallel.
+- In one project: if several things work at the same time, the time counts only once. For example, if 3 subagents work for 10 minutes, the project gets 10 minutes, not 30.
+- Across projects: if two projects work at the same time, each project gets its time, and the total adds them up. For example, if projects A and B both work for 1 hour at the same time, each gets 1 hour and the total is 2 hours. Worklog then shows "incl. 1h 00 in parallel", so you can still see the real time.
 
 ## Tokens and price
 
