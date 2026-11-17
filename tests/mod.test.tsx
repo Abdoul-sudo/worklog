@@ -48,7 +48,7 @@ function monde(
   // Ces tests lisent les textes en français ; celui en anglais garde la langue par défaut.
   mock.store(on, { ...(langue === 'fr' ? { options: { langue: 'fr' } } : {}), ...magasin })
   mock.env(on, { USERPROFILE: 'C:\\Users\\test', ...env })
-  const etat = { session: 'S1', branche: 'main', dossier: 'D:/WORK/FSY', agents: [] as { id: string; status: string }[], fonds: [] as (string | undefined)[] }
+  const etat = { session: 'S1', branche: 'main', dossier: 'D:/WORK/FSY', agents: [] as { id: string; status: string }[], fonds: [] as (string | undefined)[], focus: [] as (string | undefined)[] }
   const fichiers = new Map<string, string>()
   const toasts: string[] = []
   const statuts: (string | undefined)[] = []
@@ -85,8 +85,11 @@ function monde(
     etat.fonds.push(e.backgroundColor)
     return { value: { isPlaced: true } }
   })
-  // Sous le mod, le focus se pose sans rien dire.
-  on('ui.focus', () => ({}))
+  // Sous le mod, le focus se pose sans rien dire ; on note où.
+  on('ui.focus', (_, e) => {
+    etat.focus.push(e.element)
+    return {}
+  })
   on('ui.toast', (_, e) => {
     toasts.push(e.text)
     return { value: undefined }
@@ -385,7 +388,7 @@ test('renommer depuis le popover : le crayon, ou un double-clic sur le nom', asy
 })
 
 test('les tokens, les onglets, les réglages et la frise', async ($, on) => {
-  const { horloge } = monde(on)
+  const { horloge, etat } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
   await $.prompt.submit({ ...PROMPT, text: 'FSY-I478' })
   await horloge.advance(30 * 60_000)
@@ -441,19 +444,22 @@ test('les tokens, les onglets, les réglages et la frise', async ($, on) => {
       await bande.press({ key: 'theme-simple' })
       expect(await bande.find({ type: 'Text', text: /^Par défaut$/ })).toMatchObject({ props: { weight: 'semibold' } })
       expect(await bande.find({ type: 'Text', text: /^Nuit$/ })).toMatchObject({ props: { weight: 'regular' } })
+      // Toute la carte se clique : des bandes empilées la couvrent, le haut de l'aperçu comme le nom.
+      await bande.press({ key: 'theme-sakura#0' })
+      expect(await bande.find({ type: 'Text', text: /^Sakura$/ })).toMatchObject({ props: { weight: 'semibold' } })
+      for (const cle of ['theme-sakura#0', 'theme-sakura#1', 'theme-sakura#2', 'theme-sakura#3', 'theme-sakura']) expect(await bande.find({ key: cle })).toBeDefined()
+      // Au clavier, une carte n'est qu'un arrêt : le focus qui tombe sur une bande en trop va à la carte ; en arrière, à la
+      // carte d'avant, ou au réglage au-dessus des thèmes.
+      const focus = async (element: string) => {
+        await $.ui.focus({ component: 'AbovePrompt', requestId: BANDE.requestId, element, origin: { kind: 'person' } })
+        return etat.focus.at(-1)
+      }
+      expect(await focus('pause-max')).toBe('pause-max')
+      expect(await focus('theme-simple#0')).toBe('theme-simple')
+      expect(await focus('theme-nuit#0')).toBe('theme-nuit')
+      expect(await focus('theme-nuit#3')).toBe('theme-simple')
+      expect(await focus('theme-simple#3')).toBe('pause-max')
       await bande.press({ key: 'theme-nuit' })
-      expect(await bande.find({ key: 'theme-sakura' })).toBeDefined()
-      // Un clic pose le cadre de focus puis presse aussitôt : le bouton change de clé, et le cadre de l'app, qui ferait deux
-      // traits sur la carte, disparaît avec l'ancien. Au clavier, Entrée vient plus tard : la clé reste, le cadre aussi.
-      const focus = (element: string) => $.ui.focus({ component: 'AbovePrompt', requestId: BANDE.requestId, element, origin: { kind: 'person' } })
-      await focus('theme-sakura')
-      await bande.press({ key: 'theme-sakura' })
-      expect(await bande.find({ key: 'theme-sakura' })).toBeUndefined()
-      expect(await bande.find({ key: 'theme-sakura~1' })).toBeDefined()
-      await focus('theme-nuit~1')
-      await horloge.advance(2_000)
-      await bande.press({ key: 'theme-nuit~1' })
-      expect(await bande.find({ key: 'theme-nuit~1' })).toBeDefined()
       expect(await bande.find({ type: 'Text', text: /^Nuit$/ })).toMatchObject({ props: { weight: 'semibold' } })
     } else expect(await bande.find({ key: 'theme-nuit' })).toBeUndefined()
     // La croix ramène à l'onglet d'avant : Tout.

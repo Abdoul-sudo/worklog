@@ -197,8 +197,8 @@ const PX_CELLULE = 8.2
 const ETROIT = 64
 /** La hauteur demandée pour le panneau quand il s'ouvre au-dessus de la saisie, en rangées. */
 const RANGEES_PANNEAU = 30
-/** Un clic pose le cadre de focus de l'app, puis presse dans ce délai ; au clavier, Entrée vient plus tard. */
-const CLIC_MS = 500
+/** Les boutons empilés sur une carte de thème : chaque bande reste plus basse qu'un bouton, même en zoom réduit. */
+const BANDES_CARTE = 5
 /** Sous MOYEN, la frise passe sous les stats : la bande lui laisse cette hauteur (en rangées) avant de la montrer. */
 const RANGEES_FRISE_DESSOUS = 20
 const TRANSPARENT = '#00000000'
@@ -790,19 +790,41 @@ function encre(e: Site, ton: Ton): { color?: string; dimColor?: boolean } {
 
 /** Un contenu cliquable : l'app desktop dessine un bouton avec son propre libellé et ses couleurs ; le contenu est donc
  * dessiné tel quel, et un bouton vide posé dessus prend le clic. Ce bouton est sous le pointeur : c'est lui qui allume le
- * survol de son `groupe` (le sien par défaut), et le contenu suit ce groupe. */
-function cliquable($: Moteur, e: Site, cle: string, contenu: RenderChildren, presser: () => unknown, groupe = cle, retrecit = false) {
+ * survol de son `groupe` (le sien par défaut), et le contenu suit ce groupe.
+ *
+ * L'app donne au bouton une hauteur fixe et l'entoure d'un cadre de focus ; coupé à une bande plus basse que lui, il n'en
+ * montre rien. Un contenu plus haut qu'une ligne (une carte de thème) est couvert de `bandes` boutons empilés : un seul
+ * n'en couvrirait que le milieu. La dernière bande porte `cle` ; les autres, `cle#i`, cèdent le focus clavier (focusCarte). */
+function cliquable($: Moteur, e: Site, cle: string, contenu: RenderChildren, presser: () => unknown, groupe = cle, retrecit = false, bandes = 1) {
   const { Box, Button } = $.ui.resolve(e)
   return (
     <Box key={`zone-${cle}`} position="relative" flexDirection="row" alignItems="center" {...(retrecit ? { minWidth: 0, flexShrink: 1 } : {})}>
       {contenu}
-      <Box position="absolute" top={0} bottom={0} left={0} right={0} overflow="hidden" alignItems="center" justifyContent="center">
-        <Box flexShrink={0}>
-          <Button key={cle} plain label={ESPACE.repeat(200)} hover={{ scope: groupe, backgroundColor: TRANSPARENT }} onPress={presser} />
-        </Box>
+      <Box position="absolute" top={0} bottom={0} left={0} right={0} flexDirection="column">
+        {Array.from({ length: bandes }, (_, i) => {
+          const cleBande = i === bandes - 1 ? cle : `${cle}#${i}`
+          return (
+            <Box key={`bande-${cleBande}`} height={0} flexGrow={1} overflow="hidden" alignItems="center" justifyContent="center">
+              <Box flexShrink={0}>
+                <Button key={cleBande} plain label={ESPACE.repeat(200)} hover={{ scope: groupe, backgroundColor: TRANSPARENT }} onPress={presser} />
+              </Box>
+            </Box>
+          )
+        })}
       </Box>
     </Box>
   )
+}
+
+/** Au clavier, une carte de thème n'est qu'un arrêt : sa dernière bande. Le focus qui tombe sur une autre bande va à la
+ * carte, ou, quand il en part en arrière (Maj+Tab), à la carte d'avant ou au réglage au-dessus des thèmes. */
+function focusCarte(element: string | undefined, avant: string | null): string | undefined {
+  const bande = element === undefined ? null : /^theme-(\w+)#\d+$/.exec(element)
+  if (bande === null) return element
+  const carte = `theme-${bande[1]}`
+  if (avant !== carte) return carte
+  const i = THEMES_IDS.findIndex(theme => theme === bande[1])
+  return i > 0 ? `theme-${THEMES_IDS[i - 1]}` : 'pause-max'
 }
 
 /** Un texte cliquable, dans une encre du popover ; il s'éclaire au survol de son `groupe` (le sien par défaut). Un
@@ -1397,13 +1419,6 @@ function resume(
 
 /** Le choix du thème : un aperçu par thème, son nom dessous, sur autant de rangs qu'il faut ; le thème choisi est
  * cerclé d'accent. */
-// Le dernier élément où le cadre de focus de l'app s'est posé, et quand : une pression qui le suit de près vient d'un clic.
-let dernierFocus: { element: string; t: number } | null = null
-// Après un clic, les aperçus de thème changent de clé. Le cadre de focus que le clic a posé ferait deux traits sur la carte
-// (le bouton invisible qui la couvre est coupé sur les côtés) : il disparaît avec l'ancien bouton, à tout zoom.
-let generationThemes = 0
-const cleTheme = (theme: Theme) => (generationThemes === 0 ? `theme-${theme}` : `theme-${theme}~${generationThemes}`)
-
 function choixTheme($: Moteur, e: Site, options: Reglages) {
   if (!riche(e)) return null
   const { Box, Svg, Text } = $.ui.resolve(e)
@@ -1411,13 +1426,7 @@ function choixTheme($: Moteur, e: Site, options: Reglages) {
     <Box flexDirection="row" flexWrap="wrap" columnGap={2} rowGap="sm" paddingX="sm">
       {THEMES_IDS.map((theme: Theme) => {
         const choisi = options.theme === theme
-        const cle = cleTheme(theme)
-        const choisir = async () => {
-          const focus = dernierFocus
-          const clic = focus !== null && focus.element === cle && (await $.clock.now()) - focus.t < CLIC_MS
-          if (clic) generationThemes++
-          await changerReglage($, { theme })
-        }
+        const cle = `theme-${theme}`
         return cliquable(
           $,
           e,
@@ -1428,7 +1437,10 @@ function choixTheme($: Moteur, e: Site, options: Reglages) {
               {t().themes[theme]}
             </Text>
           </Box>,
-          choisir,
+          () => changerReglage($, { theme }),
+          cle,
+          false,
+          BANDES_CARTE,
         )
       })}
     </Box>
@@ -1779,13 +1791,16 @@ export const register: Register = on => {
   })
 
   // Le focus quitte le champ ouvert pour un autre élément de la bande : on quitte le champ, son nom s'enregistre. L'app
-  // ne signale pas un clic hors de la bande ; un message envoyé dans le chat quitte aussi le champ.
+  // ne signale pas un clic hors de la bande ; un message envoyé dans le chat quitte aussi le champ. Sur une carte de thème,
+  // le focus saute les bandes en trop.
+  let dernierFocus: string | null = null
   on('ui.focus', async ($, e, next) => {
-    if (e.element !== undefined) dernierFocus = { element: e.element, t: await $.clock.now() }
+    const element = focusCarte(e.element, dernierFocus)
+    dernierFocus = element ?? null
     const { edition } = await read($, ui)
     const champ = edition === null ? null : edition === 'autre' ? 'autre-item' : 'renommer'
-    if (e.element !== champ) await quitterChamp($)
-    return next(e)
+    if (element !== champ) await quitterChamp($)
+    return next(element === e.element ? e : { ...e, element })
   })
 
   // Au-dessus de la saisie : le popover quand il est ouvert, et la question après un long silence.
