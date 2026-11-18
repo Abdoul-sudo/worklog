@@ -1,7 +1,7 @@
 <h1 align="center">Worklog</h1>
 
 <p align="center">
-  <em>Automatically track the time, tokens and API price of each project in Claude Code, with a yearly activity heatmap and 8 themes.</em>
+  <em>Automatically track the time, tokens and API price of each project in Claude Code, with a yearly activity heatmap and 8 themes to choose from.</em>
 </p>
 
 <p align="center">
