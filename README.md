@@ -16,10 +16,11 @@
 
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
+  <a href="#usage">Usage</a> ·
   <a href="#how-the-timer-works">How the timer works</a> ·
-  <a href="#tokens-and-price">Tokens and price</a> ·
   <a href="#breaks">Breaks</a> ·
   <a href="#project-names">Project names</a> ·
+  <a href="#tokens-and-price">Tokens and price</a> ·
   <a href="#themes">Themes</a> ·
   <a href="#in-the-terminal">Terminal</a> ·
   <a href="#settings">Settings</a> ·
@@ -56,6 +57,36 @@ A chip at the bottom shows the name of the session and its time today, for examp
 
 Worklog needs Claude Code 2.1.325 or later. Node.js is optional: Worklog uses it once, to read your past history.
 
+## Update
+
+With automatic updates on (step 2 of the [Quick start](#quick-start)), Claude Code gets each new version when a session starts. The next session uses it.
+
+Without automatic updates, run these commands for each new version:
+
+```sh
+claude plugin marketplace update worklog
+claude plugin update worklog@worklog
+```
+
+Then restart Claude Code, or type `/reload-plugins`.
+
+To know when a new version comes out, click **Watch** on this GitHub page, then **Custom** > **Releases**.
+
+## Usage
+
+| Task | Action |
+| --- | --- |
+| See another period | Click **Day**, **Week**, **Month**, **Year** or **All**. Click **‹** or **›** to go back or forward. |
+| Count this session for another name, from now on | Point to the name, then click **⇄**. In the terminal, click the name. |
+| Count this session for a new name, from now on | Click **+ Add item**, type the name, then press Enter. |
+| Rename | Click **✎** next to the name. The new name also replaces the old one on past days. |
+| Open the settings | Click the gear. In the terminal, click **≡**. |
+
+| Command | What it does |
+| --- | --- |
+| `/worklog` | Shows or hides Worklog. |
+| `/worklog <name>` | Counts this session for `<name>`, from now on. For example: `/worklog PROJ-142`. |
+
 ## How the timer works
 
 - **Start.** The timer starts with your first message in a session. Opening a session does not count.
@@ -64,31 +95,6 @@ Worklog needs Claude Code 2.1.325 or later. Node.js is optional: Worklog uses it
 - **Background commands.** While Claude waits for a background command, the time counts as work. If you come back before the command ends, such as a dev server that never stops, the wait is a break.
 - **Parallel work in one project.** The time counts only once. For example, 3 subagents that work for 10 minutes give the project 10 minutes, not 30.
 - **Parallel work across projects.** Each project gets its time, and the total adds them up. Worklog shows the overlap, such as "incl. 1h 00 in parallel".
-
-## Tokens and price
-
-Do you look at your tokens more than at your time? Set **Show** to **Tokens and price** in the settings. The API price then takes the place of the time: in the stats, in each line and in the heatmap.
-
-<p align="center">
-  <img src="docs/screenshots/price.png" width="880" alt="Worklog with Show set to Tokens and price: 21.5M tokens and $23 today, and the tokens and the price of each name.">
-</p>
-
-- The price is what your tokens cost at the Anthropic API list prices, for each model and each answer.
-- Worklog always counts the price, also when it shows the time. So when you switch, your past days have their price too.
-- With a Pro or Max plan, the API price is not your bill. It shows what your work would cost on the API.
-
-### Token details
-
-Point to **Tokens**, **API price** or the tokens of a name. A box shows where your tokens went:
-
-- On the left, each type of token: input, output, cache write and cache read.
-- On the right, each model, such as Opus or Sonnet.
-
-With **Tokens and price**, each line also shows its API price. The detail is in the desktop app and VS Code.
-
-<p align="center">
-  <img src="docs/screenshots/details.png" width="880" alt="Worklog with Show set to Tokens and price. Under the API price of today, 21 dollars, a box is open. On the left: input 46.1k tokens for 14 cents, output 413k for 6.37 dollars, cache write 1.7M for 11 dollars, cache read 20.1M for 3.12 dollars. On the right: Opus 5.5, 12.4M tokens for 15 dollars, and Sonnet 5.5, 9.9M tokens for 5.80 dollars.">
-</p>
 
 ## Breaks
 
@@ -133,6 +139,31 @@ To count this session for another name from now on, point to the name in the lis
   <img src="docs/screenshots/switch.png" width="880" alt="The list of names. The pointer is on the switch icon next to website.">
 </p>
 
+## Tokens and price
+
+Do you look at your tokens more than at your time? Set **Show** to **Tokens and price** in the settings. The API price then takes the place of the time: in the stats, in each line and in the heatmap.
+
+<p align="center">
+  <img src="docs/screenshots/price.png" width="880" alt="Worklog with Show set to Tokens and price: 21.5M tokens and $23 today, and the tokens and the price of each name.">
+</p>
+
+- The price is what your tokens cost at the Anthropic API list prices, for each model and each answer.
+- Worklog always counts the price, also when it shows the time. So when you switch, your past days have their price too.
+- With a Pro or Max plan, the API price is not your bill. It shows what your work would cost on the API.
+
+### Token details
+
+Point to **Tokens**, **API price** or the tokens of a name. A box shows where your tokens went:
+
+- On the left, each type of token: input, output, cache write and cache read.
+- On the right, each model, such as Opus or Sonnet.
+
+With **Tokens and price**, each line also shows its API price. The detail is in the desktop app and VS Code.
+
+<p align="center">
+  <img src="docs/screenshots/details.png" width="880" alt="Worklog with Show set to Tokens and price. Under the API price of today, 21 dollars, a box is open. On the left: input 46.1k tokens for 14 cents, output 413k for 6.37 dollars, cache write 1.7M for 11 dollars, cache read 20.1M for 3.12 dollars. On the right: Opus 5.5, 12.4M tokens for 15 dollars, and Sonnet 5.5, 9.9M tokens for 5.80 dollars.">
+</p>
+
 ## Themes
 
 Worklog has eight themes in the desktop app. Click the gear, then click a theme.
@@ -151,21 +182,6 @@ Worklog works in the terminal too, with the same data. In a wide terminal, the h
 
 To click in Worklog in the terminal, use the fullscreen mode: `/tui fullscreen`.
 
-## Usage
-
-| Task | Action |
-| --- | --- |
-| See another period | Click **Day**, **Week**, **Month**, **Year** or **All**. Click **‹** or **›** to go back or forward. |
-| Count this session for another name, from now on | Point to the name, then click **⇄**. In the terminal, click the name. |
-| Count this session for a new name, from now on | Click **+ Add item**, type the name, then press Enter. |
-| Rename | Click **✎** next to the name. The new name also replaces the old one on past days. |
-| Open the settings | Click the gear. In the terminal, click **≡**. |
-
-| Command | What it does |
-| --- | --- |
-| `/worklog` | Shows or hides Worklog. |
-| `/worklog <name>` | Counts this session for `<name>`, from now on. For example: `/worklog PROJ-142`. |
-
 ## Settings
 
 <p align="center">
@@ -180,29 +196,6 @@ To click in Worklog in the terminal, use the fullscreen mode: `/tui fullscreen`.
 | Stay active during breaks | Up to 1h | A break up to this length is short: it counts as work. |
 | Then ask | Up to 4h | For a long break, up to this length, Worklog asks you if it was work. A very long break does not count. **Never** turns off the question. |
 | Theme | Night | Default, Night, Aurora, Ember, Forest, Ocean, Dusk or Sakura. Desktop app only. |
-
-## Update
-
-With automatic updates on (step 2 of the [Quick start](#quick-start)), Claude Code gets each new version when a session starts. The next session uses it.
-
-Without automatic updates, run these commands for each new version:
-
-```sh
-claude plugin marketplace update worklog
-claude plugin update worklog@worklog
-```
-
-Then restart Claude Code, or type `/reload-plugins`.
-
-To know when a new version comes out, click **Watch** on this GitHub page, then **Custom** > **Releases**.
-
-## Uninstall
-
-```sh
-claude plugin uninstall worklog@worklog
-```
-
-Your data stays in `~/.claude/worklog/`. To remove it, delete this folder.
 
 ## FAQ
 
@@ -256,6 +249,14 @@ Worklog runs on your computer and keeps its data there. This is all that it can 
 | Your messages | It reads each message to find an ID, such as `PROJ-142`. It does not keep your messages. |
 
 To stop the price download, set the environment variable `WORKLOG_PRICES` to `off`. To keep the data in another folder, set the environment variable `WORKLOG_DATA_DIR`.
+
+## Uninstall
+
+```sh
+claude plugin uninstall worklog@worklog
+```
+
+Your data stays in `~/.claude/worklog/`. To remove it, delete this folder.
 
 ## License
 
