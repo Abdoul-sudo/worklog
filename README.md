@@ -1,7 +1,7 @@
 <h1 align="center">Worklog</h1>
 
 <p align="center">
-  <em>Time, tokens and API price for each project, counted for you while you work with Claude.</em>
+  <em>Automatically track the time, tokens and API price of each project in Claude Code, with a yearly activity heatmap and 8 themes.</em>
 </p>
 
 <p align="center">
@@ -31,7 +31,7 @@
 
 You work with Claude on several projects, sometimes for hours without a break. Where did the time go? Which project used the most tokens? How much would they cost on the API?
 
-With Worklog, you can see the time, the tokens and the API price of each project, right above the prompt. Worklog counts everything automatically for you: you do not start, stop or pause anything.
+With Worklog, you can see the time, the tokens and the API price of each project, right above the prompt. Worklog tracks everything automatically for you.
 
 ## Quick start
 

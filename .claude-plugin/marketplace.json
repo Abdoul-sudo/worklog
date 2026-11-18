@@ -1,6 +1,6 @@
 {
   "name": "worklog",
-  "description": "Worklog: automatic time, token and API price tracking for Claude Code, per project",
+  "description": "Worklog: automatically track the time, tokens and API price of each project in Claude Code, with a yearly activity heatmap and 8 themes",
   "owner": { "name": "Abdoul-sudo" },
   "plugins": [{ "name": "worklog", "source": "./" }]
 }
