@@ -49,8 +49,9 @@ Worklog needs Claude Code 2.1.325 or later. Node.js is optional: Worklog uses it
 - The timer starts with your first message in a session. Opening a session does not count.
 - The timer runs while Claude works: answers, subagents, workflows, Ultracode and background commands, even when they work alone for hours.
 - When Claude is done, a break starts. When you come back, Worklog decides if the break counts as work.
+- While Claude waits for a background command to end, the time counts as work. If you come back before it ends, such as with a dev server that never stops, the wait is a break.
 - In one project: if several things work at the same time, the time counts only once. For example, if 3 subagents work for 10 minutes, the project gets 10 minutes, not 30.
-- Across projects: if two projects work at the same time, each project gets its time, and the total adds them up. For example, if projects A and B both work for 1 hour at the same time, each gets 1 hour and the total is 2 hours. Worklog then shows "incl. 1h 00 in parallel", so you can still see the real time.
+- Across projects: if two projects work at the same time, each project gets its time, and the total adds them up. Worklog shows the overlap apart, such as "incl. 1h 00 in parallel".
 
 ## Tokens and price
 
@@ -143,8 +144,6 @@ To click in Worklog in the terminal, use the fullscreen mode: `/tui fullscreen`.
 | Task | Action |
 | --- | --- |
 | See another period | Click **Day**, **Week**, **Month**, **Year** or **All**. Click **‹** or **›** to go back or forward. |
-| See the details of the tokens | Point to **Tokens**, **API price** or the tokens of a name. Desktop app only. |
-| See one day | Point to its square in the heatmap. Desktop app only. |
 | Count this session for another name, from now on | Point to the name, then click **⇄**. In the terminal, click the name. |
 | Count this session for a new name, from now on | Click **+ Add item**, type the name, then press Enter. |
 | Rename | Click **✎** next to the name. The new name also replaces the old one on past days. |
@@ -188,36 +187,6 @@ claude plugin uninstall worklog@worklog
 Your data stays in `~/.claude/worklog/`. To remove it, delete this folder.
 
 ## FAQ
-
-<details>
-<summary><strong>Does the timer stop when I leave?</strong></summary>
-
-Yes. The timer runs only while Claude works. When you come back, Worklog decides if your break counts as work.
-
-</details>
-
-<details>
-<summary><strong>I take a 30-minute break, then I send a message. Does the total grow by 30 minutes?</strong></summary>
-
-Yes, with the default settings. Worklog adds the 30 minutes when you send the message. During the break, the total does not move.
-
-</details>
-
-<details>
-<summary><strong>Do subagents, Ultracode and background commands count?</strong></summary>
-
-Yes. The timer runs while they work, even when you do not type. Their tokens count too.
-
-While Claude waits for a background command to end, the time counts as work. If you come back before it ends, such as with a dev server that never stops, the wait is a break.
-
-</details>
-
-<details>
-<summary><strong>Does Worklog see my past work?</strong></summary>
-
-Yes, if Node.js is installed. On the first start, Worklog reads your Claude Code history. Without Node.js, Worklog counts from the day you install it.
-
-</details>
 
 <details>
 <summary><strong>Where does the API price come from?</strong></summary>
