@@ -35,12 +35,17 @@ With Worklog, you can see the time, the tokens and the API price of each project
 
 ## Quick start
 
-```sh
-claude plugin marketplace add Abdoul-sudo/worklog
-claude plugin install worklog@worklog
-```
+1. Install Worklog:
 
-Restart Claude Code, then work as usual. A chip at the bottom shows the name of the session and its time today, for example `⏱ mobile-app · 1h 12`. Click the chip to open Worklog, or type `/worklog`.
+   ```sh
+   claude plugin marketplace add Abdoul-sudo/worklog
+   claude plugin install worklog@worklog
+   ```
+
+2. Turn on automatic updates. Claude Code does not do it for you. Type `/plugin`, open the **Marketplaces** tab, select **worklog**, then select **Enable auto-update**.
+3. Restart Claude Code, then work as usual.
+
+A chip at the bottom shows the name of the session and its time today, for example `⏱ mobile-app · 1h 12`. Click the chip to open Worklog, or type `/worklog`.
 
 Worklog needs Claude Code 2.1.325 or later. Node.js is optional: Worklog uses it once, to read your past history.
 
@@ -171,17 +176,9 @@ To click in Worklog in the terminal, use the fullscreen mode: `/tui fullscreen`.
 
 ## Update
 
-Claude Code does not update Worklog automatically. Choose one of these options.
+With automatic updates on (step 2 of the [Quick start](#quick-start)), Claude Code gets each new version when a session starts. The next session uses it.
 
-**Automatic updates (recommended).** Do this one time:
-
-1. In Claude Code, type `/plugin`.
-2. Open the **Marketplaces** tab, then select **worklog**.
-3. Select **Enable auto-update**.
-
-Claude Code then gets each new version when a session starts. The next session uses it.
-
-**Manual update.** Run these commands for each new version:
+Without automatic updates, run these commands for each new version:
 
 ```sh
 claude plugin marketplace update worklog
