@@ -7,5 +7,5 @@
   "author": { "name": "Abdoul-sudo", "url": "https://github.com/Abdoul-sudo" },
   "repository": "https://github.com/Abdoul-sudo/worklog",
   "license": "MIT",
-  "keywords": ["time-tracking", "worklog", "tokens", "heatmap", "mod"]
+  "keywords": ["claude-code-mod", "time-tracking", "timesheet", "tokens", "api-cost", "heatmap", "worklog", "mod"]
 }
