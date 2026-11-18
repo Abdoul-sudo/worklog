@@ -30,38 +30,41 @@
 
 ---
 
-You work with Claude on several projects, sometimes for hours without a break. Where did the time go? Which project used the most tokens? How much would they cost on the API?
+You use Claude on several projects. Worklog shows how much time each project takes, how many tokens it uses, and what these tokens would cost on the API. It tracks everything automatically, right above the prompt.
 
-With Worklog, you can see the time, the tokens and the API price of each project, right above the prompt. Worklog tracks everything automatically for you.
+## What it does
 
-- **Time per project.** It counts while Claude works, and it decides how your breaks count.
-- **Tokens and API price.** Point to a number to see each type of token and each model.
-- **Yearly heatmap.** One square for each day. Point to a day to see its numbers.
-- **8 themes** to choose from, in the desktop app.
-- **Terminal too.** The same data, in the desktop app, VS Code and the terminal.
-- **Private.** Your data stays on your computer.
+- **Counts your time** while Claude works: answers, subagents, background commands, Ultracode and more.
+- **Counts your tokens** and shows what they would cost on the API.
+- **Shows your whole year** as a heatmap, with 8 themes to choose from.
+- **Keeps your data** on your computer.
 
 ## Quick start
 
-1. Install Worklog:
+Install Worklog:
 
-   ```sh
-   claude plugin marketplace add Abdoul-sudo/worklog
-   claude plugin install worklog@worklog
-   ```
+```sh
+claude plugin marketplace add Abdoul-sudo/worklog
+claude plugin install worklog@worklog
+```
 
-2. Turn on automatic updates. Claude Code does not do it for you. Type `/plugin`, open the **Marketplaces** tab, select **worklog**, then select **Enable auto-update**.
-3. Restart Claude Code, then work as usual.
+Restart Claude Code, then work as usual. To get new versions, [turn on automatic updates](#update).
 
-A chip at the bottom shows the name of the session and its time today, for example `⏱ mobile-app · 1h 12`. Click the chip to open Worklog, or type `/worklog`.
+A small button at the bottom shows your project and its time today, for example `⏱ mobile-app · 1h 12`. Click it to open Worklog, or type `/worklog`.
 
-Worklog needs Claude Code 2.1.325 or later. Node.js is optional: Worklog uses it once, to read your past history.
+Worklog needs Claude Code 2.1.325 or later. Node.js is optional: with it, Worklog also reads your past work.
 
 ## Update
 
-With automatic updates on (step 2 of the [Quick start](#quick-start)), Claude Code gets each new version when a session starts. The next session uses it.
+Claude Code does not update Worklog by itself. Turn on automatic updates one time:
 
-Without automatic updates, run these commands for each new version:
+1. In Claude Code, type `/plugin`.
+2. Open the **Marketplaces** tab, then select **worklog**.
+3. Select **Enable auto-update**.
+
+After that, you get each new version when you start a session.
+
+To update by hand instead, run these commands:
 
 ```sh
 claude plugin marketplace update worklog
@@ -74,27 +77,29 @@ To know when a new version comes out, click **Watch** on this GitHub page, then 
 
 ## Usage
 
-| Task | Action |
+| To do this | Do this |
 | --- | --- |
 | See another period | Click **Day**, **Week**, **Month**, **Year** or **All**. Click **‹** or **›** to go back or forward. |
-| Count this session for another name, from now on | Point to the name, then click **⇄**. In the terminal, click the name. |
-| Count this session for a new name, from now on | Click **+ Add item**, type the name, then press Enter. |
-| Rename | Click **✎** next to the name. The new name also replaces the old one on past days. |
+| Move this session to another name | From now on: point to the name, then click **⇄**. In the terminal, click the name. |
+| Move this session to a new name | From now on: click **+ Add item**, type the name, then press Enter. |
+| Rename | Click **✎** next to the name. Past days get the new name too. |
 | Open the settings | Click the gear. In the terminal, click **≡**. |
 
 | Command | What it does |
 | --- | --- |
 | `/worklog` | Shows or hides Worklog. |
-| `/worklog <name>` | Counts this session for `<name>`, from now on. For example: `/worklog PROJ-142`. |
+| `/worklog <name>` | Moves this session to `<name>`, from now on. For example: `/worklog PROJ-142`. |
 
 ## How the timer works
 
-- **Start.** The timer starts with your first message in a session. Opening a session does not count.
-- **Claude works.** The timer runs while Claude works: answers, subagents, workflows, Ultracode and background commands. This includes long work without you.
-- **Breaks.** When Claude is done, a break starts. When you come back, Worklog decides if the break counts as work. See [Breaks](#breaks).
-- **Background commands.** While Claude waits for a background command, the time counts as work. If you come back before the command ends, such as a dev server that never stops, the wait is a break.
-- **Parallel work in one project.** The time counts only once. For example, 3 subagents that work for 10 minutes give the project 10 minutes, not 30.
-- **Parallel work across projects.** Each project gets its time, and the total adds them up. Worklog shows the overlap, such as "incl. 1h 00 in parallel".
+The timer counts while Claude works.
+
+- **It starts** with your first message. Opening a session does not count.
+- **It runs** while Claude works, even for hours without you.
+- **It stops** when Claude is done. A break starts. When you come back, Worklog decides if the break counts. See [Breaks](#breaks).
+- **Background commands** count while Claude waits for them. If you come back before one ends, such as a dev server that never stops, the wait is a break.
+- **Many things at once in one project** count once. 3 subagents that work for 10 minutes give 10 minutes, not 30.
+- **Two projects at once** each get their time. The total shows the overlap, such as "incl. 1h 00 in parallel".
 
 ## Breaks
 
@@ -124,7 +129,7 @@ You can change the 1h and the 4h in the settings. To never get the question, set
 
 ## Project names
 
-The time of each session goes to one name, such as a project or a task. Worklog decides on the name in this order:
+Worklog puts the time of each session under one name, such as a project or a task. It picks the name in this order:
 
 1. The name that you choose, with `/worklog <name>` or in the list.
 2. An ID in your messages, such as `PROJ-142`.
@@ -133,7 +138,7 @@ The time of each session goes to one name, such as a project or a task. Worklog 
 
 When Worklog finds the first ID of a session, the time before it also goes to this ID.
 
-To count this session for another name from now on, point to the name in the list, then click **⇄**.
+To move this session to another name from now on, point to the name in the list, then click **⇄**.
 
 <p align="center">
   <img src="docs/screenshots/switch.png" width="880" alt="The list of names. The pointer is on the switch icon next to website.">
@@ -141,24 +146,24 @@ To count this session for another name from now on, point to the name in the lis
 
 ## Tokens and price
 
-Do you look at your tokens more than at your time? Set **Show** to **Tokens and price** in the settings. The API price then takes the place of the time: in the stats, in each line and in the heatmap.
+Prefer tokens to time? In the settings, set **Show** to **Tokens and price**. You then see the API price where the time was.
 
 <p align="center">
   <img src="docs/screenshots/price.png" width="880" alt="Worklog with Show set to Tokens and price: 21.5M tokens and $23 today, and the tokens and the price of each name.">
 </p>
 
-- The price is what your tokens cost at the Anthropic API list prices, for each model and each answer.
-- Worklog always counts the price, also when it shows the time. So when you switch, your past days have their price too.
-- With a Pro or Max plan, the API price is not your bill. It shows what your work would cost on the API.
+- The price is what your tokens would cost on the Anthropic API.
+- On a Pro or Max plan, it is not what you pay. It shows what the same work would cost on the API.
+- Worklog always counts the price, even when it shows the time. So your past days have a price too.
 
 ### Token details
 
-Point to **Tokens**, **API price** or the tokens of a name. A box shows where your tokens went:
+Point to **Tokens** or **API price**. A box shows where your tokens went:
 
 - On the left, each type of token: input, output, cache write and cache read.
 - On the right, each model, such as Opus or Sonnet.
 
-With **Tokens and price**, each line also shows its API price. The detail is in the desktop app and VS Code.
+This box is in the desktop app and VS Code.
 
 <p align="center">
   <img src="docs/screenshots/details.png" width="880" alt="Worklog with Show set to Tokens and price. Under the API price of today, 21 dollars, a box is open. On the left: input 46.1k tokens for 14 cents, output 413k for 6.37 dollars, cache write 1.7M for 11 dollars, cache read 20.1M for 3.12 dollars. On the right: Opus 5.5, 12.4M tokens for 15 dollars, and Sonnet 5.5, 9.9M tokens for 5.80 dollars.">
