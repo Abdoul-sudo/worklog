@@ -16,6 +16,7 @@
 
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
+  <a href="#update">Update</a> ·
   <a href="#usage">Usage</a> ·
   <a href="#how-the-timer-works">How the timer works</a> ·
   <a href="#breaks">Breaks</a> ·
@@ -51,7 +52,7 @@ You use Claude on several projects. Worklog shows how much time each project tak
 2. Restart Claude Code.
 3. Work as usual.
 
-A small button at the bottom shows your project and its time today, for example `⏱ mobile-app · 1h 12`. To open Worklog, click this button or type `/worklog`.
+A small button at the bottom of Claude Code shows your project and its time today, for example `⏱ mobile-app · 1h 12`. To open Worklog, click this button or type `/worklog`.
 
 To get new versions, [turn on automatic updates](#update).
 
@@ -90,9 +91,11 @@ Each line in the list is a name: a project or a task. The bright dot shows the n
 1. **Choose the period.** Click **Day**, **Week**, **Month**, **Year** or **All**.
 2. **Go back or forward.** Click **‹** to see the period before. Click **›** to see the period after.
 3. **Open the settings.** Click the gear.
-4. **Move this session to another name.** Point to the name. Then click **⇄** next to it. The time of this session goes to this name from now on.
+4. **Move this session to another name.** Point to this name. Then click **⇄** next to it. The time of this session goes to this name from now on.
 5. **Move this session to a new name.** Click **+ Add item**. Type the name. Then press Enter.
 6. **Rename.** Point to the name with the bright dot. Then click **✎** next to it. Type the new name. Then press Enter. Past days also get the new name.
+
+Point to a day in the heatmap to see its date, its numbers and its top name.
 
 In the terminal, click a name to move this session to it. To open the settings, click **≡**.
 
@@ -126,7 +129,7 @@ A break is the time between the end of Claude's work and your next message.
   <img src="docs/breaks.svg" width="880" alt="One day with Worklog. Work always counts. A short 30 min break counts as work when you come back. For a long 2h break, Worklog asks you. The night is a very long break: it does not count.">
 </p>
 
-**Example.** Claude finishes at 10:00. You stop for a coffee. At 10:30, you send a new message. Worklog adds the 30 minutes at that moment. During the break, the total does not change. It catches up when you come back.
+**Example.** Claude finishes at 10:00. You stop for a coffee. At 10:30, you send a new message. During the break, the total does not change. At 10:30, Worklog adds the 30 minutes.
 
 If you close Claude Code during a short break, the break counts as work up to the moment you close Claude Code.
 
@@ -165,7 +168,7 @@ Do you prefer tokens to time? In the settings, set **Show** to **Tokens and pric
 
 ### Token details
 
-Point to **Tokens** or **API price**. A box shows where your tokens went:
+Point to **Tokens**, **API price** or the tokens of a name. A box shows where your tokens went:
 
 - On the left, each type of token: input, output, cache write and cache read.
 - On the right, each model, for example Opus or Sonnet.
