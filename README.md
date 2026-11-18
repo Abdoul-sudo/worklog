@@ -122,7 +122,7 @@ A break is the time between the end of Claude's work and your next message.
   <img src="docs/breaks.svg" width="880" alt="One day with Worklog. Work always counts. A short 30 min break counts as work when you come back. For a long 2h break, Worklog asks you. The night is a very long break: it does not count.">
 </p>
 
-**Example.** Claude finishes at 10:00. You stop for a coffee. At 10:30, you send a new message. During the break, the total does not change. At 10:30, Worklog adds the 30 minutes.
+**Example.** Claude finishes at 10:00. You take a coffee, then send a new message at 10:30. Until 10:30, the total does not change. Then Worklog adds the 30 minutes.
 
 If you close Claude Code during a short break, the break counts as work up to the moment you close Claude Code.
 
@@ -132,11 +132,11 @@ When Worklog asks, **Count** adds the break and **Ignore** leaves it out.
   <img src="docs/screenshots/ask.png" width="880" alt="Under Worklog, the question: 2h 08 break on website, from 9:12 to 11:20. Count it as work? Two buttons: Count and Ignore.">
 </p>
 
-You can change the 1h and the 4h in the settings. With **Then ask** set to **Never**, Worklog never asks.
+You can change the 1h and the 4h in the [settings](#settings).
 
 ## Project names
 
-Worklog puts the time of each session under one name, for example a project or a task. It picks the name in this order:
+Worklog puts the time of each session under one name. It picks the name in this order:
 
 1. The name that you choose, with `/worklog <name>` or in the list.
 2. An ID in your messages, for example `PROJ-142`.
@@ -200,7 +200,7 @@ Clicks in the terminal need the fullscreen mode: `/tui fullscreen`.
 | Show | Time and tokens | Shows the time and the tokens, or the tokens and their API price. |
 | Language | English | English or French. |
 | Stay active during breaks | Up to 1h | A break up to this length is short: it counts as work. |
-| Then ask | Up to 4h | For a long break, up to this length, Worklog asks you if it was work. A very long break does not count. **Never** turns off the question. |
+| Then ask | Up to 4h | Worklog asks you about a break up to this length. A longer break does not count. **Never** turns off the question. |
 | Theme | Night | Default, Night, Aurora, Ember, Forest, Ocean, Dusk or Sakura. Desktop app only. |
 
 ## FAQ
