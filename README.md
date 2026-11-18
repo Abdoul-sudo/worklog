@@ -157,7 +157,7 @@ If tokens matter more to you than time, set **Show** to **Tokens and price** in 
 
 ### Token details
 
-Hover over **Tokens**, **API price** or the tokens of a name to see your tokens by type and by model. This works in the desktop app and in VS Code.
+Hover over **Tokens**, **API price** or the tokens of a name to see your tokens by type and by model. This works in the desktop app.
 
 <p align="center">
   <img src="docs/screenshots/details.png" width="880" alt="Worklog with Show set to Tokens and price. The pointer is on the API price of today, 21 dollars, and a box is open under it. On the left: input 46.1k tokens for 14 cents, output 413k for 6.37 dollars, cache write 1.7M for 11 dollars, cache read 20.1M for 3.12 dollars. On the right: Opus 5.5, 12.4M tokens for 15 dollars, and Sonnet 5.5, 9.9M tokens for 5.80 dollars.">
