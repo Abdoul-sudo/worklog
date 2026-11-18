@@ -171,12 +171,26 @@ To click in Worklog in the terminal, use the fullscreen mode: `/tui fullscreen`.
 
 ## Update
 
+Claude Code does not update Worklog automatically. Choose one of these options.
+
+**Automatic updates (recommended).** Do this one time:
+
+1. In Claude Code, type `/plugin`.
+2. Open the **Marketplaces** tab, then select **worklog**.
+3. Select **Enable auto-update**.
+
+Claude Code then gets each new version when a session starts. The next session uses it.
+
+**Manual update.** Run these commands for each new version:
+
 ```sh
 claude plugin marketplace update worklog
 claude plugin update worklog@worklog
 ```
 
 Then restart Claude Code, or type `/reload-plugins`.
+
+To know when a new version comes out, click **Watch** on this GitHub page, then **Custom** > **Releases**.
 
 ## Uninstall
 
