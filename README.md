@@ -31,8 +31,6 @@
 
 ---
 
-You use Claude on several projects, sometimes for hours. Worklog shows where that time went, how many tokens each project used, and what these tokens would cost on the API. It tracks all of this automatically, right above the prompt.
-
 ## What it does
 
 - **Counts your time** while Claude works: answers, subagents, background commands, Ultracode and more.
@@ -50,11 +48,8 @@ You use Claude on several projects, sometimes for hours. Worklog shows where tha
    ```
 
 2. Restart Claude Code.
-3. Work as usual.
 
 A small button then appears at the bottom of Claude Code, with your project and its time today, for example `⏱ mobile-app · 1h 12`. This button, or the `/worklog` command, opens Worklog.
-
-New versions do not come automatically. You can [turn on automatic updates](#update) one time.
 
 Worklog needs Claude Code 2.1.325 or later. Node.js is optional: with it, Worklog also imports your past work.
 
@@ -106,8 +101,6 @@ In the terminal, a click on a name moves this session to it, and **≡** opens t
 
 ## How the timer works
 
-The timer counts while Claude works.
-
 - **It starts** with your first message. Opening a session does not count.
 - **It runs** while Claude works, even for hours without you.
 - **It stops** when Claude is done. A break starts. When you come back, Worklog decides if the break counts. See [Breaks](#breaks).
@@ -151,8 +144,6 @@ Worklog puts the time of each session under one name, for example a project or a
 4. The name of the project folder. In a Git worktree, the name of the main project.
 
 When Worklog finds the first ID of a session, the time before it also goes to this ID.
-
-You can also choose the name yourself: see [Usage](#usage).
 
 ## Tokens and price
 
@@ -241,13 +232,6 @@ In long sessions, most tokens are cache reads. They are cheap, so many tokens ca
 <summary><strong>Does a resumed or forked conversation count twice?</strong></summary>
 
 No. When you resume or fork a conversation, Claude Code can copy old messages into the new file. Worklog counts each message only once.
-
-</details>
-
-<details>
-<summary><strong>What does Worklog not count?</strong></summary>
-
-Work outside Claude Code: meetings, calls and other tools.
 
 </details>
 
