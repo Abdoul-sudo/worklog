@@ -228,6 +228,13 @@ No. When you resume or fork a conversation, Claude Code can copy old messages in
 
 </details>
 
+<details>
+<summary><strong>If I delete a conversation, do I lose its time?</strong></summary>
+
+No. Worklog keeps its own copy of your time and tokens in `~/.claude/worklog/`. When you delete a conversation in Claude Code, this copy stays.
+
+</details>
+
 ## Privacy and access
 
 Worklog runs on your computer and keeps its data there. This is everything it can access:
