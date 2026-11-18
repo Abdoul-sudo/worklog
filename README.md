@@ -23,7 +23,8 @@
   <a href="#themes">Themes</a> ·
   <a href="#in-the-terminal">Terminal</a> ·
   <a href="#settings">Settings</a> ·
-  <a href="#faq">FAQ</a>
+  <a href="#faq">FAQ</a> ·
+  <a href="#privacy-and-access">Privacy</a>
 </p>
 
 ---
@@ -243,13 +244,19 @@ Work outside Claude Code: meetings, calls and other tools.
 
 </details>
 
-## Privacy
+## Privacy and access
 
-Worklog keeps its data on your computer, in `~/.claude/worklog/`. It does not keep your messages. It sends no data about you or your work over the network.
+Worklog runs on your computer and keeps its data there. This is all that it can do:
 
-Once a day, Worklog downloads the public LiteLLM price list to count the API price. To stop this download, set the environment variable `WORKLOG_PRICES` to `off`.
+| Access | What Worklog does |
+| --- | --- |
+| Reads files | Its own data in `~/.claude/worklog/`. Your Claude Code history in `~/.claude/projects/`, for the time, the tokens and the model of each answer. |
+| Writes files | Only its own data, in `~/.claude/worklog/`. |
+| Runs commands | `git branch --show-current`, to find an ID in the branch name. `node`, to read your past history. |
+| Network | Once a day, it downloads the public LiteLLM price list. It sends nothing about you or your work. |
+| Your messages | It reads each message to find an ID, such as `PROJ-142`. It does not keep your messages. |
 
-To keep the data in another folder, set the environment variable `WORKLOG_DATA_DIR`.
+To stop the price download, set the environment variable `WORKLOG_PRICES` to `off`. To keep the data in another folder, set the environment variable `WORKLOG_DATA_DIR`.
 
 ## License
 
