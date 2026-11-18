@@ -1414,19 +1414,7 @@ function resume(
     ),
     stat('jetons', t().stats.jetons, valeurJetons),
     avecPrix &&
-      stat(
-        'prix',
-        t().stats.prix,
-        valeurPrix,
-        // Au survol, sous la valeur : ce prix est celui de l'API, pas ce que la personne paie avec son abonnement.
-        contenu.cout > 0 && [
-          <Box key="prix-api" position="absolute" top={empilees ? 1 : 2} left={0} width={32} display="none" hover={{ scope: 'stat-prix', display: 'flex' }}>
-            <Text size="caption" {...encre(e, 'gris')}>
-              {t().prixApi}
-            </Text>
-          </Box>,
-        ],
-      ),
+stat('prix', t().stats.prix, valeurPrix),
     jours !== null && options.activite && stat('serie', t().stats.serie, t().joursSerie(jours)),
   ].filter(c => c !== false)
   // Dans le terminal, la frise ne va qu'à côté de la liste, quand la largeur le permet : dessous, la bande défilerait. Dans
@@ -1506,8 +1494,7 @@ function resume(
   const frise = avecFrise ? vueFrise($, e, activite, placeFrise) : null
   // Au survol des tokens ou du prix, le détail des tokens, juste sous la stat. Les bulles viennent en dernier, pour passer
   // devant la frise et la liste. Une stat prend la largeur de son nom ou de sa valeur (estimée : un caractère de légende
-  // fait environ 0,62 colonne, un chiffre de valeur près d'une colonne). Empilées, chaque stat a sa ligne. La bulle du prix
-  // passe sous la note « Au tarif de l'API ».
+  // fait environ 0,62 colonne, un chiffre de valeur près d'une colonne). Empilées, chaque stat a sa ligne.
   const largeurStat = (nom: string, valeur: string) => Math.ceil(Math.max(nom.length * 0.62, valeur.length * 0.95)) + ECART_STATS
   const aGaucheDuPrix = largeurStat(t().stats.jetons, valeurJetons)
   const aGaucheDesJetons = avecPrix ? 0 : largeurStat(t().stats.temps, formatDuree(contenu.total))
@@ -1523,7 +1510,7 @@ function resume(
     ),
     avecPrix &&
       contenu.cout > 0 &&
-      detailJetons($, e, contenu.repartition, contenu.jetons, 'stat-prix', empilees ? { top: 3, left: 0 } : { top: 3, left: aGaucheDuPrix }, options.mesure),
+      detailJetons($, e, contenu.repartition, contenu.jetons, 'stat-prix', empilees ? { top: 2, left: 0 } : { top: 2, left: aGaucheDuPrix }, options.mesure),
   ]
   if (!serre) {
     return (

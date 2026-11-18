@@ -536,7 +536,8 @@ test("le prix API est toujours calculé ; « Tokens et prix » l'affiche à la p
   // Le prix de la ligne et celui des stats ; puis, dans les trois bulles du détail (tokens et prix des stats, tokens de la
   // ligne), celui de la sortie et celui d'Opus.
   expect((await bande.findAll({ type: 'Text', text: /^2,00 \$$/ })).length).toBe(2 + 3 * 2)
-  expect(await bande.find({ type: 'Text', text: /^Au tarif de l'API, pas votre facture$/ })).toBeDefined()
+  // Pas de note sous le prix : le détail suffit.
+  expect(await bande.find({ type: 'Text', text: /facture/ })).toBeUndefined()
   // Le détail, au survol : chaque type de token et chaque modèle, avec ses tokens et son prix.
   expect((await bande.findAll({ type: 'Text', text: /^Sortie$/ })).length).toBe(3)
   expect((await bande.findAll({ type: 'Text', text: /^Opus 5\.5$/ })).length).toBe(3)

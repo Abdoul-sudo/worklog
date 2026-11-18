@@ -41,7 +41,6 @@ const FR = {
   stats: { temps: 'Temps', jetons: 'Tokens', prix: 'Prix API', serie: 'Série' },
   joursSerie: (n: number) => `${n} jour${n > 1 ? 's' : ''}`,
   parallele: (d: string) => `dont ${d} en parallèle`,
-  prixApi: "Au tarif de l'API, pas votre facture",
   tokens: (n: string) => `${n} tokens`,
   // Le détail des tokens, au survol.
   // Le nom principal d'un jour, dans la carte de sa case.
@@ -123,7 +122,6 @@ const EN: typeof FR = {
   stats: { temps: 'Time', jetons: 'Tokens', prix: 'API price', serie: 'Streak' },
   joursSerie: (n: number) => `${n} day${n === 1 ? '' : 's'}`,
   parallele: (d: string) => `incl. ${d} in parallel`,
-  prixApi: 'At API rates, not your bill',
   tokens: (n: string) => `${n} tokens`,
   principal: 'Top',
   detail: { entree: 'Input', sortie: 'Output', ecriture: 'Cache write', lecture: 'Cache read', web: 'Web search', sansDetail: 'No detail', autres: 'Others' },
