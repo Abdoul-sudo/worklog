@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/desktop.gif" width="880" alt="Worklog above the Claude Code prompt box: the time, the tokens and the streak, a heatmap of the year, and the time of each name. The pointer clicks Day, Month and All. In the settings, it picks the Sakura theme and sets Show to Tokens and price, then clicks Day, Month and All again: the API price takes the place of the time. Then it goes back to the Aurora theme and to Time and tokens.">
+  <img src="docs/screenshots/desktop.gif" width="880" alt="Worklog above the Claude Code prompt box: the time, the tokens and the streak, a heatmap of the year, and the time of each name. The pointer points to Tokens, and a box shows the tokens of each type and each model. Then it clicks Month and All. In the settings, it picks the Sakura theme and sets Show to Tokens and price. It clicks Day and points to the API price: the box now shows the price of each line. It clicks All, then goes back to the Aurora theme and to Time and tokens.">
 </p>
 
 <p align="center">
@@ -62,8 +62,20 @@ Do you look at your tokens more than at your time? Set **Show** to **Tokens and 
 
 - The price is what your tokens cost at the Anthropic API list prices, for each model and each answer.
 - Worklog always counts the price, also when it shows the time. So when you switch, your past days have their price too.
-- To see the details, point to **Tokens**, **API price** or the tokens of a name. A box shows the tokens of each type (input, output, cache write and cache read) and of each model, with their price.
 - With a Pro or Max plan, the API price is not your bill. It shows what your work would cost on the API.
+
+### Token details
+
+Point to **Tokens**, **API price** or the tokens of a name. A box shows where your tokens went:
+
+- On the left, each type of token: input, output, cache write and cache read.
+- On the right, each model, such as Opus or Sonnet.
+
+With **Tokens and price**, each line also shows its API price. The detail is in the desktop app and VS Code.
+
+<p align="center">
+  <img src="docs/screenshots/details.png" width="880" alt="Worklog with Show set to Tokens and price. Under the API price of today, 21 dollars, a box is open. On the left: input 46.1k tokens for 14 cents, output 413k for 6.37 dollars, cache write 1.7M for 11 dollars, cache read 20.1M for 3.12 dollars. On the right: Opus 5.5, 12.4M tokens for 15 dollars, and Sonnet 5.5, 9.9M tokens for 5.80 dollars.">
+</p>
 
 ## Breaks
 
