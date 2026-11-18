@@ -81,13 +81,20 @@ To get a message for each new version, click **Watch** on this GitHub page. Then
 
 ## Usage
 
-| To do this | Do this |
-| --- | --- |
-| See another period | Click **Day**, **Week**, **Month**, **Year** or **All**. Click **‹** or **›** to go back or forward. |
-| Move this session to another name, from now on | Point to the name. Then click **⇄**. In the terminal, click the name. |
-| Move this session to a new name, from now on | Click **+ Add item**. Type the name. Press Enter. |
-| Rename | Click **✎** next to the name. Past days get the new name too. |
-| Open the settings | Click the gear. In the terminal, click **≡**. |
+Each line in the list is a name: a project or a task. The bright dot shows the name of this session.
+
+<p align="center">
+  <img src="docs/screenshots/usage.png" width="880" alt="Worklog with 6 numbered parts. 1: the Day, Week, Month, Year and All tabs, at the top right. 2: the back and forward arrows, next to Today. 3: the gear, at the top right. 4: the switch icon next to the name website. 5: Add item, under the list. 6: mobile-app, the name of this session, with a bright dot.">
+</p>
+
+1. **Choose the period.** Click **Day**, **Week**, **Month**, **Year** or **All**.
+2. **Go back or forward.** Click **‹** to see the period before. Click **›** to see the period after.
+3. **Open the settings.** Click the gear.
+4. **Move this session to another name.** Point to the name. Then click **⇄** next to it. The time of this session goes to this name from now on.
+5. **Move this session to a new name.** Click **+ Add item**. Type the name. Then press Enter.
+6. **Rename.** Point to the name with the bright dot. Then click **✎** next to it. Type the new name. Then press Enter. Past days also get the new name.
+
+In the terminal, click a name to move this session to it. To open the settings, click **≡**.
 
 | Command | What it does |
 | --- | --- |
@@ -142,11 +149,7 @@ Worklog puts the time of each session under one name, for example a project or a
 
 When Worklog finds the first ID of a session, the time before it also goes to this ID.
 
-To move this session to another name from now on, point to the name in the list. Then click **⇄**.
-
-<p align="center">
-  <img src="docs/screenshots/switch.png" width="880" alt="The list of names. The pointer is on the switch icon next to website.">
-</p>
+To choose the name yourself, see [Usage](#usage).
 
 ## Tokens and price
 
