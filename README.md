@@ -86,11 +86,11 @@ Each line in the list is a name: a project or a task. The bright dot marks the n
 1. **Period.** **Day**, **Week**, **Month**, **Year** and **All** change the period that you see.
 2. **Back and forward.** The arrows go to the period before or after.
 3. **Settings.** The gear opens the settings.
-4. **Switch.** When you point to another name, **⇄** appears next to it. A click moves this session to that name, from now on.
+4. **Switch.** Hover over another name and click **⇄** to move this session to it, from now on.
 5. **New name.** **+ Add item** creates a name and moves this session to it.
-6. **Rename.** When you point to the name with the bright dot, **✎** appears. A click lets you rename it. Past days get the new name too.
+6. **Rename.** Hover over the name with the bright dot and click **✎**. Past days get the new name too.
 
-Each day of the heatmap also has a card, with its date, its numbers and its top name. It appears when you point to the day.
+Hover over a day in the heatmap to see its numbers.
 
 In the terminal, a click on a name moves this session to it, and **≡** opens the settings.
 
@@ -122,15 +122,13 @@ A break is the time between the end of Claude's work and your next message.
   <img src="docs/breaks.svg" width="880" alt="One day with Worklog. Work always counts. A short 30 min break counts as work when you come back. For a long 2h break, Worklog asks you. The night is a very long break: it does not count.">
 </p>
 
-**Example.** Claude finishes at 10:00. You take a coffee, then send a new message at 10:30. Until 10:30, the total does not change. Then Worklog adds the 30 minutes.
-
-If you close Claude Code during a short break, the break counts as work up to the moment you close Claude Code.
-
-When Worklog asks, **Count** adds the break and **Ignore** leaves it out.
+For a long break, the question appears under Worklog:
 
 <p align="center">
   <img src="docs/screenshots/ask.png" width="880" alt="Under Worklog, the question: 2h 08 break on website, from 9:12 to 11:20. Count it as work? Two buttons: Count and Ignore.">
 </p>
+
+If you close Claude Code during a short break, the break counts as work up to the moment you close Claude Code.
 
 You can change the 1h and the 4h in the [settings](#settings).
 
@@ -159,15 +157,10 @@ If tokens matter more to you than time, set **Show** to **Tokens and price** in 
 
 ### Token details
 
-When you point to **Tokens**, **API price** or the tokens of a name, a box shows where your tokens went:
-
-- On the left, each type of token: input, output, cache write and cache read.
-- On the right, each model, for example Opus or Sonnet.
-
-This box works in the desktop app and in VS Code.
+Hover over **Tokens**, **API price** or the tokens of a name to see your tokens by type and by model. This works in the desktop app and in VS Code.
 
 <p align="center">
-  <img src="docs/screenshots/details.png" width="880" alt="Worklog with Show set to Tokens and price. Under the API price of today, 21 dollars, a box is open. On the left: input 46.1k tokens for 14 cents, output 413k for 6.37 dollars, cache write 1.7M for 11 dollars, cache read 20.1M for 3.12 dollars. On the right: Opus 5.5, 12.4M tokens for 15 dollars, and Sonnet 5.5, 9.9M tokens for 5.80 dollars.">
+  <img src="docs/screenshots/details.png" width="880" alt="Worklog with Show set to Tokens and price. The pointer is on the API price of today, 21 dollars, and a box is open under it. On the left: input 46.1k tokens for 14 cents, output 413k for 6.37 dollars, cache write 1.7M for 11 dollars, cache read 20.1M for 3.12 dollars. On the right: Opus 5.5, 12.4M tokens for 15 dollars, and Sonnet 5.5, 9.9M tokens for 5.80 dollars.">
 </p>
 
 ## Themes
@@ -180,7 +173,7 @@ Worklog comes with 8 themes in the desktop app. You choose one in the settings.
 
 ## In the terminal
 
-Worklog works in the terminal too, with the same data. In a wide terminal, the heatmap shows one square for each day.
+Worklog works in the terminal too, with the same data.
 
 <p align="center">
   <img src="docs/screenshots/terminal.png" width="880" alt="Worklog in the terminal: the stats and the names on the left, the heatmap of the year on the right.">
@@ -196,12 +189,12 @@ Clicks in the terminal need the fullscreen mode: `/tui fullscreen`.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| Show the activity heatmap | On | Shows one square for each day of the year. |
+| Show the activity heatmap | On | Shows or hides the heatmap. |
 | Show | Time and tokens | Shows the time and the tokens, or the tokens and their API price. |
 | Language | English | English or French. |
 | Stay active during breaks | Up to 1h | A break up to this length is short: it counts as work. |
 | Then ask | Up to 4h | Worklog asks you about a break up to this length. A longer break does not count. **Never** turns off the question. |
-| Theme | Night | Default, Night, Aurora, Ember, Forest, Ocean, Dusk or Sakura. Desktop app only. |
+| Theme | Night | Desktop app only. |
 
 ## FAQ
 
