@@ -726,23 +726,23 @@ describe('corrections, tokens et périodes', () => {
     const { source } = svgActivite(liste, null, null)
     // La carte d'une case donne sa date, puis ce que montre le réglage « Afficher », sous leurs libellés.
     expect(carte(source, 'Lundi 5 janvier')).toEqual(['Lundi 5 janvier', '30 min', '1,5 M'])
-    expect(source).toMatch(/<g id="deux">.*>Temps<\/tspan><tspan [^>]*>Tokens<\/tspan>/)
+    expect(source).toMatch(/<svg id="deux" [^>]*>.*>Temps<\/tspan><tspan [^>]*>Tokens<\/tspan>/)
     const parJetons = svgActivite(liste, null, null, 'jetons').source
     expect(carte(parJetons, 'Lundi 5 janvier')).toEqual(['Lundi 5 janvier', '1,5 M', '3,40 $'])
     expect(carte(parJetons, 'Mardi 6 janvier')).toEqual(['Mardi 6 janvier', '15 k', '—'])
-    expect(parJetons).toMatch(/<g id="deux">.*>Tokens<\/tspan><tspan [^>]*>Prix API<\/tspan>/)
+    expect(parJetons).toMatch(/<svg id="deux" [^>]*>.*>Tokens<\/tspan><tspan [^>]*>Prix API<\/tspan>/)
     // Chaque case montre sa carte, et seulement la sienne, à son survol ; les cartes viennent après les cases.
     expect(source).toContain('.b{visibility:hidden;pointer-events:none}.c0:hover~.b0,.c1:hover~.b1{visibility:visible}')
     expect(source.lastIndexOf('<rect class="c')).toBeLessThan(source.indexOf('<svg class="b'))
     // Un prix sous le centime s'écrit « < 0,01 $ » : le « < » est échappé, le SVG reste du XML valide.
     const petit = casesEntre(debut, debut, new Map([['2026-01-05', 30]]), Infinity, new Map([['2026-01-05', 1_000]]), new Map([['2026-01-05', 0.001]]))
     expect(carte(svgActivite(petit, null, null, 'jetons').source, 'Lundi 5 janvier')).toEqual(['Lundi 5 janvier', '1 k', '&lt; 0,01 $'])
-    // Le nom principal du jour ajoute sa ligne ; un jour sans rien le dit.
+    // Le nom principal du jour ajoute sa ligne ; un jour sans rien n'a que sa date.
     const avecNom = casesEntre(debut, fin, new Map([['2026-01-05', 30]]), Infinity, new Map([['2026-01-05', 1_000]]), new Map(), new Map([['2026-01-05', 'FLO-I1']]))
     const { source: sourceNom } = svgActivite(avecNom, null, null)
     expect(carte(sourceNom, 'Lundi 5 janvier')).toEqual(['Lundi 5 janvier', '30 min', '1 k', 'FLO-I1'])
-    expect(sourceNom).toMatch(/<g id="trois">.*>Principal<\/tspan>/)
-    expect(carte(sourceNom, 'Mardi 6 janvier')).toEqual(['Mardi 6 janvier', 'rien'])
+    expect(sourceNom).toMatch(/<svg id="trois" [^>]*>.*>Principal<\/tspan>/)
+    expect(carte(sourceNom, 'Mardi 6 janvier')).toEqual(['Mardi 6 janvier'])
     // Un long nom est coupé.
     const long = casesEntre(debut, debut, new Map([['2026-01-05', 30]]), Infinity, new Map(), new Map(), new Map([['2026-01-05', 'une-refonte-du-checkout']]))
     expect(carte(svgActivite(long, null, null).source, 'Lundi 5 janvier')).toEqual(['Lundi 5 janvier', '30 min', '0', 'une-refonte-du-ch…'])
@@ -765,7 +765,7 @@ describe('corrections, tokens et périodes', () => {
       new Map(jours.map(j => [j, 1_234.56])),
       new Map(jours.map(j => [j, 'une-refonte-complete-du-checkout-avec-un-nom-tres-long-encore'])),
     )
-    for (const mesure of ['tout', 'jetons'] as const) expect(svgActivite(liste, null, null, mesure).source.length).toBeLessThan(115_000)
+    for (const mesure of ['tout', 'jetons'] as const) expect(svgActivite(liste, null, null, mesure).source.length).toBeLessThan(120_000)
   })
 
   test("les jours hors de l'année restent vides ; aujourd'hui est cerclé", async () => {

@@ -171,47 +171,41 @@ export function svgActivite(
     if (avenir) return
     // La carte du jour : la date, puis ses chiffres et son nom principal, chacun avec son libellé. Ses données d'abord :
     // sa forme (combien de lignes, lesquelles) donne son fond et ses libellés, dessinés une fois pour toutes (plus bas).
-    const forme: Forme = estAujourdhui ? (c.principal === undefined ? 'date' : 'jour') : vide ? 'vide' : c.principal === undefined ? 'deux' : 'trois'
+    const forme: Forme = estAujourdhui ? (c.principal === undefined ? 'date' : 'jour') : vide ? 'date' : c.principal === undefined ? 'deux' : 'trois'
     // Un long nom est coupé : la carte reste étroite, et le dessin sous la limite de taille de l'app.
     const nom = c.principal === undefined ? [] : [[...c.principal].length > NOM_CARTE ? `${[...c.principal].slice(0, NOM_CARTE - 1).join('')}…` : c.principal]
-    const lignes = vide ? [t().rien] : [...valeurs, ...nom]
+    const lignes = vide ? [] : [...valeurs, ...nom]
     cartes.push({ i, x, y, forme, date, lignes })
   })
-  // Une carte par forme : toutes les cartes d'une forme ont la largeur de la plus large, leurs valeurs alignées en colonne.
+  // Les libellés d'une forme sont dessinés une fois (plus bas) ; chaque carte prend la largeur de son texte.
   const libellesDe: Record<Forme, string[]> = {
     trois: [...libelles, t().principal],
     deux: libelles,
     jour: [t().principal],
     date: [],
-    vide: [],
   }
   const colonneValeurs = (f: Forme) => (libellesDe[f].length === 0 ? 0 : Math.max(...libellesDe[f].map(largeurTexte)) + ECART_CARTE)
-  const largeurDe = new Map<Forme, number>()
-  for (const k of cartes) {
-    const besoin = Math.max(largeurTexte(k.date), ...k.lignes.map(v => colonneValeurs(k.forme) + largeurTexte(v)))
-    largeurDe.set(k.forme, Math.max(largeurDe.get(k.forme) ?? 0, Math.ceil(besoin) + 2 * MARGE_BULLE))
-  }
-  const hauteurDe = (f: Forme) => (1 + (f === 'date' ? 0 : f === 'jour' || f === 'vide' ? 1 : libellesDe[f].length)) * LIGNE_CARTE + 2 * MARGE_HAUTE
+  const hauteurDe = (f: Forme) => (1 + libellesDe[f].length) * LIGNE_CARTE + 2 * MARGE_HAUTE
   const ligneY = (n: number) => Math.round(MARGE_HAUTE + n * LIGNE_CARTE + LIGNE_CARTE * 0.78)
-  // Le fond et la bordure sont des attributs : le style de la page ne s'applique pas aux formes réutilisées (<use>).
+  // Le fond d'une forme prend la largeur que lui donne chaque carte (`<use width>`). Le fond et la bordure sont des
+  // attributs : le style de la page ne s'applique pas aux formes réutilisées.
   const fondBulle = ENCRE.fond === SANS_FOND ? FOND_BULLE : ENCRE.fond
-  const modeles = [...largeurDe].map(([f, w]) => {
-    const h = hauteurDe(f)
+  const modeles = [...new Set(cartes.map(k => k.forme))].map(f => {
     const etiquettes = libellesDe[f].map((l, n) => `<tspan x="${MARGE_BULLE}" y="${ligneY(n + 1)}">${xml(l)}</tspan>`).join('')
-    const fond = `<rect x=".5" y=".5" width="${w - 1}" height="${h - 1}" rx="7" fill="${fondBulle}" stroke="${ENCRE.bord}"/>`
-    return `<g id="${f}">${fond}${etiquettes === '' ? '' : `<text fill="${ENCRE.gris}">${etiquettes}</text>`}</g>`
+    const fond = `<rect x=".5" y=".5" width="100%" height="${hauteurDe(f) - 1}" rx="7" fill="${fondBulle}" stroke="${ENCRE.bord}"/>`
+    return `<svg id="${f}" overflow="visible">${fond}${etiquettes === '' ? '' : `<text fill="${ENCRE.gris}">${etiquettes}</text>`}</svg>`
   })
   for (const k of cartes) {
-    const w = largeurDe.get(k.forme)!
+    const w = Math.ceil(Math.max(largeurTexte(k.date), ...k.lignes.map(v => colonneValeurs(k.forme) + largeurTexte(v)))) + 2 * MARGE_BULLE
     const h = hauteurDe(k.forme)
     const aDroite = k.x + cote + 6 + w <= largeur || k.x - 6 - w < 0
     const xCarte = Math.max(0, Math.min(largeur - w, aDroite ? k.x + cote + 6 : k.x - 6 - w))
     const yCarte = Math.round(Math.max(0, Math.min(hauteur - h, k.y + cote / 2 - h / 2)))
     const xValeur = Math.round(MARGE_BULLE + colonneValeurs(k.forme))
-    const valeurs = k.lignes.map((v, n) => `<tspan x="${k.forme === 'vide' ? MARGE_BULLE : xValeur}" y="${ligneY(n + 1)}">${xml(v)}</tspan>`).join('')
+    const valeurs = k.lignes.map((v, n) => `<tspan x="${xValeur}" y="${ligneY(n + 1)}">${xml(v)}</tspan>`).join('')
     regles.push(`.c${k.i}:hover~.b${k.i}`)
     bulles.push(
-      `<svg class="b b${k.i}${k.forme === 'vide' ? ' v' : ''}" x="${Math.round(xCarte)}" y="${yCarte}"><use href="#${k.forme}"/>` +
+      `<svg class="b b${k.i}" x="${Math.round(xCarte)}" y="${yCarte}"><use href="#${k.forme}" width="${w - 1}"/>` +
         `<text><tspan x="${MARGE_BULLE}" y="${ligneY(0)}">${xml(k.date)}</tspan>${valeurs}</text></svg>`,
     )
   }
@@ -219,8 +213,7 @@ export function svgActivite(
     `<defs>${modeles.join('')}</defs>` +
       `<style>.k{width:${cote}px;height:${cote}px;rx:${annuelle ? 1.5 : 2.5}px}.b{visibility:hidden;pointer-events:none}` +
       (regles.length > 0 ? `${regles.join(',')}{visibility:visible}` : '') +
-      `text{font:${POLICE_BULLE}px ${POLICES}}.b text{fill:${ENCRE.texte}}.b tspan:first-child{fill:${ENCRE.vif};font-weight:600}` +
-      `.v tspan+tspan{fill:${ENCRE.gris}}</style>`,
+      `text{font:${POLICE_BULLE}px ${POLICES}}.b text{fill:${ENCRE.texte}}.b tspan:first-child{fill:${ENCRE.vif};font-weight:600}</style>`,
     ...bulles,
   )
   const source = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${largeur} ${hauteur}" width="${largeur}" height="${hauteur}" preserveAspectRatio="xMinYMin meet">${parts.join('')}</svg>`
@@ -239,8 +232,8 @@ const ECART_CARTE = 10
 const NOM_CARTE = 18
 
 /** La forme de la carte d'un jour : la date et trois lignes (deux chiffres et le nom principal), ou deux (sans nom), aujourd'hui
- * avec son nom principal (`jour`) ou sans (`date`), un jour sans rien (`vide`). */
-type Forme = 'trois' | 'deux' | 'jour' | 'date' | 'vide'
+ * avec son nom principal (`jour`) ou sans (`date`). Un jour sans rien n'a que sa date (`date`). */
+type Forme = 'trois' | 'deux' | 'jour' | 'date'
 
 /** Un texte dans du XML : « < 0,01 $ » y garde son « < » échappé. */
 const xml = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;')
