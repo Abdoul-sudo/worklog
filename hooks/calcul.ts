@@ -1,5 +1,5 @@
 // Logique pure du comptage : aucun appel à `$`, testée par tests/calcul.test.ts.
-import type { Ecart, Ligne, Plage } from '../types'
+import type { Ecart, Ligne, Part, Plage, Repartition } from '../types'
 import { type Langue, LANGUES, t as texte } from './langue'
 
 export const SANS_ITEM = 'sans nom'
@@ -95,7 +95,8 @@ export type Activite =
 type EvenementActivite = { t: number; s: string; e: Activite; k: string | null; d?: string; i?: 1 }
 type EvenementClassement = { t: number; s: string; e: 'classement'; session: string; debut: number; choix: Choix }
 // `p` : le détail des réponses, par modèle, pour leur prix API ; `c` : ce prix, en dollars, ajouté à la lecture (avecCouts).
-type EvenementJetons = { t: number; s: string; e: 'jetons'; n: number; k: string | null; d?: string; i?: 1; p?: Detail[]; c?: number }
+// `r` : ces tokens et leur prix par type et par modèle, ajoutés à la lecture (avecCouts).
+type EvenementJetons = { t: number; s: string; e: 'jetons'; n: number; k: string | null; d?: string; i?: 1; p?: Detail[]; c?: number; r?: Repartition }
 // Un ID cité dans un message qu'une conversation reprise par l'app a recopié (scripts/importer.mjs) : il nomme la session
 // reprise, sans temps.
 type EvenementRepere = { t: number; s: string; e: 'repere'; k: string; d?: string; i: 1 }
@@ -156,6 +157,8 @@ export type Bilan = {
   jetons: number
   /** Le prix API des tokens, en dollars : ceux dont le détail est connu. */
   cout: number
+  /** Les tokens de la période et leur prix, par type et par modèle : ceux dont le détail est connu. */
+  repartition: Repartition
   ecarts: Ecart[]
   parSession: Map<string, Map<string, number>>
   /** La dernière activité de chaque item sur la période : la fin de son dernier temps, ou sa dernière dépense de tokens. */
@@ -390,7 +393,7 @@ export function calculer(
     }
     if (arrete && !actives.has(session)) enPause.add(session)
   }
-  const jetons = consos.map(ev => ({ item: itemDe(ev), t: ev.t, n: ev.n, c: ev.c ?? 0, session: ev.s }))
+  const jetons = consos.map(ev => ({ item: itemDe(ev), t: ev.t, n: ev.n, c: ev.c ?? 0, r: ev.r, session: ev.s }))
   return { plages, ecarts, actives, jetons, enPause }
 }
 
@@ -501,7 +504,23 @@ export function bilan(
     })
   }
 
-  const lignes = [...totaux].map(([item, t]) => ({ item, minutes: t.minutes, enCours: enCours.has(item), jetons: t.jetons, cout: t.cout }))
+  // Le détail des tokens de la période, item par item et en tout.
+  const repartition = repartitionVide()
+  const repartitions = new Map<string, Repartition>()
+  for (const j of jetons) {
+    if (j.r === undefined || j.t < debut || j.t >= fin) continue
+    cumuler(repartition, j.r)
+    if (!repartitions.has(j.item)) repartitions.set(j.item, repartitionVide())
+    cumuler(repartitions.get(j.item)!, j.r)
+  }
+  const lignes = [...totaux].map(([item, t]) => ({
+    item,
+    minutes: t.minutes,
+    enCours: enCours.has(item),
+    jetons: t.jetons,
+    cout: t.cout,
+    ...(repartitions.has(item) ? { repartition: repartitions.get(item)! } : {}),
+  }))
   // Un écart déjà couvert par une autre session sur le même item n'a rien à confirmer.
   const aConfirmer = calcul.ecarts
     .map(e => ({ ...e, item: nom(e.item) }))
@@ -529,6 +548,7 @@ export function bilan(
     reel: Math.round(reelBrut / MINUTE),
     jetons: lignes.reduce((s, l) => s + l.jetons, 0),
     cout: lignes.reduce((s, l) => s + l.cout, 0),
+    repartition,
     ecarts: aConfirmer,
     derniere,
     enPause: calcul.enPause,
@@ -573,8 +593,39 @@ export function prixClaude(liste: unknown): Prix {
   return garde
 }
 
-/** Le prix API de réponses en dollars, d'après les prix de LiteLLM ; null pour un modèle sans prix connu. */
-export function coutReponse(d: Detail, prix: Prix): number | null {
+export const repartitionVide = (): Repartition => ({
+  entree: { n: 0, c: 0 },
+  sortie: { n: 0, c: 0 },
+  ecriture: { n: 0, c: 0 },
+  lecture: { n: 0, c: 0 },
+  web: 0,
+  modeles: {},
+})
+
+const ajouter = (a: Part, n: number, c: number) => {
+  a.n += n
+  a.c += c
+}
+
+/** Ajoute `r` à `total`. */
+export function cumuler(total: Repartition, r: Readonly<Repartition>): void {
+  for (const type of ['entree', 'sortie', 'ecriture', 'lecture'] as const) ajouter(total[type], r[type].n, r[type].c)
+  total.web += r.web
+  for (const [modele, p] of Object.entries(r.modeles)) ajouter((total.modeles[modele] ??= { n: 0, c: 0 }), p.n, p.c)
+}
+
+/** Le nom court d'un modèle : `claude-opus-5-5` donne `Opus 5.5`, `claude-3-5-sonnet-20241022` donne `Sonnet 3.5`. */
+export function nomModele(id: string): string {
+  const morceaux = id.replace(/^claude-/, '').replace(/-\d{8}$/, '').split('-')
+  const mots = morceaux.filter(m => !/^\d+$/.test(m))
+  const version = morceaux.filter(m => /^\d+$/.test(m)).join('.')
+  if (mots.length === 0) return id
+  return [mots.map(m => m.charAt(0).toUpperCase() + m.slice(1)).join(' '), version].filter(Boolean).join(' ')
+}
+
+/** Le prix API d'une réponse en dollars, par type de token, d'après les prix de LiteLLM ; null pour un modèle sans prix
+ * connu. Les facteurs (mode rapide, inférence aux États-Unis) s'appliquent aux tokens, pas aux recherches web. */
+function coutsReponse(d: Detail, prix: Prix) {
   const entree = prix[d.m] ?? prix[d.m.replace(/-\d{8}$/, '')]
   if (entree === undefined) return null
   const valeur = (cle: string) => (typeof entree[cle] === 'number' ? (entree[cle] as number) : undefined)
@@ -591,26 +642,53 @@ export function coutReponse(d: Detail, prix: Prix): number | null {
   const ecriture = prixDe('output_cost_per_token')
   if (lecture === undefined || ecriture === undefined) return null
   // Sans prix de cache, ceux d'Anthropic : écrire coûte 1,25 fois la lecture pour 5 min, 2 fois pour 1 h ; relire, 0,1 fois.
-  const tokens =
-    d.in * lecture +
-    d.out * ecriture +
-    d.c5 * (prixDe('cache_creation_input_token_cost') ?? lecture * 1.25) +
-    d.c1 * (prixDe('cache_creation_input_token_cost_above_1hr') ?? lecture * 2) +
-    d.cr * (prixDe('cache_read_input_token_cost') ?? lecture * 0.1)
   const facteurs = (entree.provider_specific_entry ?? {}) as Readonly<Record<string, unknown>>
   const facteur = (cle: string) => (typeof facteurs[cle] === 'number' ? (facteurs[cle] as number) : 1)
   const recherche = entree.search_context_cost_per_query as Readonly<Record<string, unknown>> | undefined
   const parRecherche = typeof recherche?.search_context_size_medium === 'number' ? recherche.search_context_size_medium : 0.01
-  return tokens * (d.rapide === 1 ? facteur('fast') : 1) * (d.us === 1 ? facteur('us') : 1) + (d.web ?? 0) * parRecherche
+  return {
+    entree: d.in * lecture,
+    sortie: d.out * ecriture,
+    ecriture:
+      d.c5 * (prixDe('cache_creation_input_token_cost') ?? lecture * 1.25) +
+      d.c1 * (prixDe('cache_creation_input_token_cost_above_1hr') ?? lecture * 2),
+    lecture: d.cr * (prixDe('cache_read_input_token_cost') ?? lecture * 0.1),
+    facteur: (d.rapide === 1 ? facteur('fast') : 1) * (d.us === 1 ? facteur('us') : 1),
+    web: (d.web ?? 0) * parRecherche,
+  }
 }
 
-/** Le prix API de chaque dépense de tokens (`c`), d'après le détail de ses réponses ; sans prix connu, rien ne change. */
+/** Le prix API de réponses en dollars, d'après les prix de LiteLLM ; null pour un modèle sans prix connu. */
+export function coutReponse(d: Detail, prix: Prix): number | null {
+  const c = coutsReponse(d, prix)
+  return c === null ? null : (c.entree + c.sortie + c.ecriture + c.lecture) * c.facteur + c.web
+}
+
+/** Les tokens de réponses et leur prix, par type et par modèle ; un modèle sans prix connu a ses tokens, sans prix. */
+function repartir(details: readonly Detail[], prix: Prix | null): Repartition {
+  const r = repartitionVide()
+  for (const d of details) {
+    const c = prix === null ? null : coutsReponse(d, prix)
+    const f = c?.facteur ?? 0
+    ajouter(r.entree, d.in, (c?.entree ?? 0) * f)
+    ajouter(r.sortie, d.out, (c?.sortie ?? 0) * f)
+    ajouter(r.ecriture, d.c5 + d.c1, (c?.ecriture ?? 0) * f)
+    ajouter(r.lecture, d.cr, (c?.lecture ?? 0) * f)
+    r.web += c?.web ?? 0
+    const n = d.in + d.out + d.c5 + d.c1 + d.cr
+    if (n > 0) ajouter((r.modeles[d.m] ??= { n: 0, c: 0 }), n, prix === null ? 0 : (coutReponse(d, prix) ?? 0))
+  }
+  return r
+}
+
+/** Le prix API de chaque dépense de tokens (`c`), et son détail par type et par modèle (`r`), d'après ses réponses ; sans
+ * prix connu, `c` manque et le détail n'a que des tokens. */
 export function avecCouts(evenements: readonly Evenement[], prix: Prix | null): Evenement[] {
-  if (prix === null) return [...evenements]
   return evenements.map(ev => {
     if (ev.e !== 'jetons' || ev.p === undefined) return ev
-    const couts = ev.p.map(d => coutReponse(d, prix)).filter((c): c is number => c !== null)
-    return couts.length === 0 ? ev : { ...ev, c: couts.reduce((a, b) => a + b, 0) }
+    const r = repartir(ev.p, prix)
+    const couts = prix === null ? [] : ev.p.map(d => coutReponse(d, prix)).filter((c): c is number => c !== null)
+    return couts.length === 0 ? { ...ev, r } : { ...ev, c: couts.reduce((a, b) => a + b, 0), r }
   })
 }
 

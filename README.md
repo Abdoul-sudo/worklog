@@ -61,6 +61,7 @@ Do you look at your tokens more than at your time? Set **Show** to **Tokens and 
 
 - The price is what your tokens cost at the Anthropic API list prices, for each model and each answer.
 - Worklog always counts the price, also when it shows the time. So when you switch, your past days have their price too.
+- To see the details, point to **Tokens**, **API price** or the tokens of a name. A box shows the tokens of each type (input, output, cache write and cache read) and of each model, with their price.
 - With a Pro or Max plan, the API price is not your bill. It shows what your work would cost on the API.
 
 ## Breaks
@@ -129,6 +130,8 @@ To click in Worklog in the terminal, use the fullscreen mode: `/tui fullscreen`.
 | Task | Action |
 | --- | --- |
 | See another period | Click **Day**, **Week**, **Month**, **Year** or **All**. Click **‹** or **›** to go back or forward. |
+| See the details of the tokens | Point to **Tokens**, **API price** or the tokens of a name. Desktop app only. |
+| See one day | Point to its square in the heatmap. Desktop app only. |
 | Count this session for another name, from now on | Point to the name, then click **⇄**. In the terminal, click the name. |
 | Count this session for a new name, from now on | Click **+ Add item**, type the name, then press Enter. |
 | Rename | Click **✎** next to the name. The new name also replaces the old one on past days. |

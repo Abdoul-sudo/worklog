@@ -533,8 +533,14 @@ test("le prix API est toujours calculé ; « Tokens et prix » l'affiche à la p
   await bande.press({ key: 'reglages' })
   // 1 000 tokens lus à 4 $ le million, 100 000 écrits à 20 $ le million.
   expect(await bande.find({ type: 'Text', text: /^101 k tokens$/ })).toBeDefined()
-  expect((await bande.findAll({ type: 'Text', text: /^2,00 \$$/ })).length).toBe(2)
+  // Le prix de la ligne et celui des stats ; puis, dans les trois bulles du détail (tokens et prix des stats, tokens de la
+  // ligne), celui de la sortie et celui d'Opus.
+  expect((await bande.findAll({ type: 'Text', text: /^2,00 \$$/ })).length).toBe(2 + 3 * 2)
   expect(await bande.find({ type: 'Text', text: /^Au tarif de l'API, pas votre facture$/ })).toBeDefined()
+  // Le détail, au survol : chaque type de token et chaque modèle, avec ses tokens et son prix.
+  expect((await bande.findAll({ type: 'Text', text: /^Sortie$/ })).length).toBe(3)
+  expect((await bande.findAll({ type: 'Text', text: /^Opus 5\.5$/ })).length).toBe(3)
+  expect((await bande.findAll({ type: 'Text', text: /^100 k$/ })).length).toBe(3)
   await puce.unmount()
   await bande.unmount()
 })
@@ -610,13 +616,14 @@ test('des prix arrivés pendant que Worklog est ouvert redessinent la frise, jou
   await bande.press({ key: 'reglages' })
   const caseDHier = async () => {
     const svgs = await bande.findAll({ type: 'Svg' })
-    const source = svgs.map(x => String((x.props as { source?: unknown })?.source ?? '')).find(x => x.includes('<title>')) ?? ''
-    return /<title>Mercredi 11 novembre[^<]*<\/title>/.exec(source)?.[0]
+    const source = svgs.map(x => String((x.props as { source?: unknown })?.source ?? '')).find(x => /<rect class="c\d+ k"/.test(x)) ?? ''
+    const valeurs = /Mercredi 11 novembre<\/tspan>((?:<tspan[^>]*>[^<]*<\/tspan>)*)<\/text>/.exec(source)?.[1] ?? ''
+    return [...valeurs.matchAll(/<tspan[^>]*>([^<]*)<\/tspan>/g)].map(x => x[1]).join(' · ')
   }
-  expect(await caseDHier()).toBe('<title>Mercredi 11 novembre · 101 k tokens</title>')
+  expect(await caseDHier()).toBe('101 k · — · FLO-I1')
   liberer()
   await horloge.settle()
-  expect(await caseDHier()).toBe('<title>Mercredi 11 novembre · 101 k tokens · 2,00 $</title>')
+  expect(await caseDHier()).toBe('101 k · 2,00 $ · FLO-I1')
   await puce.unmount()
   await bande.unmount()
 })
@@ -644,7 +651,7 @@ test("dans une bande étroite et basse de l'app desktop, la frise laisse la plac
   const dessin = async (props: { maxRows: number; bodyColumns: number }) => {
     const bande = await $.ui.mount({ ...BANDE, props: { ...BANDE.props, ...props }, surface: 'desktop' })
     const svgs = await bande.findAll({ type: 'Svg' })
-    const frise = svgs.some(x => String((x.props as { source?: unknown })?.source ?? '').includes('<title>'))
+    const frise = svgs.some(x => /<rect class="c\d+ k"/.test(String((x.props as { source?: unknown })?.source ?? '')))
     const ajouter = (await bande.find({ key: 'autre' })) !== undefined
     await bande.unmount()
     return { frise, ajouter }

@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren, RenderNode } from 'claude-code'
 
-import type { Ecart, Frise, Interface, Ligne, Onglet, Reglages, Session, Vue } from '../types'
+import type { Ecart, Frise, Interface, Ligne, Onglet, Reglages, Repartition, Session, Vue } from '../types'
 import { type DessinTerminal, casesEntre, cellulesActivite, compterSerie, svgActivite } from './activite'
 import {
   type Activite,
@@ -42,6 +42,7 @@ import {
   lireLignes,
   lireOptions,
   nommer,
+  nomModele,
   prixClaude,
 } from './calcul'
 import {
@@ -49,6 +50,7 @@ import {
   ENCRE,
   couleurs,
   APERCU,
+  FOND_BULLE,
   SANS_FOND,
   choisirTheme,
   svgApercu,
@@ -171,7 +173,13 @@ let dernierDebutAgents = -Infinity
 // Les travaux de fond (une commande, un Monitor, un workflow) encore en cours à la fin du dernier tour : Claude les attend.
 let tachesDeFond = new Set<string>()
 // Minutes des jours passés pour la frise, recalculées une fois par jour ou après une correction.
-let cacheFrise: { cle: string; minutes: Map<string, number>; jetons: Map<string, number>; couts: Map<string, number> } | null = null
+let cacheFrise: {
+  cle: string
+  minutes: Map<string, number>
+  jetons: Map<string, number>
+  couts: Map<string, number>
+  principaux: Map<string, string>
+} | null = null
 // Le dernier lancement de l'importation de l'historique, dans cette session.
 let importLance = -Infinity
 /** Les lignes d'une page dans la bande : quatre sur deux colonnes de deux, deux sur une seule (la bande reste basse). Le panneau, lui, remplit sa hauteur : ses rangées, moins celles de l'en-tête, des stats, de la frise et du
@@ -193,6 +201,8 @@ const LARGE = 95
 const MOYEN = 80
 /** La largeur d'une cellule dans l'app desktop, en pixels CSS (mesurée) : pour donner à une boîte la largeur d'un dessin. */
 const PX_CELLULE = 8.2
+/** L'écart entre deux stats, en colonnes. */
+const ECART_STATS = 3
 /** En dessous de cette largeur (en cellules), les onglets passent sous le titre. */
 const ETROIT = 64
 /** La hauteur demandée pour le panneau quand il s'ouvre au-dessus de la saisie, en rangées. */
@@ -566,6 +576,7 @@ async function calculerVue($: Moteur): Promise<void> {
     reel: b.reel,
     jetons: b.jetons,
     cout: b.cout,
+    repartition: b.repartition,
     lignes,
     derniere: Object.fromEntries(b.derniere),
   }
@@ -597,6 +608,14 @@ function bornesFrise(etat: Interface, maintenant: number, contenu: Vue | null): 
   return { debut: new Date(annee, 0, 1).getTime(), fin: new Date(annee, 11, 31).getTime() }
 }
 
+/** Le nom principal d'un jour : celui qui a le plus de temps, ou avec « Tokens et prix », le plus cher ; puis le plus de
+ * tokens. */
+function principal(lignes: readonly Ligne[], mesure: Mesure): string | undefined {
+  const rang = (l: Ligne) => (mesure === 'jetons' ? [l.cout, l.jetons] : [l.minutes, l.jetons])
+  const premier = [...lignes].sort((a, b) => rang(b)[0]! - rang(a)[0]! || rang(b)[1]! - rang(a)[1]!)[0]
+  return premier === undefined ? undefined : affichage(premier.item)
+}
+
 /** La frise d'activité ; les minutes des jours passés sont gardées jusqu'au lendemain ou jusqu'à une correction. */
 async function calculerFrise($: Moteur): Promise<void> {
   const options = await lireReglages($)
@@ -606,7 +625,7 @@ async function calculerFrise($: Moteur): Promise<void> {
   const etat = await read($, ui)
   const regardee = await read($, vue)
   const { debut, fin } = bornesFrise(etat, maintenant, regardee)
-  const cle = `${cleJour(debut)}|${cleJour(fin)}|${cleJour(aujourdhui)}`
+  const cle = `${cleJour(debut)}|${cleJour(fin)}|${cleJour(aujourdhui)}|${options.mesure}`
   if (cacheFrise?.cle !== cle) {
     const { b } = await bilanDe($, debut, Math.min(jourSuivant(fin), aujourdhui))
     cacheFrise = {
@@ -614,11 +633,18 @@ async function calculerFrise($: Moteur): Promise<void> {
       minutes: new Map(b.jours.map(j => [cleJour(j.debut), j.total])),
       jetons: new Map(b.jours.map(j => [cleJour(j.debut), j.jetons])),
       couts: new Map(b.jours.map(j => [cleJour(j.debut), j.cout])),
+      principaux: new Map(
+        b.jours.flatMap(j => {
+          const nom = principal(j.lignes, options.mesure)
+          return nom === undefined ? [] : [[cleJour(j.debut), nom] as const]
+        }),
+      ),
     }
   }
   const parJour = new Map(cacheFrise.minutes)
   const jetonsParJour = new Map(cacheFrise.jetons)
   const coutsParJour = new Map(cacheFrise.couts)
+  const principaux = new Map(cacheFrise.principaux)
   const contientAujourdhui = debut <= aujourdhui && aujourdhui <= fin
   // Aujourd'hui est la seule case qui bouge : elle est recalculée à chaque fois.
   if (contientAujourdhui) {
@@ -626,8 +652,11 @@ async function calculerFrise($: Moteur): Promise<void> {
     parJour.set(cleJour(aujourdhui), duJour?.total ?? 0)
     jetonsParJour.set(cleJour(aujourdhui), duJour?.jetons ?? 0)
     coutsParJour.set(cleJour(aujourdhui), duJour?.cout ?? 0)
+    const principalDuJour = duJour === undefined ? undefined : principal(duJour.lignes, options.mesure)
+    if (principalDuJour === undefined) principaux.delete(cleJour(aujourdhui))
+    else principaux.set(cleJour(aujourdhui), principalDuJour)
   }
-  const liste = casesEntre(debut, fin, parJour, aujourdhui, jetonsParJour, coutsParJour)
+  const liste = casesEntre(debut, fin, parJour, aujourdhui, jetonsParJour, coutsParJour, principaux)
   // La période de l'onglet est mise en avant dans la frise ; l'année et Tout la couvrent déjà entière.
   const enAvant = etat.onglet === 'jour' || etat.onglet === 'semaine' || etat.onglet === 'mois'
   const periode = enAvant && regardee !== null ? { debut: regardee.debut, fin: regardee.fin } : null
@@ -1007,6 +1036,82 @@ const texteJetons = (l: Ligne) => (l.jetons > 0 ? t().tokens(formatJetons(l.jeto
 const texteValeur = (l: Ligne, mesure: Mesure) =>
   mesure === 'jetons' ? (l.cout > 0 ? formatCout(l.cout) : '—') : l.minutes > 0 ? formatDuree(l.minutes) : '—'
 
+/** Les modèles que la bulle du détail nomme ; les autres sont réunis sur une ligne. */
+const MODELES_DETAIL = 4
+
+/**
+ * Le détail des tokens, au survol de `scope` (dans l'app seulement) : à gauche par type, à droite par modèle, chacun avec
+ * ses tokens, et son prix API avec « Tokens et prix » (`mesure`). Posé en absolu à `place`, il apparaît sans rien
+ * déplacer. `total` : les tokens de la période ; ceux sans détail (un historique effacé) ont leur ligne.
+ */
+function detailJetons(
+  $: Moteur,
+  e: Site,
+  r: Repartition | undefined,
+  total: number,
+  scope: string,
+  place: { top?: number; bottom?: number; left?: number; right?: number },
+  mesure: Mesure,
+) {
+  if (!riche(e) || r === undefined || total === 0) return false
+  const { Box, Text } = $.ui.resolve(e)
+  const avecPrix = mesure === 'jetons' && r.entree.c + r.sortie.c + r.ecriture.c + r.lecture.c + r.web > 0
+  const { detail } = t()
+  type Rang = { nom: string; n: number | null; c: number | null }
+  const detailles = r.entree.n + r.sortie.n + r.ecriture.n + r.lecture.n
+  const types: Rang[] = [
+    { nom: detail.entree, ...r.entree },
+    { nom: detail.sortie, ...r.sortie },
+    { nom: detail.ecriture, ...r.ecriture },
+    { nom: detail.lecture, ...r.lecture },
+    ...(avecPrix && r.web > 0 ? [{ nom: detail.web, n: null, c: r.web }] : []),
+    ...(total > detailles ? [{ nom: detail.sansDetail, n: total - detailles, c: null }] : []),
+  ]
+  const tries = Object.entries(r.modeles).sort(([, a], [, b]) => b.c - a.c || b.n - a.n)
+  const autres = tries.slice(MODELES_DETAIL - 1)
+  const modeles: Rang[] = [
+    ...(tries.length > MODELES_DETAIL ? tries.slice(0, MODELES_DETAIL - 1) : tries).map(([m, p]) => ({ nom: nomModele(m), ...p })),
+    ...(tries.length > MODELES_DETAIL
+      ? [{ nom: detail.autres, n: autres.reduce((s, [, p]) => s + p.n, 0), c: autres.reduce((s, [, p]) => s + p.c, 0) }]
+      : []),
+  ]
+  // Un bloc en colonnes (les noms, les tokens alignés à droite, les prix) : chaque colonne prend la largeur de son plus
+  // long texte. Une case vide garde sa ligne avec une espace insécable.
+  const colonne = (cle: string, textes: string[], ton: Ton, aDroite: boolean) => (
+    <Box key={cle} flexDirection="column" alignItems={aDroite ? 'flex-end' : 'flex-start'}>
+      {textes.map((x, i) => (
+        <Text key={`${cle}-${i}`} size="caption" tabular {...encre(e, ton)}>
+          {x === '' ? ' ' : x}
+        </Text>
+      ))}
+    </Box>
+  )
+  const bloc = (cle: string, rangs: Rang[]) => (
+    <Box key={cle} flexDirection="row" gap={1}>
+      {colonne(`${cle}-noms`, rangs.map(x => x.nom), 'gris', false)}
+      {colonne(`${cle}-jetons`, rangs.map(x => (x.n === null ? '' : formatJetons(x.n))), 'texte', true)}
+      {avecPrix && colonne(`${cle}-prix`, rangs.map(x => (x.c === null ? '' : x.c > 0 ? formatCout(x.c) : '—')), 'vif', true)}
+    </Box>
+  )
+  return (
+    <Box
+      position="absolute"
+      {...place}
+      display="none"
+      hover={{ scope, display: 'flex' }}
+      flexDirection="row"
+      gap={2}
+      paddingX={1}
+      backgroundColor={ENCRE.fond === SANS_FOND ? FOND_BULLE : ENCRE.fond}
+      borderStyle="round"
+      borderColor={ENCRE.bord}
+    >
+      {bloc('types', types)}
+      {modeles.length > 0 && bloc('modeles', modeles)}
+    </Box>
+  )
+}
+
 function ligne(
   $: Moteur,
   e: Site,
@@ -1067,11 +1172,19 @@ function ligne(
         —
       </Text>
     )
-  const jetons = l.jetons > 0 && (
+  const texteDesJetons = (
     <Text size="caption" tabular {...encre(e, 'faible')}>
       {texteJetons(l)}
     </Text>
   )
+  // Au survol des tokens, leur détail (bullesListe) : ils sont le groupe de survol de sa bulle.
+  const jetons =
+    l.jetons > 0 &&
+    (riche(e) ? (
+      <Box hover={{ scope: `jetons-${l.item}`, backgroundColor: TRANSPARENT }}>{texteDesJetons}</Box>
+    ) : (
+      texteDesJetons
+    ))
   if (!riche(e)) {
     // Pas de survol dans le terminal : pas d'icône ; le nom est le bouton, en colonnes fixes avec les chiffres.
     const libelle = affichage(l.item)
@@ -1235,6 +1348,23 @@ function resume(
   const rang = (l: Ligne) =>
     // Une seule colonne sur une grande largeur : le nom a une largeur fixe, pour garder les chiffres près de lui.
     ligne($, e, l, teintes[contenu.lignes.indexOf(l)]!, d.actuel, etat, !deuxColonnes && d.colonnes >= LARGE, options.mesure, largeurs)
+  // Au survol des tokens d'une ligne, leur détail, juste au-dessus d'elle. Les bulles viennent après toutes les lignes,
+  // pour passer devant les deux colonnes. Celle de gauche s'ouvre vers la droite, celle de droite vers la gauche : elles
+  // restent dans le popover.
+  const hauteurListe = Math.max(...colonnesListe.map(c => c.length))
+  const bullesListe = colonnesListe.flatMap((colonne, i) =>
+    colonne.map((l, rangee) =>
+      detailJetons(
+        $,
+        e,
+        l.repartition,
+        l.jetons,
+        `jetons-${l.item}`,
+        { bottom: hauteurListe - rangee, ...(i === 0 ? { left: 0 } : { right: 0 }) },
+        options.mesure,
+      ),
+    ),
+  )
   const retrait = serre ? 0 : ('sm' as const)
   const parallele = enParallele > 0 ? t().parallele(formatDuree(enParallele)) : ''
   // Une stat du terminal : son nom en gris, sa valeur en gras.
@@ -1289,13 +1419,13 @@ function resume(
         t().stats.prix,
         valeurPrix,
         // Au survol, sous la valeur : ce prix est celui de l'API, pas ce que la personne paie avec son abonnement.
-        contenu.cout > 0 && (
-          <Box position="absolute" top={empilees ? 1 : 2} left={0} width={32} display="none" hover={{ scope: 'stat-prix', display: 'flex' }}>
+        contenu.cout > 0 && [
+          <Box key="prix-api" position="absolute" top={empilees ? 1 : 2} left={0} width={32} display="none" hover={{ scope: 'stat-prix', display: 'flex' }}>
             <Text size="caption" {...encre(e, 'gris')}>
               {t().prixApi}
             </Text>
-          </Box>
-        ),
+          </Box>,
+        ],
       ),
     jours !== null && options.activite && stat('serie', t().stats.serie, t().joursSerie(jours)),
   ].filter(c => c !== false)
@@ -1307,7 +1437,7 @@ function resume(
   // Trois stats au plus, sur une ligne, groupées à gauche : une ou deux stats ne laissent pas de grand vide entre elles.
   // À côté de la frise, le groupe prend la place libre, et pousse la frise au bord droit.
   const stats = (
-    <Box flexDirection="row" alignItems="flex-start" gap={3} flexShrink={0} {...(avecFrise ? { flexGrow: 1 } : {})}>
+    <Box flexDirection="row" alignItems="flex-start" gap={ECART_STATS} flexShrink={0} {...(avecFrise ? { flexGrow: 1 } : {})}>
       {cartes}
     </Box>
   )
@@ -1354,14 +1484,18 @@ function resume(
         </Box>
       )}
       {colonnesListe.length === 1 ? (
-        colonnesListe[0]!.map(rang)
+        <Box position="relative" flexDirection="column" alignItems="stretch">
+          {colonnesListe[0]!.map(rang)}
+          {bullesListe}
+        </Box>
       ) : (
-        <Box flexDirection="row" alignItems="flex-start" gap={4}>
+        <Box position="relative" flexDirection="row" alignItems="flex-start" gap={4}>
           {colonnesListe.map((colonne, i) => (
             <Box key={`colonne-${i}`} flexDirection="column" alignItems="stretch" flexGrow={1} width={0}>
               {colonne.map(rang)}
             </Box>
           ))}
+          {bullesListe}
         </Box>
       )}
       {/* Dans le terminal, à côté de la frise plus haute, le pied descend en bas de la carte. */}
@@ -1370,9 +1504,30 @@ function resume(
     </Box>
   )
   const frise = avecFrise ? vueFrise($, e, activite, placeFrise) : null
+  // Au survol des tokens ou du prix, le détail des tokens, juste sous la stat. Les bulles viennent en dernier, pour passer
+  // devant la frise et la liste. Une stat prend la largeur de son nom ou de sa valeur (estimée : un caractère de légende
+  // fait environ 0,62 colonne, un chiffre de valeur près d'une colonne). Empilées, chaque stat a sa ligne. La bulle du prix
+  // passe sous la note « Au tarif de l'API ».
+  const largeurStat = (nom: string, valeur: string) => Math.ceil(Math.max(nom.length * 0.62, valeur.length * 0.95)) + ECART_STATS
+  const aGaucheDuPrix = largeurStat(t().stats.jetons, valeurJetons)
+  const aGaucheDesJetons = avecPrix ? 0 : largeurStat(t().stats.temps, formatDuree(contenu.total))
+  const bulles = [
+    detailJetons(
+      $,
+      e,
+      contenu.repartition,
+      contenu.jetons,
+      'stat-jetons',
+      empilees ? { top: avecPrix ? 1 : 2, left: 0 } : { top: 2, left: aGaucheDesJetons },
+      options.mesure,
+    ),
+    avecPrix &&
+      contenu.cout > 0 &&
+      detailJetons($, e, contenu.repartition, contenu.jetons, 'stat-prix', empilees ? { top: 3, left: 0 } : { top: 3, left: aGaucheDuPrix }, options.mesure),
+  ]
   if (!serre) {
     return (
-      <Box flexDirection="column" alignItems="stretch" gap="sm">
+      <Box position="relative" flexDirection="column" alignItems="stretch" gap="sm">
         {d.colonnes >= MOYEN ? (
           // Les stats en haut, à la hauteur des mois de la frise.
           <Box flexDirection="row" alignItems="flex-start" gap={4} paddingX={retrait}>
@@ -1394,6 +1549,7 @@ function resume(
           </Box>
         )}
         {liste}
+        {bulles}
       </Box>
     )
   }

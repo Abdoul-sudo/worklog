@@ -1,15 +1,17 @@
 // La frise d'activité, comme celle de GitHub : une case par jour, une colonne par semaine.
 // Logique pure, testée par tests/activite.test.ts.
 import { cleJour, debutJour, debutSemaine, decalerJours, formatCout, formatDuree, formatJetons, formatJour, majuscule } from './calcul'
-import { ENCRE, aUnCiel } from './dessins'
+import { ENCRE, FOND_BULLE, SANS_FOND, aUnCiel } from './dessins'
 import { t } from './langue'
 import type { Reglages } from '../types'
 
-export type Case = { t: number; minutes: number; jetons?: number; cout?: number }
+/** Un jour : ses minutes, ses tokens, leur prix et son nom principal (`principal`). */
+export type Case = { t: number; minutes: number; jetons?: number; cout?: number; principal?: string }
 
 /** Les jours de `debut` à `fin` (inclus), en semaines qui commencent le lundi. Les jours d'avant `debut` calent la grille
  * avec -1 minute : ils ne sont pas dessinés. Les jours après `aujourdhui` sont à venir : -2 minutes, une case à peine
- * visible. `jetonsParJour` donne aussi les tokens de chaque jour. */
+ * visible. `jetonsParJour`, `coutsParJour` et `principaux` donnent aussi les tokens, leur prix et le nom principal de
+ * chaque jour. */
 export function casesEntre(
   debut: number,
   fin: number,
@@ -17,13 +19,19 @@ export function casesEntre(
   aujourdhui = Infinity,
   jetonsParJour: ReadonlyMap<string, number> = new Map(),
   coutsParJour: ReadonlyMap<string, number> = new Map(),
+  principaux: ReadonlyMap<string, string> = new Map(),
 ): Case[] {
   const premier = debutJour(debut)
   const dernier = debutJour(fin)
   const liste: Case[] = []
   for (let t = debutSemaine(debut); t <= dernier; t = decalerJours(t, 1)) {
     const minutes = t < premier ? -1 : t > aujourdhui ? -2 : (minutesParJour.get(cleJour(t)) ?? 0)
-    liste.push(minutes < 0 ? { t, minutes } : { t, minutes, jetons: jetonsParJour.get(cleJour(t)) ?? 0, cout: coutsParJour.get(cleJour(t)) ?? 0 })
+    const principal = principaux.get(cleJour(t))
+    liste.push(
+      minutes < 0
+        ? { t, minutes }
+        : { t, minutes, jetons: jetonsParJour.get(cleJour(t)) ?? 0, cout: coutsParJour.get(cleJour(t)) ?? 0, ...(principal === undefined ? {} : { principal }) },
+    )
   }
   return liste
 }
@@ -70,7 +78,8 @@ function niveaux(liste: readonly Case[], parJetons: boolean): (c: Case) => 0 | 1
 
 const OPACITES = [0.1, 0.32, 0.55, 0.78, 1]
 
-/** La frise en SVG, pour le fond sombre du popover (app desktop et VS Code). Une infobulle donne la date et le temps ;
+/** La frise en SVG, pour le fond sombre du popover (app desktop et VS Code). Au survol, une carte donne la date, les
+ * chiffres et le nom principal du jour ;
  * la case d'aujourd'hui est cerclée. La `periode` de l'onglet est mise en avant : un jour par un cercle, une semaine ou
  * un mois par une bande claire derrière ses colonnes. Une année entière prend des cases plus petites, pour tenir à côté
  * des stats. */
@@ -126,6 +135,13 @@ export function svgActivite(
   // Sur un thème à trame, une case a sa couleur pleine, déjà mêlée au fond (ou à la bande de la période) : la trame ne
   // passe pas au travers, et les jours hors de la frise restent vides.
   const fondBande = melanger(ENCRE.vif, ENCRE.fond, 0.07)
+  // Au survol d'une case, une carte donne sa date, ses chiffres et son nom principal, à côté d'elle, dans le style des
+  // bulles du détail des tokens. Les cartes viennent après toutes les cases, pour passer devant elles ; une règle CSS par
+  // case montre la sienne. La carte est du HTML : elle prend la largeur de son texte.
+  const bulles: string[] = []
+  const regles: string[] = []
+  const cartes: { i: number; x: number; y: number; forme: Forme; date: string; lignes: string[] }[] = []
+  const libelles = mesure === 'jetons' ? [t().stats.jetons, t().stats.prix] : [t().stats.temps, t().stats.jetons]
   liste.forEach((c, i) => {
     const colonne = Math.floor(i / 7)
     const ligne = i % 7
@@ -135,24 +151,106 @@ export function svgActivite(
     const couleur = n === 0 ? ENCRE.vide : ENCRE.accent
     const estAujourdhui = aujourdhui !== null && c.t === aujourdhui
     const cercle = estAujourdhui || (unJour && dansPeriode(c)) ? ` stroke="${ENCRE.vif}" stroke-opacity=".6"` : ''
-    // Aujourd'hui sans son temps : le dessin ne change ainsi qu'au changement de niveau, pas à chaque minute.
-    const temps = c.minutes > 0 ? formatDuree(c.minutes) : t().rien
-    const jetons = (c.jetons ?? 0) > 0 ? t().tokens(formatJetons(c.jetons!)) : null
-    const prix = (c.cout ?? 0) > 0 ? formatCout(c.cout!) : null
-    const valeur =
-      mesure === 'jetons' ? (jetons === null ? t().rien : prix === null ? jetons : `${jetons} · ${prix}`) : jetons === null ? temps : `${temps} · ${jetons}`
-    // Le texte va dans du XML : « < 0,01 $ » y garde son « < » échappé.
-    const infobulle = (estAujourdhui ? t().aujourdhui : `${majuscule(formatJour(c.t))} · ${valeur}`).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    // Les chiffres de la carte du jour : ceux que montre le réglage « Afficher ». Le texte va dans du XML : « < 0,01 $ »
+    // y garde son « < » échappé. Aujourd'hui n'a que son nom et son nom principal : le dessin ne change ainsi pas à chaque
+    // minute.
+    const valeurs = estAujourdhui
+      ? []
+      : mesure === 'jetons'
+        ? [formatJetons(c.jetons ?? 0), (c.cout ?? 0) > 0 ? formatCout(c.cout!) : '—']
+        : [c.minutes > 0 ? formatDuree(c.minutes) : '—', formatJetons(c.jetons ?? 0)]
+    const vide = !estAujourdhui && c.minutes <= 0 && (c.jetons ?? 0) === 0
+    const date = estAujourdhui ? t().aujourdhui : majuscule(formatJour(c.t))
     const opacite = avenir ? 0.035 : OPACITES[n]!
     // Un jour à venir reste presque transparent : la frise ne montre pas de cases sombres après aujourd'hui.
     const dessous = !aUnCiel() || avenir ? null : bande && colonne >= de && colonne <= a ? fondBande : ENCRE.fond
     const peinture = dessous === null ? `fill="${couleur}" fill-opacity="${opacite}"` : `fill="${melanger(couleur, dessous, opacite)}"`
-    parts.push(
-      `<rect x="${colonne * pas}" y="${haut + ligne * pas}" width="${cote}" height="${cote}" rx="${annuelle ? 1.5 : 2.5}" ${peinture}${cercle}>${avenir ? '' : `<title>${infobulle}</title>`}</rect>`,
-    )
+    const x = colonne * pas
+    const y = haut + ligne * pas
+    parts.push(`<rect class="c${i} k" x="${x}" y="${y}" ${peinture}${cercle}/>`)
+    if (avenir) return
+    // La carte du jour : la date, puis ses chiffres et son nom principal, chacun avec son libellé. Ses données d'abord :
+    // sa forme (combien de lignes, lesquelles) donne son fond et ses libellés, dessinés une fois pour toutes (plus bas).
+    const forme: Forme = estAujourdhui ? (c.principal === undefined ? 'date' : 'jour') : vide ? 'vide' : c.principal === undefined ? 'deux' : 'trois'
+    // Un long nom est coupé : la carte reste étroite, et le dessin sous la limite de taille de l'app.
+    const nom = c.principal === undefined ? [] : [[...c.principal].length > NOM_CARTE ? `${[...c.principal].slice(0, NOM_CARTE - 1).join('')}…` : c.principal]
+    const lignes = vide ? [t().rien] : [...valeurs, ...nom]
+    cartes.push({ i, x, y, forme, date, lignes })
   })
+  // Une carte par forme : toutes les cartes d'une forme ont la largeur de la plus large, leurs valeurs alignées en colonne.
+  const libellesDe: Record<Forme, string[]> = {
+    trois: [...libelles, t().principal],
+    deux: libelles,
+    jour: [t().principal],
+    date: [],
+    vide: [],
+  }
+  const colonneValeurs = (f: Forme) => (libellesDe[f].length === 0 ? 0 : Math.max(...libellesDe[f].map(largeurTexte)) + ECART_CARTE)
+  const largeurDe = new Map<Forme, number>()
+  for (const k of cartes) {
+    const besoin = Math.max(largeurTexte(k.date), ...k.lignes.map(v => colonneValeurs(k.forme) + largeurTexte(v)))
+    largeurDe.set(k.forme, Math.max(largeurDe.get(k.forme) ?? 0, Math.ceil(besoin) + 2 * MARGE_BULLE))
+  }
+  const hauteurDe = (f: Forme) => (1 + (f === 'date' ? 0 : f === 'jour' || f === 'vide' ? 1 : libellesDe[f].length)) * LIGNE_CARTE + 2 * MARGE_HAUTE
+  const ligneY = (n: number) => Math.round(MARGE_HAUTE + n * LIGNE_CARTE + LIGNE_CARTE * 0.78)
+  // Le fond et la bordure sont des attributs : le style de la page ne s'applique pas aux formes réutilisées (<use>).
+  const fondBulle = ENCRE.fond === SANS_FOND ? FOND_BULLE : ENCRE.fond
+  const modeles = [...largeurDe].map(([f, w]) => {
+    const h = hauteurDe(f)
+    const etiquettes = libellesDe[f].map((l, n) => `<tspan x="${MARGE_BULLE}" y="${ligneY(n + 1)}">${xml(l)}</tspan>`).join('')
+    const fond = `<rect x=".5" y=".5" width="${w - 1}" height="${h - 1}" rx="7" fill="${fondBulle}" stroke="${ENCRE.bord}"/>`
+    return `<g id="${f}">${fond}${etiquettes === '' ? '' : `<text fill="${ENCRE.gris}">${etiquettes}</text>`}</g>`
+  })
+  for (const k of cartes) {
+    const w = largeurDe.get(k.forme)!
+    const h = hauteurDe(k.forme)
+    const aDroite = k.x + cote + 6 + w <= largeur || k.x - 6 - w < 0
+    const xCarte = Math.max(0, Math.min(largeur - w, aDroite ? k.x + cote + 6 : k.x - 6 - w))
+    const yCarte = Math.round(Math.max(0, Math.min(hauteur - h, k.y + cote / 2 - h / 2)))
+    const xValeur = Math.round(MARGE_BULLE + colonneValeurs(k.forme))
+    const valeurs = k.lignes.map((v, n) => `<tspan x="${k.forme === 'vide' ? MARGE_BULLE : xValeur}" y="${ligneY(n + 1)}">${xml(v)}</tspan>`).join('')
+    regles.push(`.c${k.i}:hover~.b${k.i}`)
+    bulles.push(
+      `<svg class="b b${k.i}${k.forme === 'vide' ? ' v' : ''}" x="${Math.round(xCarte)}" y="${yCarte}"><use href="#${k.forme}"/>` +
+        `<text><tspan x="${MARGE_BULLE}" y="${ligneY(0)}">${xml(k.date)}</tspan>${valeurs}</text></svg>`,
+    )
+  }
+  parts.push(
+    `<defs>${modeles.join('')}</defs>` +
+      `<style>.k{width:${cote}px;height:${cote}px;rx:${annuelle ? 1.5 : 2.5}px}.b{visibility:hidden;pointer-events:none}` +
+      (regles.length > 0 ? `${regles.join(',')}{visibility:visible}` : '') +
+      `text{font:${POLICE_BULLE}px ${POLICES}}.b text{fill:${ENCRE.texte}}.b tspan:first-child{fill:${ENCRE.vif};font-weight:600}` +
+      `.v tspan+tspan{fill:${ENCRE.gris}}</style>`,
+    ...bulles,
+  )
   const source = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${largeur} ${hauteur}" width="${largeur}" height="${hauteur}" preserveAspectRatio="xMinYMin meet">${parts.join('')}</svg>`
   return { source, largeur, hauteur }
+}
+
+/** La carte d'une case : la taille et les polices de la légende de l'app, pour ressembler aux bulles du détail des
+ * tokens. La hauteur d'une ligne, les marges et l'écart entre libellé et valeur, en pixels. */
+const POLICE_BULLE = 12
+const POLICES = "system-ui,-apple-system,'Segoe UI',sans-serif"
+const LIGNE_CARTE = 14
+const MARGE_BULLE = 11
+const MARGE_HAUTE = 5
+const ECART_CARTE = 10
+/** La longueur au plus du nom principal dans la carte, en caractères. */
+const NOM_CARTE = 18
+
+/** La forme de la carte d'un jour : la date et trois lignes (deux chiffres et le nom principal), ou deux (sans nom), aujourd'hui
+ * avec son nom principal (`jour`) ou sans (`date`), un jour sans rien (`vide`). */
+type Forme = 'trois' | 'deux' | 'jour' | 'date' | 'vide'
+
+/** Un texte dans du XML : « < 0,01 $ » y garde son « < » échappé. */
+const xml = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+
+/** La largeur estimée d'un texte (XML) dans la police de la bulle : les chiffres et les minuscules font un peu plus d'une
+ * demi-taille, les majuscules plus, les espaces et la ponctuation moins. Une entité XML compte pour un caractère. */
+function largeurTexte(xml: string): number {
+  let em = 0
+  for (const c of xml.replace(/&[a-z]+;/g, '<')) em += /[ .,:·'|il]/.test(c) ? 0.28 : /[A-Z$<]/.test(c) ? 0.66 : /[mwMW]/.test(c) ? 0.82 : 0.55
+  return em * POLICE_BULLE * 0.96
 }
 
 /** La couleur pleine de `dessus` posée à `opacite` sur `dessous` (deux couleurs #RRGGBB). */

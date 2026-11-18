@@ -43,6 +43,10 @@ const FR = {
   parallele: (d: string) => `dont ${d} en parallèle`,
   prixApi: "Au tarif de l'API, pas votre facture",
   tokens: (n: string) => `${n} tokens`,
+  // Le détail des tokens, au survol.
+  // Le nom principal d'un jour, dans la carte de sa case.
+  principal: 'Principal',
+  detail: { entree: 'Entrée', sortie: 'Sortie', ecriture: 'Écriture cache', lecture: 'Lecture cache', web: 'Recherche web', sansDetail: 'Sans détail', autres: 'Autres' },
   autreItem: '+ Ajouter un item',
   autrePlaceholder: 'ID ou nom, puis Entrée',
   renommerPlaceholder: 'Nouveau nom, puis Entrée',
@@ -121,6 +125,8 @@ const EN: typeof FR = {
   parallele: (d: string) => `incl. ${d} in parallel`,
   prixApi: 'At API rates, not your bill',
   tokens: (n: string) => `${n} tokens`,
+  principal: 'Top',
+  detail: { entree: 'Input', sortie: 'Output', ecriture: 'Cache write', lecture: 'Cache read', web: 'Web search', sansDetail: 'No detail', autres: 'Others' },
   autreItem: '+ Add item',
   autrePlaceholder: 'ID or name, then Enter',
   renommerPlaceholder: 'New name, then Enter',

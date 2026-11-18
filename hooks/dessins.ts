@@ -22,6 +22,8 @@ type Encres = {
 const BLANCS = { survol: '#FFFFFF0A', filet: '#FFFFFF12', choisi: '#FFFFFF17', rail: '#FFFFFF08' }
 /** Pas de fond propre : le popover laisse voir celui de l'app (thème Simple). */
 export const SANS_FOND = '#00000000'
+/** Le fond des bulles de détail quand le thème (Par défaut) n'a pas de fond à lui. */
+export const FOND_BULLE = '#262626'
 const ARGILE = '#E0835F'
 
 /** Le fond de chaque thème : 1600 × 1200, ancré en haut à gauche, que le popover coupe. Ses mouvements sont lents et

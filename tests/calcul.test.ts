@@ -17,7 +17,9 @@ import {
   avecCouts,
   bilan,
   calculer,
+  cleJour,
   coutReponse,
+  nomModele,
   choixDemande,
   debutJour,
   demandeEffective,
@@ -637,6 +639,12 @@ describe('fichiers et textes', () => {
   })
 })
 
+/** Les textes de la carte d'un jour dans la frise : sa date, puis ses valeurs ; null sans carte pour cette date. */
+function carte(svg: string, date: string): string[] | null {
+  const m = new RegExp(`<tspan[^>]*>${date}</tspan>((?:<tspan[^>]*>[^<]*</tspan>)*)</text>`).exec(svg)
+  return m === null ? null : [date, ...[...m[1]!.matchAll(/<tspan[^>]*>([^<]*)<\/tspan>/g)].map(x => x[1]!)]
+}
+
 describe('corrections, tokens et périodes', () => {
   const evts: Evenement[] = [
     ev(h(9), 'A', 'message', 'FSY'),
@@ -716,17 +724,48 @@ describe('corrections, tokens et périodes', () => {
     )
     expect(liste.map(c => c.jetons)).toEqual([1_500_000, 15_000])
     const { source } = svgActivite(liste, null, null)
-    expect(source).toContain('30 min · 1,5 M tokens')
-    // L'infobulle ne donne que ce que montre le réglage « Afficher ».
-    expect(svgActivite(liste, null, null, 'jetons').source).toContain('<title>Lundi 5 janvier · 1,5 M tokens · 3,40 $</title>')
-    expect(svgActivite(liste, null, null, 'jetons').source).toContain('<title>Mardi 6 janvier · 15 k tokens</title>')
+    // La carte d'une case donne sa date, puis ce que montre le réglage « Afficher », sous leurs libellés.
+    expect(carte(source, 'Lundi 5 janvier')).toEqual(['Lundi 5 janvier', '30 min', '1,5 M'])
+    expect(source).toMatch(/<g id="deux">.*>Temps<\/tspan><tspan [^>]*>Tokens<\/tspan>/)
+    const parJetons = svgActivite(liste, null, null, 'jetons').source
+    expect(carte(parJetons, 'Lundi 5 janvier')).toEqual(['Lundi 5 janvier', '1,5 M', '3,40 $'])
+    expect(carte(parJetons, 'Mardi 6 janvier')).toEqual(['Mardi 6 janvier', '15 k', '—'])
+    expect(parJetons).toMatch(/<g id="deux">.*>Tokens<\/tspan><tspan [^>]*>Prix API<\/tspan>/)
+    // Chaque case montre sa carte, et seulement la sienne, à son survol ; les cartes viennent après les cases.
+    expect(source).toContain('.b{visibility:hidden;pointer-events:none}.c0:hover~.b0,.c1:hover~.b1{visibility:visible}')
+    expect(source.lastIndexOf('<rect class="c')).toBeLessThan(source.indexOf('<svg class="b'))
     // Un prix sous le centime s'écrit « < 0,01 $ » : le « < » est échappé, le SVG reste du XML valide.
     const petit = casesEntre(debut, debut, new Map([['2026-01-05', 30]]), Infinity, new Map([['2026-01-05', 1_000]]), new Map([['2026-01-05', 0.001]]))
-    expect(svgActivite(petit, null, null, 'jetons').source).toContain('<title>Lundi 5 janvier · 1 k tokens · &lt; 0,01 $</title>')
+    expect(carte(svgActivite(petit, null, null, 'jetons').source, 'Lundi 5 janvier')).toEqual(['Lundi 5 janvier', '1 k', '&lt; 0,01 $'])
+    // Le nom principal du jour ajoute sa ligne ; un jour sans rien le dit.
+    const avecNom = casesEntre(debut, fin, new Map([['2026-01-05', 30]]), Infinity, new Map([['2026-01-05', 1_000]]), new Map(), new Map([['2026-01-05', 'FLO-I1']]))
+    const { source: sourceNom } = svgActivite(avecNom, null, null)
+    expect(carte(sourceNom, 'Lundi 5 janvier')).toEqual(['Lundi 5 janvier', '30 min', '1 k', 'FLO-I1'])
+    expect(sourceNom).toMatch(/<g id="trois">.*>Principal<\/tspan>/)
+    expect(carte(sourceNom, 'Mardi 6 janvier')).toEqual(['Mardi 6 janvier', 'rien'])
+    // Un long nom est coupé.
+    const long = casesEntre(debut, debut, new Map([['2026-01-05', 30]]), Infinity, new Map(), new Map(), new Map([['2026-01-05', 'une-refonte-du-checkout']]))
+    expect(carte(svgActivite(long, null, null).source, 'Lundi 5 janvier')).toEqual(['Lundi 5 janvier', '30 min', '0', 'une-refonte-du-ch…'])
     // Même temps, tokens très différents : par temps, les deux cases ont la même intensité ; par tokens, non.
-    const peintures = (svg: string) => [...svg.matchAll(/ rx="[\d.]+" ([^>]*)><title>/g)].map(m => m[1])
+    const peintures = (svg: string) => [...svg.matchAll(/<rect class="c\d+ k" x="[\d.]+" y="[\d.]+" ([^>]*)\/>/g)].map(m => m[1])
     expect(new Set(peintures(source)).size).toBe(1)
     expect(new Set(peintures(svgActivite(liste, null, null, 'jetons').source)).size).toBe(2)
+  })
+
+  test("une année pleine, avec la bulle de chaque jour, tient sous la limite de l'app (131 072 caractères)", async () => {
+    const debut = new Date(2026, 0, 1).getTime()
+    const fin = new Date(2026, 11, 31).getTime()
+    const jours = casesEntre(debut, fin, new Map(), Infinity).map(c => cleJour(c.t))
+    const liste = casesEntre(
+      debut,
+      fin,
+      new Map(jours.map(j => [j, 599])),
+      Infinity,
+      new Map(jours.map(j => [j, 123_456_789])),
+      new Map(jours.map(j => [j, 1_234.56])),
+      new Map(jours.map(j => [j, 'une-refonte-complete-du-checkout-avec-un-nom-tres-long-encore'])),
+    )
+    for (const mesure of ['tout', 'jetons'] as const) expect(svgActivite(liste, null, null, mesure).source.length).toBeLessThan(115_000)
   })
 
   test("les jours hors de l'année restent vides ; aujourd'hui est cerclé", async () => {
@@ -734,8 +773,9 @@ describe('corrections, tokens et périodes', () => {
     const liste = casesEntre(new Date(2026, 0, 1).getTime(), new Date(2026, 11, 31).getTime(), new Map(), aujourdhui)
     const { source } = svgActivite(liste, aujourdhui, null)
     // Une case par jour de l'année, rien sous les jours d'avant le 1er janvier : pas de fond plein sous toute la frise.
-    expect([...source.matchAll(/<rect /g)].length).toBe(liste.filter(c => c.minutes !== -1).length)
-    expect(source).toMatch(/stroke="#[0-9A-F]{6}" stroke-opacity=".6"><title>Aujourd'hui<\/title>/)
+    expect([...source.matchAll(/<rect class="c\d+ k"/g)].length).toBe(liste.filter(c => c.minutes !== -1).length)
+    expect(source).toMatch(/stroke="#[0-9A-F]{6}" stroke-opacity=".6"\/>/)
+    expect(source).toContain(">Aujourd'hui</tspan></text></svg>")
   })
 
   test("le fond animé est calé sur l'heure : relancé, il reprend là où il en était", async () => {
@@ -943,5 +983,53 @@ describe('le prix API', () => {
     expect(arrondi(b.cout)).toBe(0.03)
     // Sans prix connus, les tokens restent sans prix.
     expect(bilan(avecCouts(evenements.map(e => ({ ...e, c: undefined }) as Evenement), null), R, h(12), JOUR, jourSuivant(JOUR)).cout).toBe(0)
+  })
+
+  test('le détail des tokens : par type et par modèle, par item et au total, avec le même prix que le total', async () => {
+    const opus = { m: 'claude-opus-5-5', in: 1_000, out: 2_000, c5: 1_000, c1: 10_000, cr: 100_000, rapide: 1 as const, web: 1 }
+    const haiku = { m: 'claude-haiku-5-5-20260101', in: 50_000, out: 1_000, c5: 0, c1: 0, cr: 40_000 }
+    const evenements = avecCouts(
+      [
+        ev(h(9), 'A', 'message', 'FLO-I1'),
+        { t: h(9, 5), s: 'A', e: 'jetons', n: 114_000, k: 'FLO-I1', p: [opus] } as Evenement,
+        { t: h(9, 6), s: 'A', e: 'jetons', n: 91_000, k: 'FLO-I1', p: [haiku] } as Evenement,
+        ev(h(9, 10), 'A', 'reponse', 'FLO-I1'),
+        ev(h(10), 'B', 'message', 'FLO-I2'),
+        { t: h(10, 5), s: 'B', e: 'jetons', n: 91_000, k: 'FLO-I2', p: [haiku] } as Evenement,
+        ev(h(10, 10), 'B', 'reponse', 'FLO-I2'),
+      ],
+      PRIX,
+    )
+    const b = bilan(evenements, R, h(12), JOUR, jourSuivant(JOUR))
+    const r = b.lignes.find(l => l.item === 'FLO-I1')!.repartition!
+    expect([r.entree.n, r.sortie.n, r.ecriture.n, r.lecture.n]).toEqual([51_000, 3_000, 11_000, 140_000])
+    // Le mode rapide double les tokens d'Opus ; la recherche web garde son prix.
+    expect([r.entree, r.sortie, r.ecriture, r.lecture].map(p => arrondi(p.c))).toEqual([0.013, 0.0805, 0.17, 0.0404])
+    expect(arrondi(r.web)).toBe(0.01)
+    expect(Object.fromEntries(Object.entries(r.modeles).map(([m, p]) => [m, [p.n, arrondi(p.c)]]))).toEqual({
+      'claude-opus-5-5': [114_000, 0.308],
+      'claude-haiku-5-5-20260101': [91_000, 0.0059],
+    })
+    // Les types, les modèles et le total donnent le même prix.
+    const types = r.entree.c + r.sortie.c + r.ecriture.c + r.lecture.c + r.web
+    const modeles = Object.values(r.modeles).reduce((s, p) => s + p.c, 0)
+    const ligne = b.lignes.find(l => l.item === 'FLO-I1')!.cout
+    expect([arrondi(types), arrondi(modeles)]).toEqual([arrondi(ligne), arrondi(ligne)])
+    // Au total, les deux items.
+    expect(b.repartition.modeles['claude-haiku-5-5-20260101']!.n).toBe(182_000)
+    expect(arrondi(b.repartition.entree.c + b.repartition.sortie.c + b.repartition.ecriture.c + b.repartition.lecture.c + b.repartition.web)).toBe(arrondi(b.cout))
+    // Sans prix connus, le détail garde les tokens.
+    const sansPrix = bilan(avecCouts(evenements.map(e => ({ ...e, c: undefined, r: undefined }) as Evenement), null), R, h(12), JOUR, jourSuivant(JOUR))
+    expect([sansPrix.repartition.lecture.n, sansPrix.repartition.lecture.c]).toEqual([180_000, 0])
+  })
+
+  test('le nom court des modèles', async () => {
+    expect(['claude-opus-5-5', 'claude-sonnet-4-5-20250929', 'claude-3-5-sonnet-20241022', 'claude-haiku-5-5', 'claude-fable-5-2'].map(nomModele)).toEqual([
+      'Opus 5.5',
+      'Sonnet 4.5',
+      'Sonnet 3.5',
+      'Haiku 5.5',
+      'Fable 5.2',
+    ])
   })
 })
