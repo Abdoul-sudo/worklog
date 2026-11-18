@@ -31,7 +31,7 @@
 
 ---
 
-You use Claude on several projects. Worklog shows how much time each project takes, how many tokens it uses, and what these tokens would cost on the API. It tracks all of this automatically, above the prompt.
+You use Claude on several projects, sometimes for hours. Worklog shows where that time went, how many tokens each project used, and what these tokens would cost on the API. It tracks all of this automatically, right above the prompt.
 
 ## What it does
 
@@ -52,24 +52,24 @@ You use Claude on several projects. Worklog shows how much time each project tak
 2. Restart Claude Code.
 3. Work as usual.
 
-A small button at the bottom of Claude Code shows your project and its time today, for example `⏱ mobile-app · 1h 12`. To open Worklog, click this button or type `/worklog`.
+A small button then appears at the bottom of Claude Code, with your project and its time today, for example `⏱ mobile-app · 1h 12`. This button, or the `/worklog` command, opens Worklog.
 
-To get new versions, [turn on automatic updates](#update).
+New versions do not come automatically. You can [turn on automatic updates](#update) one time.
 
-Worklog needs Claude Code 2.1.325 or later. Node.js is optional. If you have Node.js, Worklog also reads your past work.
+Worklog needs Claude Code 2.1.325 or later. Node.js is optional: with it, Worklog also imports your past work.
 
 ## Update
 
-Claude Code does not update Worklog by itself. Turn on automatic updates one time:
+By default, Claude Code does not update Worklog. You can turn on automatic updates one time:
 
 1. In Claude Code, type `/plugin`.
 2. Open the **Marketplaces** tab.
 3. Select **worklog**.
 4. Select **Enable auto-update**.
 
-After that, you get each new version when you start a session.
+After that, each new version comes when you start a session.
 
-To update by hand instead, run these commands:
+You can also update by hand, with these commands:
 
 ```sh
 claude plugin marketplace update worklog
@@ -78,26 +78,26 @@ claude plugin update worklog@worklog
 
 Then restart Claude Code, or type `/reload-plugins`.
 
-To get a message for each new version, click **Watch** on this GitHub page. Then click **Custom**. Then select **Releases**.
+To hear about each new version, watch the releases of this repository: **Watch** > **Custom** > **Releases**.
 
 ## Usage
 
-Each line in the list is a name: a project or a task. The bright dot shows the name of this session.
+Each line in the list is a name: a project or a task. The bright dot marks the name of this session.
 
 <p align="center">
   <img src="docs/screenshots/usage.png" width="880" alt="Worklog with 6 numbered parts. 1: the Day, Week, Month, Year and All tabs, at the top right. 2: the back and forward arrows, next to Today. 3: the gear, at the top right. 4: the switch icon next to the name website. 5: Add item, under the list. 6: mobile-app, the name of this session, with a bright dot.">
 </p>
 
-1. **Choose the period.** Click **Day**, **Week**, **Month**, **Year** or **All**.
-2. **Go back or forward.** Click **‹** to see the period before. Click **›** to see the period after.
-3. **Open the settings.** Click the gear.
-4. **Move this session to another name.** Point to this name. Then click **⇄** next to it. The time of this session goes to this name from now on.
-5. **Move this session to a new name.** Click **+ Add item**. Type the name. Then press Enter.
-6. **Rename.** Point to the name with the bright dot. Then click **✎** next to it. Type the new name. Then press Enter. Past days also get the new name.
+1. **Period.** **Day**, **Week**, **Month**, **Year** and **All** change the period that you see.
+2. **Back and forward.** The arrows go to the period before or after.
+3. **Settings.** The gear opens the settings.
+4. **Switch.** When you point to another name, **⇄** appears next to it. A click moves this session to that name, from now on.
+5. **New name.** **+ Add item** creates a name and moves this session to it.
+6. **Rename.** When you point to the name with the bright dot, **✎** appears. A click lets you rename it. Past days get the new name too.
 
-Point to a day in the heatmap to see its date, its numbers and its top name.
+Each day of the heatmap also has a card, with its date, its numbers and its top name. It appears when you point to the day.
 
-In the terminal, click a name to move this session to it. To open the settings, click **≡**.
+In the terminal, a click on a name moves this session to it, and **≡** opens the settings.
 
 | Command | What it does |
 | --- | --- |
@@ -111,7 +111,7 @@ The timer counts while Claude works.
 - **It starts** with your first message. Opening a session does not count.
 - **It runs** while Claude works, even for hours without you.
 - **It stops** when Claude is done. A break starts. When you come back, Worklog decides if the break counts. See [Breaks](#breaks).
-- **Background commands** count while Claude waits for them. If you come back before the command ends, the wait is a break. For example, a dev server never ends.
+- **Background commands** count while Claude waits for them. If you come back before one ends, for example a dev server that never stops, the wait becomes a break.
 - **Many things at once in one project** count once. 3 subagents that work for 10 minutes give 10 minutes, not 30.
 - **Two projects at once** each get their time. The total shows the overlap, for example "incl. 1h 00 in parallel".
 
@@ -133,13 +133,13 @@ A break is the time between the end of Claude's work and your next message.
 
 If you close Claude Code during a short break, the break counts as work up to the moment you close Claude Code.
 
-When Worklog asks, click **Count** to add the break, or **Ignore** to leave it out.
+When Worklog asks, **Count** adds the break and **Ignore** leaves it out.
 
 <p align="center">
   <img src="docs/screenshots/ask.png" width="880" alt="Under Worklog, the question: 2h 08 break on website, from 9:12 to 11:20. Count it as work? Two buttons: Count and Ignore.">
 </p>
 
-You can change the 1h and the 4h in the settings. To never get the question, set **Then ask** to **Never**.
+You can change the 1h and the 4h in the settings. With **Then ask** set to **Never**, Worklog never asks.
 
 ## Project names
 
@@ -152,11 +152,11 @@ Worklog puts the time of each session under one name, for example a project or a
 
 When Worklog finds the first ID of a session, the time before it also goes to this ID.
 
-To choose the name yourself, see [Usage](#usage).
+You can also choose the name yourself: see [Usage](#usage).
 
 ## Tokens and price
 
-Do you prefer tokens to time? In the settings, set **Show** to **Tokens and price**. Worklog then shows the API price in place of the time.
+If tokens matter more to you than time, set **Show** to **Tokens and price** in the settings. The API price then takes the place of the time.
 
 <p align="center">
   <img src="docs/screenshots/price.png" width="880" alt="Worklog with Show set to Tokens and price: 21.5M tokens and $23 today, and the tokens and the price of each name.">
@@ -168,12 +168,12 @@ Do you prefer tokens to time? In the settings, set **Show** to **Tokens and pric
 
 ### Token details
 
-Point to **Tokens**, **API price** or the tokens of a name. A box shows where your tokens went:
+When you point to **Tokens**, **API price** or the tokens of a name, a box shows where your tokens went:
 
 - On the left, each type of token: input, output, cache write and cache read.
 - On the right, each model, for example Opus or Sonnet.
 
-This box is in the desktop app and VS Code.
+This box works in the desktop app and in VS Code.
 
 <p align="center">
   <img src="docs/screenshots/details.png" width="880" alt="Worklog with Show set to Tokens and price. Under the API price of today, 21 dollars, a box is open. On the left: input 46.1k tokens for 14 cents, output 413k for 6.37 dollars, cache write 1.7M for 11 dollars, cache read 20.1M for 3.12 dollars. On the right: Opus 5.5, 12.4M tokens for 15 dollars, and Sonnet 5.5, 9.9M tokens for 5.80 dollars.">
@@ -181,7 +181,7 @@ This box is in the desktop app and VS Code.
 
 ## Themes
 
-Worklog has 8 themes in the desktop app. To change the theme, click the gear. Then click a theme.
+Worklog comes with 8 themes in the desktop app. You choose one in the settings.
 
 <p align="center">
   <img src="docs/screenshots/themes.png" width="880" alt="Worklog in its eight themes: Default, Night, Aurora, Ember, Forest, Ocean, Dusk and Sakura.">
@@ -195,7 +195,7 @@ Worklog works in the terminal too, with the same data. In a wide terminal, the h
   <img src="docs/screenshots/terminal.png" width="880" alt="Worklog in the terminal: the stats and the names on the left, the heatmap of the year on the right.">
 </p>
 
-To click in Worklog in the terminal, use the fullscreen mode: `/tui fullscreen`.
+Clicks in the terminal need the fullscreen mode: `/tui fullscreen`.
 
 ## Settings
 
@@ -253,7 +253,7 @@ Work outside Claude Code: meetings, calls and other tools.
 
 ## Privacy and access
 
-Worklog runs on your computer and keeps its data there. This is all that it can do:
+Worklog runs on your computer and keeps its data there. This is everything it can access:
 
 | Access | What Worklog does |
 | --- | --- |
@@ -263,7 +263,7 @@ Worklog runs on your computer and keeps its data there. This is all that it can 
 | Network | Once a day, it downloads the public LiteLLM price list. It sends nothing about you or your work. |
 | Your messages | It reads each message to find an ID, for example `PROJ-142`. It does not keep your messages. |
 
-To stop the price download, set the environment variable `WORKLOG_PRICES` to `off`. To keep the data in another folder, set the environment variable `WORKLOG_DATA_DIR`.
+Two environment variables change this: `WORKLOG_PRICES=off` stops the price download, and `WORKLOG_DATA_DIR` keeps the data in another folder.
 
 ## Uninstall
 
@@ -271,7 +271,7 @@ To stop the price download, set the environment variable `WORKLOG_PRICES` to `of
 claude plugin uninstall worklog@worklog
 ```
 
-Your data stays in `~/.claude/worklog/`. To remove it, delete this folder.
+Your data stays in `~/.claude/worklog/`. To remove it too, delete this folder.
 
 ## License
 
