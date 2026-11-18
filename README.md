@@ -33,6 +33,13 @@ You work with Claude on several projects, sometimes for hours without a break. W
 
 With Worklog, you can see the time, the tokens and the API price of each project, right above the prompt. Worklog tracks everything automatically for you.
 
+- **Time per project.** It counts while Claude works, and it decides how your breaks count.
+- **Tokens and API price.** Point to a number to see each type of token and each model.
+- **Yearly heatmap.** One square for each day. Point to a day to see its numbers.
+- **8 themes** to choose from, in the desktop app.
+- **Terminal too.** The same data, in the desktop app, VS Code and the terminal.
+- **Private.** Your data stays on your computer.
+
 ## Quick start
 
 1. Install Worklog:
@@ -51,12 +58,12 @@ Worklog needs Claude Code 2.1.325 or later. Node.js is optional: Worklog uses it
 
 ## How the timer works
 
-- The timer starts with your first message in a session. Opening a session does not count.
-- The timer runs while Claude works: answers, subagents, workflows, Ultracode and background commands, even when they work alone for hours.
-- When Claude is done, a break starts. When you come back, Worklog decides if the break counts as work.
-- While Claude waits for a background command to end, the time counts as work. If you come back before it ends, such as with a dev server that never stops, the wait is a break.
-- In one project: if several things work at the same time, the time counts only once. For example, if 3 subagents work for 10 minutes, the project gets 10 minutes, not 30.
-- Across projects: if two projects work at the same time, each project gets its time, and the total adds them up. Worklog shows the overlap apart, such as "incl. 1h 00 in parallel".
+- **Start.** The timer starts with your first message in a session. Opening a session does not count.
+- **Claude works.** The timer runs while Claude works: answers, subagents, workflows, Ultracode and background commands. This includes long work without you.
+- **Breaks.** When Claude is done, a break starts. When you come back, Worklog decides if the break counts as work. See [Breaks](#breaks).
+- **Background commands.** While Claude waits for a background command, the time counts as work. If you come back before the command ends, such as a dev server that never stops, the wait is a break.
+- **Parallel work in one project.** The time counts only once. For example, 3 subagents that work for 10 minutes give the project 10 minutes, not 30.
+- **Parallel work across projects.** Each project gets its time, and the total adds them up. Worklog shows the overlap, such as "incl. 1h 00 in parallel".
 
 ## Tokens and price
 
@@ -85,19 +92,19 @@ With **Tokens and price**, each line also shows its API price. The detail is in 
 
 ## Breaks
 
-A break is the time between the end of Claude's work and your next message. A short break counts as work. For a long break, Worklog asks you. A very long break does not count.
-
-<p align="center">
-  <img src="docs/breaks.svg" width="880" alt="One day with Worklog. Work always counts. A short 30 min break counts as work when you come back. For a long 2h break, Worklog asks you. The night is a very long break: it does not count.">
-</p>
-
-**Example.** Claude finishes at 10:00. You stop for a coffee. At 10:30, you send a new message. Worklog adds the 30 minutes at that moment. During the break, the total does not change. It catches up when you come back.
+A break is the time between the end of Claude's work and your next message.
 
 | Break | What Worklog does |
 | --- | --- |
 | Short: up to 1h | Counts the break as work. |
 | Long: from 1h to 4h | Asks you if the break was work. |
 | Very long: more than 4h | Does not count the break as work, and does not ask. |
+
+<p align="center">
+  <img src="docs/breaks.svg" width="880" alt="One day with Worklog. Work always counts. A short 30 min break counts as work when you come back. For a long 2h break, Worklog asks you. The night is a very long break: it does not count.">
+</p>
+
+**Example.** Claude finishes at 10:00. You stop for a coffee. At 10:30, you send a new message. Worklog adds the 30 minutes at that moment. During the break, the total does not change. It catches up when you come back.
 
 If you close Claude Code during a short break, the break counts as work up to the moment you close Claude Code.
 
