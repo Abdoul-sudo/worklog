@@ -36,6 +36,7 @@
 - **Counts your time** while Claude works: answers, subagents, background commands, Ultracode and more.
 - **Counts your tokens** and shows what they would cost on the API.
 - **Shows your whole year** as a heatmap, with 8 themes to choose from.
+- **Includes your past work**: at install, it reads your Claude Code history for the time, the tokens and the price.
 - **Keeps your data** on your computer.
 
 ## Quick start
