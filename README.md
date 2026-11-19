@@ -202,7 +202,7 @@ Clicks in the terminal need the fullscreen mode: `/tui fullscreen`.
 <details>
 <summary><strong>Does Worklog use my Claude usage?</strong></summary>
 
-No. Worklog never sends a message to Claude, so it uses no tokens and does not count toward your plan limits. It only reads files on your computer and counts what Claude already did.
+No, Worklog never uses tokens and does not count toward your plan limits. It only reads the files that Claude Code already writes on your computer.
 
 </details>
 
