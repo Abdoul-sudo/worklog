@@ -359,7 +359,8 @@ describe('sessions en parallèle', () => {
     const { b, parItem } = minutesDuJour([...session('A', 'FLO-I1', h(9)), ...session('B', 'FLO-I1', h(9, 30))], h(11))
     expect(parItem).toEqual({ 'FLO-I1': 90 })
     expect(b.jours[0]?.total).toBe(90)
-    expect(b.parSession).toEqual(new Map([['A', new Map([['FLO-I1', 60]])], ['B', new Map([['FLO-I1', 60]])]]))
+    // La puce montre le temps de l'item, toutes sessions comprises : celui de sa ligne.
+    expect(b.parItem).toEqual(new Map([['FLO-I1', 90]]))
   })
 
   test("une session passée d'un item à l'autre : la puce ne compte que l'item affiché", async () => {
@@ -373,7 +374,7 @@ describe('sessions en parallèle', () => {
       h(11),
     )
     expect(parItem).toEqual({ 'FLO-I1': 60, 'FSY-I2': 30 })
-    expect(b.parSession.get('A')).toEqual(new Map([['FLO-I1', 60], ['FSY-I2', 30]]))
+    expect(b.parItem).toEqual(new Map([['FLO-I1', 60], ['FSY-I2', 30]]))
   })
 
   test("un écart déjà couvert par l'autre session du même item n'est pas à confirmer", async () => {
@@ -557,7 +558,7 @@ describe("l'historique importé", () => {
 })
 
 describe('items sans tokens', () => {
-  test("sans un token sur la période, un item n'a ni ligne ni temps compté ; le temps de sa session n'en change pas", async () => {
+  test("sans un token sur la période, un item n'a ni ligne ni temps compté ; la puce garde son temps", async () => {
     const evenements = [
       ev(h(9), 'A', 'message', 'FLO-I1'),
       ev(h(10), 'A', 'reponse', 'FLO-I1'),
@@ -570,7 +571,7 @@ describe('items sans tokens', () => {
     const b = bilan(evenements, R, h(11), JOUR, jourSuivant(JOUR), new Map(), undefined, true)
     expect(b.lignes.map(l => l.item)).toEqual(['FLO-I1'])
     expect([b.total, b.reel, b.jetons]).toEqual([60, 60, 700])
-    expect(b.parSession.get('B')).toEqual(new Map([['FSY-I2', 60]]))
+    expect(b.parItem.get('FSY-I2')).toBe(60)
     expect(b.derniere.get('FLO-I1')).toBe(h(10))
     // En cours (Claude y travaille), un item sans token garde sa ligne.
     const enCours = bilan(evenements.filter(e => e.t <= h(10, 20)), R, h(10, 20), JOUR, jourSuivant(JOUR), new Map(), undefined, true)

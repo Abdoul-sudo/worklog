@@ -148,7 +148,6 @@ export type Corrections = { renommages: Readonly<Record<string, string>>; retrai
 export const SANS_CORRECTION: Corrections = { renommages: {}, retraits: [] }
 
 export type Jour = { debut: number; lignes: Ligne[]; total: number; reel: number; jetons: number; cout: number }
-/** `parSession` : les minutes de chaque session sur la période, item par item. */
 export type Bilan = {
   jours: Jour[]
   lignes: Ligne[]
@@ -160,7 +159,9 @@ export type Bilan = {
   /** Les tokens de la période et leur prix, par type et par modèle : ceux dont le détail est connu. */
   repartition: Repartition
   ecarts: Ecart[]
-  parSession: Map<string, Map<string, number>>
+  /** Les minutes de chaque item sur la période, toutes sessions comprises : le temps commun ne compte qu'une fois. Les
+   * items sans token gardent leur temps. */
+  parItem: Map<string, number>
   /** La dernière activité de chaque item sur la période : la fin de son dernier temps, ou sa dernière dépense de tokens. */
   derniere: Map<string, number>
   /** Les sessions en pause (une pause notée au journal par une version passée), une fois que Claude a fini son travail. */
@@ -452,7 +453,7 @@ export function bilan(
   const toutes = calcul.plages.flatMap(p => sansRetraits({ ...p, item: nom(p.item) }, corrections.retraits))
   const tousJetons = calcul.jetons.map(j => ({ ...j, item: nom(j.item) })).filter(j => !retire(j.item, j.t))
   const enCours = new Set([...calcul.actives.values()].map(nom))
-  // Le temps de chaque session (la puce) garde tout ; les lignes et les totaux laissent les items sans token.
+  // Le temps de chaque item (la puce) garde tout ; les lignes et les totaux laissent les items sans token.
   const avecJetons = new Set(tousJetons.filter(j => j.n > 0 && j.t >= debut && j.t < fin).map(j => j.item))
   const garde = (item: string) => !avecJetonsSeulement || avecJetons.has(item) || enCours.has(item)
   const plages = toutes.filter(p => garde(p.item))
@@ -527,21 +528,16 @@ export function bilan(
     .filter(e => e.debut >= debut && e.debut < fin && !retire(e.item, e.debut))
     .filter(e => e.fin - e.debut - recouvrement(items.get(e.item) ?? [], e.debut, e.fin) >= MINUTE)
     .sort((a, b) => a.debut - b.debut)
-  const parSession = new Map<string, Map<string, number>>()
-  for (const p of toutes) {
-    const items = parSession.get(p.session) ?? new Map<string, number>()
-    if (!items.has(p.item)) {
-      const segments = unir(toutes.filter(q => q.session === p.session && q.item === p.item))
-      items.set(p.item, Math.round(recouvrement(segments, debut, fin) / MINUTE))
-    }
-    parSession.set(p.session, items)
+  const parItem = new Map<string, number>()
+  for (const item of new Set(toutes.map(p => p.item))) {
+    parItem.set(item, Math.round(recouvrement(unir(toutes.filter(p => p.item === item)), debut, fin) / MINUTE))
   }
   const derniere = new Map<string, number>()
   const noterDerniere = (item: string, t: number) => derniere.set(item, Math.max(derniere.get(item) ?? -Infinity, t))
   for (const p of plages) if (p.fin > debut && p.debut < fin) noterDerniere(p.item, Math.min(p.fin, fin))
   for (const j of jetons) if (j.t >= debut && j.t < fin) noterDerniere(j.item, j.t)
   return {
-    parSession,
+    parItem,
     jours,
     lignes: lignes.sort(parTemps),
     total: Math.round(totalBrut / MINUTE),

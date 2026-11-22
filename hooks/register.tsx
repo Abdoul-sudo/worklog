@@ -538,7 +538,8 @@ async function rafraichir($: Moteur): Promise<void> {
   const brut = (await itemDe($, s)) ?? nomParDefaut
   const item = brut === null ? null : nommer(brut, corrections.renommages)
   const enPause = b.enPause.has(s)
-  const etat: Session = { item, minutes: b.parSession.get(s)?.get(item ?? SANS_ITEM) ?? 0, enPause }
+  // Le temps du nom aujourd'hui, toutes sessions comprises : le même que sa ligne dans Worklog.
+  const etat: Session = { item, minutes: b.parItem.get(item ?? SANS_ITEM) ?? 0, enPause }
   await update($, session, () => etat)
   await update($, reglages, () => options)
   // VS Code n'affiche ni la puce ni la bande : la ligne de statut les remplace.

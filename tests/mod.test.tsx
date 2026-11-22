@@ -246,7 +246,8 @@ test("une conversation de l'app desktop reprise sous un autre id garde le nom ch
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
   await travailler($, horloge, 'la suite', 5)
   const puce = await $.ui.mount({ ...PIED, surface: 'desktop' })
-  await puceAffiche(puce, 'claude mod', '5 min')
+  // Le temps du nom garde les 10 minutes d'avant la relance.
+  await puceAffiche(puce, 'claude mod', '15 min')
   await puce.unmount()
 })
 
@@ -316,7 +317,8 @@ test("un item choisi à la main ne change plus tout seul ; deux sessions sur un 
   await travailler($, horloge, 'encore', 15)
   const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
   await puce.press({ key: 'puce' })
-  await puceAffiche(puce, 'FLO-I1', '15 min')
+  // La puce montre le temps du nom aujourd'hui, les deux sessions comprises : le même que sa ligne.
+  await puceAffiche(puce, 'FLO-I1', '25 min')
   expect(await bande.find({ type: 'Text', text: /^25 min$/ })).toBeDefined()
   await puce.unmount()
   await bande.unmount()

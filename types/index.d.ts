@@ -14,7 +14,7 @@ export type Repartition = { entree: Part; sortie: Part; ecriture: Part; lecture:
  * `repartition` : le détail de ses tokens, quand il est connu. */
 export type Ligne = { item: string; minutes: number; enCours: boolean; jetons: number; cout: number; repartition?: Repartition }
 
-/** Ce que la puce affiche : le nom de la session et son temps du jour. */
+/** Ce que la puce affiche : le nom de la session et le temps de ce nom aujourd'hui, toutes sessions comprises. */
 export type Session = { item: string | null; minutes: number; enPause: boolean }
 
 export type Onglet = 'jour' | 'semaine' | 'mois' | 'annee' | 'tout' | 'reglages'
