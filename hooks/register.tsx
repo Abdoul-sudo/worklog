@@ -67,6 +67,7 @@ import {
   svgFlocon,
   svgInterrupteur,
   svgIcone,
+  svgInfo,
   svgJaugeCache,
   svgPastille,
   ICONES,
@@ -1609,17 +1610,73 @@ function choixTheme($: Moteur, e: Site, options: Reglages) {
  * hauteur limitée, et chaque libellé dit seul ce qu'il règle. */
 function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
   if (!riche(e)) return null
-  const { Box, Select, Text } = $.ui.resolve(e)
+  const { Box, Select, Svg, Text } = $.ui.resolve(e)
+  const aides = t().aides
+  type Aide = keyof typeof aides
+  // Après le nom d'un réglage qui en a besoin, une icône ⓘ. À son survol, son aide s'ouvre à sa droite, centrée sur
+  // elle, après la place du pointeur, dans une carte comme celle du cache, sans titre : le nom est juste à côté. La carte
+  // reste ouverte sous le pointeur : pour cliquer la commande qu'elle couvre, on sort d'abord de la carte. Rien ne se
+  // dessine par-dessus : ce qui suit l'aide dans l'arbre passerait devant elle, alors la ligne pose sa commande avant son
+  // nom (row-reverse), et la colonne des thèmes vient avant celle des réglages. Les lignes d'avant et l'en-tête, plus tôt
+  // dans l'arbre, passent dessous.
+  const avecAide = (cle: Aide, nom: RenderChildren) => {
+    const groupe = `aide-${cle}`
+    const texte = aides[cle]
+    return (
+      <Box flexDirection="row" alignItems="center" gap="xs" flexShrink={1} minWidth={0}>
+        {nom}
+        <Box key={`info-${cle}`} position="relative" flexShrink={0} hover={{ scope: groupe, backgroundColor: TRANSPARENT }}>
+          <Svg alt={t().alt.aide} source={svgInfo(ENCRE.faible)} width={14} height={14} />
+          <Box position="absolute" top={0} left={0} display="none" hover={{ scope: groupe, display: 'flex' }}>
+            <Svg alt={t().alt.aide} source={svgInfo(ENCRE.vif)} width={14} height={14} />
+          </Box>
+          {/* Une bande à droite de l'icône, qui la dépasse de deux rangées en haut et en bas : la carte y est centrée sur
+              l'icône, entière (une bande plus basse que la carte la couperait), et prend la largeur de son texte. */}
+          <Box
+            key={`bulle-aide-${cle}`}
+            position="absolute"
+            top={-2}
+            bottom={-2}
+            left={3}
+            width={largeurAide(texte)}
+            flexDirection="row"
+            alignItems="center"
+            display="none"
+            hover={{ scope: groupe, display: 'flex' }}
+          >
+            {/* La dernière ligne : sa bulle remonte d'environ 2 px (la bande centre aussi la marge), loin du bas du popover. */}
+            <Box
+              {...(cle === 'pauseMax' ? { marginBottom: 'xs' as const } : {})}
+              paddingX={1}
+              backgroundColor={ENCRE.fond === SANS_FOND ? FOND_BULLE : ENCRE.fond}
+              borderStyle="round"
+              borderColor={ENCRE.bord}
+            >
+              <Text size="caption" {...encre(e, 'texte')}>
+                {texte}
+              </Text>
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+    )
+  }
+  const ligneReglage = (cle: string, contenu: RenderChildren, aDroite: RenderChildren, aide?: Aide) =>
+    aide === undefined ? (
+      <Box key={`ligne-reglage-${cle}`} flexDirection="row" justifyContent="space-between" alignItems="center" gap={2} paddingX="sm">
+        {contenu}
+        {aDroite}
+      </Box>
+    ) : (
+      <Box key={`ligne-reglage-${cle}`} flexDirection="row-reverse" justifyContent="space-between" alignItems="center" gap={2} paddingX="sm">
+        {aDroite}
+        {contenu}
+      </Box>
+    )
   const bascules: { cle: 'activite' | 'cache'; libelle: string }[] = [
     { cle: 'activite', libelle: t().bascules.activite },
     { cle: 'cache', libelle: t().bascules.cache },
   ]
-  const ligneReglage = (cle: string, contenu: RenderChildren, aDroite: RenderChildren) => (
-    <Box key={`ligne-reglage-${cle}`} flexDirection="row" justifyContent="space-between" alignItems="center" gap={2} paddingX="sm">
-      {contenu}
-      {aDroite}
-    </Box>
-  )
   // Côte à côte, chaque colonne prend la moitié de la largeur.
   const colonne = (lignes: RenderChildren) => (
     <Box flexDirection="column" alignItems="stretch" gap="xs" {...(aCote ? { flexGrow: 1, width: 0 } : {})}>
@@ -1628,30 +1685,47 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
   )
   const affichageLignes = bascules.map(b => {
     const basculer = () => changerReglage($, { [b.cle]: !options[b.cle] })
-    const { Svg } = $.ui.resolve(e)
     const interrupteur = <Svg alt={options[b.cle] ? t().alt.active : t().alt.desactive} source={svgInterrupteur(options[b.cle])} width={28} height={16} />
-    return ligneReglage(b.cle, bouton($, e, `reglage-${b.cle}`, b.libelle, 'texte', basculer), cliquable($, e, `interrupteur-${b.cle}`, interrupteur, basculer))
+    const nom = bouton($, e, `reglage-${b.cle}`, b.libelle, 'texte', basculer)
+    // Seul le cache a une aide : la frise d'activité se comprend seule.
+    const aide = b.cle === 'cache' ? b.cle : undefined
+    return ligneReglage(b.cle, aide === undefined ? nom : avecAide(aide, nom), cliquable($, e, `interrupteur-${b.cle}`, interrupteur, basculer), aide)
   })
-  const duree = (cle: string, libelle: string, valeurs: readonly number[], actuelle: number, nommer: (m: number) => string, choisir: (m: number) => unknown) =>
-    ligneReglage(
-      cle,
+  const duree = (cle: string, libelle: string, valeurs: readonly number[], actuelle: number, nommer: (m: number) => string, choisir: (m: number) => unknown, aide?: Aide) => {
+    const nom = (
       <Text size="footnote" {...encre(e, 'texte')}>
         {libelle}
-      </Text>,
+      </Text>
+    )
+    return ligneReglage(
+      cle,
+      aide === undefined ? nom : avecAide(aide, nom),
       <Select
         key={cle}
         value={String(actuelle)}
         options={valeurs.map(m => ({ value: String(m), label: nommer(m) }))}
         onSelect={valeur => choisir(Number(valeur))}
       />,
+      aide,
     )
+  }
   const jusqua = (m: number) => t().jusqua(t().seuilChoix(m))
   const pauses = [
     duree('seuil', t().seuil, SEUILS, options.seuilPause, jusqua, seuilPause => changerReglage($, { seuilPause })),
-    duree('pause-max', t().pauseMax, choixDemande(options), demandeEffective(options), m => (m === 0 ? t().jamais : jusqua(m)), pauseMax => changerReglage($, { pauseMax })),
+    duree(
+      'pause-max',
+      t().pauseMax,
+      choixDemande(options),
+      demandeEffective(options),
+      m => (m === 0 ? t().jamais : jusqua(m)),
+      pauseMax => changerReglage($, { pauseMax }),
+      'pauseMax',
+    ),
   ]
+  const themes = colonne(choixTheme($, e, options))
   return (
-    <Box flexDirection={aCote ? 'row' : 'column'} alignItems="stretch" gap={aCote ? 4 : 'md'}>
+    <Box flexDirection={aCote ? 'row-reverse' : 'column'} alignItems="stretch" gap={aCote ? 4 : 'md'}>
+      {aCote && themes}
       {colonne([
         ...affichageLignes,
         ligneReglage(
@@ -1680,10 +1754,16 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
         ),
         ...pauses,
       ])}
-      {colonne(choixTheme($, e, options))}
+      {!aCote && themes}
     </Box>
   )
 }
+
+/** La largeur de la bande d'une aide, en cellules : assez pour son texte sur une ligne (un caractère de légende fait
+ * moins de 0,8 cellule) et ses marges ; la carte, elle, prend la largeur de son texte. Au-delà de LARGEUR_AIDE, le texte
+ * passe à la ligne. */
+const LARGEUR_AIDE = 56
+const largeurAide = (texte: string) => Math.min(LARGEUR_AIDE, Math.ceil(texte.length * 0.8) + 4)
 
 /** Les réglages dans le terminal, où une liste déroulante ne s'ouvre qu'au clavier : chaque réglage montre ses choix,
  * à cliquer ; le choix actuel est plein (●) et clair. L'affichage et le comptage côte à côte quand la place le permet. */

@@ -410,3 +410,11 @@ export function svgBarreCache(part: number, couleur: string, largeur: number): s
     '</svg>'
   )
 }
+
+/** L'icône d'aide des réglages : un i dans un cercle, au trait fin. */
+export function svgInfo(couleur: string): string {
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="${couleur}" stroke-width="1.3" stroke-linecap="round">` +
+    `<circle cx="8" cy="8" r="6.3"/><path d="M8 7.3v3.9"/><circle cx="8" cy="4.9" r=".3" fill="${couleur}"/></svg>`
+  )
+}

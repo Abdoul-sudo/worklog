@@ -1109,8 +1109,15 @@ test("la puce du cache, dans l'en-tête : pleine après un appel, ambre ses dix 
   // Froid, le prochain message coûte la réécriture ; chaud, il aurait coûté la relecture.
   expect(froide.indexOf('≈ 1,20 $')).toBeLessThan(froide.indexOf('≈ 0,06 $'))
 
-  // Le réglage cache la puce et sa carte.
+  // Chaque réglage a son aide, cachée jusqu'au survol de son icône ⓘ.
   await bande.press({ key: 'reglages' })
+  const aide = (await bande.find({ key: 'bulle-aide-cache' })) as Trouve | undefined
+  expect(aide?.props?.display).toBe('none')
+  expect(aide?.text).toContain('le cache reste chaud')
+  expect(await bande.find({ key: 'info-pauseMax' })).toBeDefined()
+  expect(await bande.find({ key: 'info-seuil' })).toBeUndefined()
+  expect(await bande.find({ key: 'info-activite' })).toBeUndefined()
+  // Le réglage cache la puce et sa carte.
   await bande.press({ key: 'interrupteur-cache' })
   expect(await puce()).toBeUndefined()
   expect(await bande.find({ key: 'carte-cache' })).toBeUndefined()

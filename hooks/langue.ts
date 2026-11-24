@@ -85,6 +85,11 @@ const FR = {
     explicationChaud: 'Chaque message garde le cache chaud.',
     explicationFroid: 'Le prochain message réécrit tout le contexte.',
   },
+  // L'aide des réglages qui en ont besoin, au survol de leur icône ⓘ.
+  aides: {
+    cache: 'Montre combien de temps le cache reste chaud. Froid, le message suivant coûte plus.',
+    pauseMax: "Après une longue pause, Worklog demande si c'était du travail.",
+  },
   alt: {
     reglages: 'Réglages',
     fermerReglages: 'Fermer les réglages',
@@ -95,6 +100,7 @@ const FR = {
     pasDeSuite: 'Pas de suite',
     active: 'Activé',
     desactive: 'Désactivé',
+    aide: 'Aide',
   },
   icones: { precedent: 'Période précédente', suivant: 'Période suivante', crayon: 'Renommer', changer: 'Passer sur cet item', valider: 'Enregistrer le nom' },
   commande: {
@@ -177,6 +183,10 @@ const EN: typeof FR = {
     explicationChaud: 'Each message keeps the cache warm.',
     explicationFroid: 'The next message writes the whole context again.',
   },
+  aides: {
+    cache: 'Shows how long the cache stays warm. If cold, the next message costs more.',
+    pauseMax: 'For a longer break, Worklog asks if it was work or not.',
+  },
   alt: {
     reglages: 'Settings',
     fermerReglages: 'Close settings',
@@ -187,6 +197,7 @@ const EN: typeof FR = {
     pasDeSuite: 'No next period',
     active: 'On',
     desactive: 'Off',
+    aide: 'Help',
   },
   icones: { precedent: 'Previous period', suivant: 'Next period', crayon: 'Rename', changer: 'Switch to this item', valider: 'Save the name' },
   commande: {
