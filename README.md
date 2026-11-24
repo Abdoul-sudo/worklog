@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/desktop.gif" width="880" alt="Worklog above the Claude Code prompt box: the time, the tokens and the streak, a heatmap of the year, and the time of each name. The pointer points to Tokens, and a box shows the tokens of each type and each model. Then it clicks Month and All. In the settings, it picks the Sakura theme and sets Show to Tokens and price. It clicks Day and points to the API price: the box now shows the price of each line. It clicks All, then goes back to the Aurora theme and to Time and tokens.">
+  <img src="docs/screenshots/desktop.gif" width="880" alt="Worklog above the Claude Code prompt box: the time, the tokens and the streak, the cache status, a heatmap of the year, and the time of each name. The pointer points to Cache 56 min, and a box shows how long the cache stays warm and the price of the next message. Then it points to Tokens, and a box shows the tokens of each type and each model. Then it clicks Month and All. In the settings, it picks the Sakura theme and sets Show to Tokens and price. It clicks Day and points to the API price: the box now shows the price of each line. It clicks All, then goes back to the Aurora theme and to Time and tokens.">
 </p>
 
 <p align="center">
@@ -83,7 +83,7 @@ To hear about each new version, watch the releases of this repository: **Watch**
 Each line in the list is a name: a project or a task. The bright dot marks the name of this session.
 
 <p align="center">
-  <img src="docs/screenshots/usage.png" width="880" alt="Worklog with 6 numbered parts. 1: the Day, Week, Month, Year and All tabs, at the top right. 2: the back and forward arrows, next to Today. 3: the gear, at the top right. 4: the switch icon next to the name website. 5: Add item, under the list. 6: mobile-app, the name of this session, with a bright dot.">
+  <img src="docs/screenshots/usage.png" width="880" alt="Worklog with 7 numbered parts. 1: the Day, Week, Month, Year and All tabs, at the top right. 2: the back and forward arrows, next to Today. 3: the gear, at the top right. 4: the switch icon next to the name website. 5: Add item, under the list. 6: mobile-app, the name of this session, with a bright dot. 7: Cache 49 min, to the left of the tabs.">
 </p>
 
 1. **Period.** **Day**, **Week**, **Month**, **Year** and **All** change the period that you see.
@@ -92,6 +92,7 @@ Each line in the list is a name: a project or a task. The bright dot marks the n
 4. **Switch.** Hover over another name and click **⇄** to move this session to it, from now on.
 5. **New name.** **+ Add item** creates a name and moves this session to it.
 6. **Rename.** Hover over the name with the bright dot and click **✎**. Past days get the new name too.
+7. **Cache.** The status of the prompt cache. See [Prompt cache](#prompt-cache).
 
 Hover over a day in the heatmap to see its numbers.
 
@@ -151,7 +152,7 @@ When Worklog finds the first ID of a session, the time before it also goes to th
 If tokens matter more to you than time, set **Show** to **Tokens and price** in the settings. The API price then takes the place of the time.
 
 <p align="center">
-  <img src="docs/screenshots/price.png" width="880" alt="Worklog with Show set to Tokens and price: 21.5M tokens and $23 today, and the tokens and the price of each name.">
+  <img src="docs/screenshots/price.png" width="880" alt="Worklog with Show set to Tokens and price: 20.3M tokens and $20 today, and the tokens and the price of each name.">
 </p>
 
 - The price is what your tokens would cost on the Anthropic API.
@@ -163,12 +164,16 @@ If tokens matter more to you than time, set **Show** to **Tokens and price** in 
 Hover over **Tokens**, **API price** or the tokens of a name to see your tokens by type and by model. This works in the desktop app.
 
 <p align="center">
-  <img src="docs/screenshots/details.png" width="880" alt="Worklog with Show set to Tokens and price. The pointer is on the API price of today, 21 dollars, and a box is open under it. On the left: input 46.1k tokens for 14 cents, output 413k for 6.37 dollars, cache write 1.7M for 11 dollars, cache read 20.1M for 3.12 dollars. On the right: Opus 5.5, 12.4M tokens for 15 dollars, and Sonnet 5.5, 9.9M tokens for 5.80 dollars.">
+  <img src="docs/screenshots/details.png" width="880" alt="Worklog with Show set to Tokens and price. The pointer is on the API price of today, 20 dollars, and a box is open under it. On the left: input 33.4k tokens for 12 cents, output 361k for 6.19 dollars, cache write 1.6M for 10 dollars, cache read 18.3M for 3.17 dollars. On the right: Opus 5.5, 14.7M tokens for 16 dollars, Sonnet 5.5, 5.4M tokens for 3.45 dollars, and Haiku 5.5, 152k tokens for 2 cents.">
 </p>
 
 ## Prompt cache
 
-Claude Code keeps your conversation in a prompt cache. While the cache is warm, each message reads the conversation from the cache at a low price. After some time without a message, the cache goes cold. The next message then writes the whole conversation again, at full price.
+Claude Code keeps your conversation in a prompt cache, which makes each message cheaper. After some time without sending a message, the cache goes cold. The next message then writes the whole conversation again, at full price.
+
+<p align="center">
+  <img src="docs/screenshots/cache-cold.png" width="880" alt="Worklog with the pointer on Cache cold, at the top, to the left of the tabs. A box is open under it: Cache cold, 76.1k tokens. It expired at 21:23, and the last call was at 20:23. The next message costs about $0.02, and less than $0.01 with a warm cache. Under it: The next message writes the whole context again.">
+</p>
 
 Worklog shows the cache status at the top, to the left of the tabs:
 
@@ -179,7 +184,7 @@ Worklog shows the cache status at the top, to the left of the tabs:
 In the desktop app, hover over the cache status to see more: when the cache expires, how long it lives, the time of the last call, the size of the context, and the estimated price of the next message, warm or cold.
 
 <p align="center">
-  <img src="docs/screenshots/cache.png" width="880" alt="Worklog with the pointer on Cache 1h 00, at the top, to the left of the tabs. A box is open under it: Cache warm, 746k tokens, 1h 00 left of 1h. It expires at 20:56, and the last call was at 19:56. The next message costs about $0.15, and about $5.97 if the cache goes cold. Under it: Each message keeps the cache warm.">
+  <img src="docs/screenshots/cache.png" width="880" alt="Worklog with the pointer on Cache 59 min, at the top, to the left of the tabs. A box is open under it: Cache warm, 76.6k tokens, 59 min left of 1h. It expires at 22:36, and the last call was at 21:36. The next message costs less than $0.01, and about $0.02 if the cache goes cold. Under it: Each message keeps the cache warm.">
 </p>
 
 - Each call to the model makes the cache warm again for its full time. Claude Code usually keeps the cache for 1 hour.
