@@ -528,7 +528,7 @@ function marquerAgentEnTour($: Moteur, agent: string): void {
 async function changerItem($: Moteur, item: string): Promise<void> {
   await definirItem($, await $.session.id(), item, true)
   await noterActivite($, 'item')
-  await rafraichir($)
+  enFond(rafraichir($))
 }
 
 async function classer($: Moteur, ecart: Ecart, choix: Choix): Promise<void> {
@@ -714,20 +714,33 @@ async function apresMessage($: Moteur, texte: string, chercherItem: boolean, ins
 async function repondre($: Moteur, ecart: Ecart, choix: Choix): Promise<void> {
   await classer($, ecart, choix)
   await update($, question, () => null)
-  await rafraichir($)
+  enFond(rafraichir($))
 }
 
-async function ouvrirOuFermer($: Moteur): Promise<void> {
-  const ouvert = !(await read($, deplie))
-  await update($, ui, etat => ({ ...etat, onglet: ouvert ? 'jour' : etat.onglet, decalage: 0, edition: null, page: 0 }))
-  // Le contenu est prêt avant que le popover n'apparaisse : il ne se dessine pas d'abord sans la frise, plus étroit.
-  if (ouvert) {
+/** Ouvre le popover sur aujourd'hui, une fois son contenu prêt : il ne se dessine pas d'abord sans la frise, plus étroit.
+ * Il s'ouvre même si un calcul échoue. */
+async function ouvrirPopover($: Moteur): Promise<void> {
+  await update($, ui, etat => ({ ...etat, onglet: 'jour' as const, decalage: 0, edition: null, page: 0 }))
+  try {
     // La session d'abord (son item garde une ligne), puis la période et la frise.
     await rafraichir($)
     await calculerVue($)
     await calculerFrise($)
+  } finally {
+    await update($, deplie, () => true)
   }
-  await update($, deplie, () => ouvert)
+}
+
+async function fermerPopover($: Moteur): Promise<void> {
+  await update($, ui, etat => ({ ...etat, decalage: 0, edition: null, page: 0 }))
+  await update($, deplie, () => false)
+}
+
+/** Le clic sur la puce. Le contenu se prépare en fond : le clic rend la main tout de suite, et le popover apparaît quand
+ * il est prêt. Un clic n'a que dix secondes de calcul à lui ; sous une forte charge, le calcul de l'année les dépassait. */
+async function basculerPopover($: Moteur): Promise<void> {
+  if (await read($, deplie)) await fermerPopover($)
+  else enFond(ouvrirPopover($))
 }
 
 /** Le panneau latéral : son propre fond, et la hauteur qu'il demande. */
@@ -736,10 +749,11 @@ async function ouvrirPanneau($: Moteur): Promise<void> {
   await $.ui.open({ id: PANNEAU, title: t().titre, rows: RANGEES_PANNEAU, ...(ENCRE.fond === SANS_FOND ? {} : { backgroundColor: ENCRE.fond }) })
 }
 
+/** Un onglet, une période ou les réglages : l'onglet s'allume tout de suite, son contenu se calcule en fond (calculerVue
+ * écarte un résultat qu'un autre choix a rendu périmé). */
 async function choisirOnglet($: Moteur, onglet: Onglet, decalage: number): Promise<void> {
   await update($, ui, etat => ({ ...etat, onglet, decalage: Math.min(0, decalage), edition: null, page: 0 }))
-  await calculerVue($)
-  await calculerFrise($)
+  enFond(calculerVue($).then(() => calculerFrise($)))
 }
 
 async function choisirItem($: Moteur, item: string): Promise<void> {
@@ -761,7 +775,7 @@ async function renommer($: Moteur, ancien: string, nouveau: string): Promise<voi
   const actuel = (await itemDe($, s)) ?? nomParDefaut
   if (actuel !== null && nommer(actuel, suite) === nouveau) await definirItem($, s, nouveau, true)
   cacheFrise = null
-  await rafraichir($)
+  enFond(rafraichir($))
 }
 
 async function changerReglage($: Moteur, changement: Partial<Reglages>): Promise<void> {
@@ -770,8 +784,9 @@ async function changerReglage($: Moteur, changement: Partial<Reglages>): Promise
   appliquer(suite)
   await $.store.set('options', suite)
   await update($, reglages, () => suite)
+  // La frise de l'année se recalcule, en fond : un thème ou une langue s'applique tout de suite.
   cacheFrise = null
-  await rafraichir($)
+  enFond(rafraichir($))
 }
 
 /** /worklog : seul, ouvre ou ferme Worklog ; tout autre texte devient le nom de la session. */
@@ -783,12 +798,17 @@ async function commande($: Moteur, args: string): Promise<string> {
   if (texte === '') {
     // VS Code n'a ni bande ni puce à cliquer : Worklog y ouvre un panneau.
     if ((await $.session.surfaces()).includes('vscode')) {
-      if (!(await read($, deplie))) await ouvrirOuFermer($)
+      if (!(await read($, deplie))) await ouvrirPopover($)
       await ouvrirPanneau($)
       return textes.panneau
     }
-    await ouvrirOuFermer($)
-    return (await read($, deplie)) ? textes.bande : textes.ferme
+    // La commande attend le contenu : sa réponse dit ce qui est fait.
+    if (await read($, deplie)) {
+      await fermerPopover($)
+      return textes.ferme
+    }
+    await ouvrirPopover($)
+    return textes.bande
   }
   // Ces mots demandent d'arrêter ou de reprendre le temps, ce qui n'existe pas : ils ne deviennent pas le nom.
   if (MOTS_SANS_ARRET.includes(texte.toLowerCase())) return textes.sansArret
@@ -810,7 +830,7 @@ function puce($: Moteur, e: Site, etat: Session) {
   const libelle = libellePuce(etat.item, etat.minutes, etat.enPause, e.surface === 'terminal')
   return (
     <Box key="zone-puce">
-      <Button key="puce" plain label={riche(e) ? `${MARGE_PUCE}${libelle}${MARGE_PUCE}` : libelle} onPress={() => ouvrirOuFermer($)} />
+      <Button key="puce" plain label={riche(e) ? `${MARGE_PUCE}${libelle}${MARGE_PUCE}` : libelle} onPress={() => basculerPopover($)} />
     </Box>
   )
 }
