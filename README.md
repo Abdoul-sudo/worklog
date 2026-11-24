@@ -178,6 +178,10 @@ Worklog shows the cache status at the top, to the left of the tabs:
 
 In the desktop app, hover over the cache status to see more: when the cache expires, how long it lives, the time of the last call, the size of the context, and the estimated price of the next message, warm or cold.
 
+<p align="center">
+  <img src="docs/screenshots/cache.png" width="880" alt="Worklog with the pointer on Cache 1h 00, at the top, to the left of the tabs. A box is open under it: Cache warm, 746k tokens, 1h 00 left of 1h. It expires at 20:56, and the last call was at 19:56. The next message costs about $0.15, and about $5.97 if the cache goes cold. Under it: Each message keeps the cache warm.">
+</p>
+
 - Each call to the model makes the cache warm again for its full time. Claude Code usually keeps the cache for 1 hour.
 - Each model has its own cache. When you change the model, the cache is cold.
 - Subagents have their own cache. Their calls do not change the status.
