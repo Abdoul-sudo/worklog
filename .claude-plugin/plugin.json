@@ -1,7 +1,7 @@
 {
   "name": "worklog",
   "displayName": "Worklog",
-  "version": "4.6.0",
+  "version": "4.6.1",
   "description": "Automatically track the time, tokens and API price of each project in Claude Code, see when your prompt cache goes cold, and get a yearly activity heatmap in 8 themes",
   "types": "./types/index.d.ts",
   "author": { "name": "Abdoul-sudo", "url": "https://github.com/Abdoul-sudo" },
