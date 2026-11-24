@@ -129,7 +129,7 @@ A break is the time between the end of Claude's work and your next message.
 For a long break, the question appears under Worklog:
 
 <p align="center">
-  <img src="docs/screenshots/ask.png" width="880" alt="Under Worklog, the question: 2h 08 break on website, from 9:12 to 11:20. Count it as work? Two buttons: Count and Ignore.">
+  <img src="docs/screenshots/ask.png" width="880" alt="Under Worklog, in a yellow frame, the question: 2h 08 break on website, from 9:12 to 11:20. Count it as work? Two buttons: Count and Ignore.">
 </p>
 
 If you close Claude Code during a short break, the break counts as work up to the moment you close Claude Code.
@@ -152,7 +152,7 @@ When Worklog finds the first ID of a session, the time before it also goes to th
 If tokens matter more to you than time, set **Show** to **Tokens and price** in the settings. The API price then takes the place of the time.
 
 <p align="center">
-  <img src="docs/screenshots/price.png" width="880" alt="Worklog with Show set to Tokens and price: 20.3M tokens and $20 today, and the tokens and the price of each name.">
+  <img src="docs/screenshots/price.png" width="880" alt="Worklog with Show set to Tokens and price: 20.3M tokens and $20 today, and the tokens and the price of each name. Yellow frames mark the API price and the price of each name.">
 </p>
 
 - The price is what your tokens would cost on the Anthropic API.
