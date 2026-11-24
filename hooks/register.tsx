@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, RenderChildren, RenderNode } from 'claude-code'
+import type { EngineInterface, Register, RenderChildren, RenderNode, TurnUsage } from 'claude-code'
 
-import type { Ecart, Frise, Interface, Ligne, Onglet, Reglages, Repartition, Session, Vue } from '../types'
+import type { Cache, Ecart, Frise, Interface, Ligne, Onglet, Reglages, Repartition, Session, Vue } from '../types'
 import { type DessinTerminal, casesEntre, cellulesActivite, compterSerie, svgActivite } from './activite'
 import {
   type Activite,
@@ -15,7 +15,9 @@ import {
   type Evenement,
   type Prix,
   type Retrait,
+  DUREES_CACHE,
   MARGE_VIE,
+  MINUTE,
   MOTIF_ID,
   SANS_ITEM,
   nomSaisi,
@@ -30,6 +32,7 @@ import {
   debutJour,
   depuis,
   decalerJours,
+  dureeCache,
   detecterItem,
   dureeEcart,
   formatCout,
@@ -43,7 +46,9 @@ import {
   lireOptions,
   nommer,
   nomModele,
+  prixCache,
   prixClaude,
+  restantCache,
 } from './calcul'
 import {
   CIEL,
@@ -54,12 +59,15 @@ import {
   SANS_FOND,
   choisirTheme,
   svgApercu,
+  svgBarreCache,
   svgChrono,
   svgCiel,
   svgEngrenage,
   svgFermer,
+  svgFlocon,
   svgInterrupteur,
   svgIcone,
+  svgJaugeCache,
   svgPastille,
   ICONES,
   TAILLE_ICONE,
@@ -138,7 +146,9 @@ const deplie = atom({ plugin: 'worklog', key: 'deplie' } as const, false)
 const ui = atom({ plugin: 'worklog', key: 'ui' } as const, INTERFACE_INITIALE, { shape: 'ui-6' })
 const vue = atom({ plugin: 'worklog', key: 'vue' } as const, null, { shape: 'vue-5' })
 const frise = atom({ plugin: 'worklog', key: 'frise' } as const, null, { shape: 'frise-7' })
-const reglages = atom({ plugin: 'worklog', key: 'reglages' } as const, null, { shape: 'reglages-2' })
+const reglages = atom({ plugin: 'worklog', key: 'reglages' } as const, null, { shape: 'reglages-3' })
+const cachePrompt = atom({ plugin: 'worklog', key: 'cache' } as const, null, { shape: 'cache-1' })
+const minutesCache = atom({ plugin: 'worklog', key: 'minutesCache' } as const, null)
 
 let chemins: { journal: string; importe: string; projets: string; prix: string } | null = null
 // Les prix API des modèles Claude (prix.json) ; null tant que le mod n'en a pas.
@@ -542,10 +552,7 @@ async function rafraichir($: Moteur): Promise<void> {
   const etat: Session = { item, minutes: b.parItem.get(item ?? SANS_ITEM) ?? 0, enPause }
   await update($, session, () => etat)
   await update($, reglages, () => options)
-  // VS Code n'affiche ni la puce ni la bande : la ligne de statut les remplace.
-  const dansVsCode = (await $.session.surfaces()).includes('vscode')
-  // VS Code : la ligne de statut, qui ne se clique pas, dit comment ouvrir le popover.
-  $.ui.status(dansVsCode ? `${libellePuce(item, etat.minutes, enPause)} · /worklog` : undefined)
+  await mettreStatut($)
   if (await read($, deplie)) {
     await calculerVue($)
     await calculerFrise($)
@@ -960,9 +967,9 @@ function marque($: Moteur, e: Site) {
   return <Svg alt={t().titre} source={svgChrono()} width={14} height={14} />
 }
 
-/** L'en-tête : la période et ses flèches, les onglets, l'engrenage. Étroit (un panneau), les onglets passent sur une
- * ligne à eux, sous le titre. */
-function enTete($: Moteur, e: Site, etat: Interface, titre: string, etroit: boolean) {
+/** L'en-tête : la période et ses flèches, la puce du cache, les onglets, l'engrenage. Étroit (un panneau), les onglets
+ * passent sur une ligne à eux, sous le titre. */
+function enTete($: Moteur, e: Site, etat: Interface, titre: string, etroit: boolean, cache: CacheLu | null) {
   const { Box, Text } = $.ui.resolve(e)
   const enReglages = etat.onglet === 'reglages'
   const periode = (
@@ -986,12 +993,16 @@ function enTete($: Moteur, e: Site, etat: Interface, titre: string, etroit: bool
   const onglets = ONGLETS.map(o =>
     bouton($, e, `onglet-${o}`, t().onglets[o], etat.onglet === o ? 'vif' : 'gris', () => choisirOnglet($, o, 0), { gras: etat.onglet === o }),
   )
+  const puce = cache === null ? null : puceCache($, e, cache)
   if (etroit && riche(e)) {
     return (
       <Box key="entete" flexDirection="column" alignItems="stretch" gap="sm">
         <Box flexDirection="row" justifyContent="space-between" alignItems="center" gap={2}>
           {periode}
-          {boutonReglages($, e, etat)}
+          <Box flexDirection="row" alignItems="center" gap={3}>
+            {puce}
+            {boutonReglages($, e, etat)}
+          </Box>
         </Box>
         <Box flexDirection="row" alignItems="center" gap={3}>
           {onglets}
@@ -1003,6 +1014,8 @@ function enTete($: Moteur, e: Site, etat: Interface, titre: string, etroit: bool
     <Box key="entete" flexDirection="row" justifyContent="space-between" alignItems="center" gap={2}>
       {periode}
       <Box flexDirection="row" alignItems="center" gap={2}>
+        {/* Le cache dit l'état de maintenant, pas celui de la période : il se tient à l'écart des onglets. */}
+        {puce !== null && <Box marginRight={2}>{puce}</Box>}
         {onglets}
         {boutonReglages($, e, etat)}
       </Box>
@@ -1597,7 +1610,10 @@ function choixTheme($: Moteur, e: Site, options: Reglages) {
 function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
   if (!riche(e)) return null
   const { Box, Select, Text } = $.ui.resolve(e)
-  const bascules: { cle: 'activite'; libelle: string }[] = [{ cle: 'activite', libelle: t().bascules.activite }]
+  const bascules: { cle: 'activite' | 'cache'; libelle: string }[] = [
+    { cle: 'activite', libelle: t().bascules.activite },
+    { cle: 'cache', libelle: t().bascules.cache },
+  ]
   const ligneReglage = (cle: string, contenu: RenderChildren, aDroite: RenderChildren) => (
     <Box key={`ligne-reglage-${cle}`} flexDirection="row" justifyContent="space-between" alignItems="center" gap={2} paddingX="sm">
       {contenu}
@@ -1678,7 +1694,7 @@ function vueReglagesTerminal($: Moteur, e: Site, options: Reglages, aCote: boole
       {valeurs.map(v => bouton($, e, `${cle}-${v}`, `${v === actuelle ? '●' : '○'} ${libelle(v)}`, v === actuelle ? 'vif' : 'gris', () => choisir(v)))}
     </Box>
   )
-  const caseACocher = (cle: 'activite', libelle: string) =>
+  const caseACocher = (cle: 'activite' | 'cache', libelle: string) =>
     bouton($, e, `reglage-${cle}`, `${options[cle] ? '☑' : '☐'} ${libelle}`, 'texte', () => changerReglage($, { [cle]: !options[cle] }))
   // Les noms des réglages à choix, sur une colonne de la largeur du plus long : leurs choix s'alignent.
   const largeurNom = Math.max(t().mesure.length, t().langue.length) + 2
@@ -1697,6 +1713,7 @@ function vueReglagesTerminal($: Moteur, e: Site, options: Reglages, aCote: boole
       <Box flexDirection="column" {...(aCote ? { flexGrow: 1 } : {})}>
         {titre(t().sections.affichage)}
         {caseACocher('activite', t().bascules.activite)}
+        {caseACocher('cache', t().bascules.cache)}
         {reglage('mesure', t().mesure, choix('mesure', MESURES, options.mesure, m => t().mesures[m], mesure => changerReglage($, { mesure })))}
         {reglage(
           'langue',
@@ -1725,7 +1742,8 @@ async function popover($: Moteur, e: Site, colonnes: number, rangees: number, en
   const contenu = await read($, vue)
   const actuel = (await read($, session))?.item ?? null
   const activite = await read($, frise)
-  const entete = enTete($, e, etat, contenu?.titre ?? '', colonnes < ETROIT)
+  const cache = await lireCache($)
+  const entete = enTete($, e, etat, contenu?.titre ?? '', colonnes < ETROIT, cache)
   const corps =
     etat.onglet === 'reglages' ? (
       riche(e) ? vueReglages($, e, options, colonnes >= LARGE) : vueReglagesTerminal($, e, options, colonnes >= LARGE)
@@ -1785,6 +1803,7 @@ async function popover($: Moteur, e: Site, colonnes: number, rangees: number, en
         <Box key="corps" flexDirection="column" alignItems="stretch" paddingX="sm">
           {corps}
         </Box>
+        {cache !== null && carteDuCache($, e, cache, await $.clock.now())}
       </Box>
     </Box>
   )
@@ -1805,6 +1824,204 @@ function questionSilence($: Moteur, e: Site, ecart: Ecart) {
         <Button key="ecart-oui" label={t().compter} variant="primary" onPress={() => repondre($, ecart, 'travail')} />
         <Button key="ecart-non" label={t().ignorer} variant="secondary" onPress={() => repondre($, ecart, 'pause')} />
       </Box>
+    </Box>
+  )
+}
+
+/** VS Code n'affiche ni les puces ni la bande : la ligne de statut les remplace. Elle ne se clique pas : elle dit comment
+ * ouvrir le popover. */
+async function mettreStatut($: Moteur): Promise<void> {
+  const etat = await read($, session)
+  if (etat === null || !(await $.session.surfaces()).includes('vscode')) return $.ui.status(undefined)
+  const cache = texteCache(await read($, minutesCache), await read($, reglages))
+  $.ui.status([libellePuce(etat.item, etat.minutes, etat.enPause), cache, '/worklog'].filter(x => x !== null).join(' · '))
+}
+
+/** Sous ce nombre de minutes, le cache passe au jaune : il refroidit bientôt, ça presse. */
+const ALERTE_CACHE = { '5m': 2, '1h': 10 } as const
+/** Les couleurs du cache, les mêmes dans chaque thème : abricot quand il est chaud (une couleur chaude qui ne fait pas
+ * erreur), jaune quand il refroidit bientôt (ça presse), bleu glace quand il est froid. */
+const ABRICOT = '#F2B07A'
+const JAUNE = '#E6D06A'
+const GLACE = '#7CC4FF'
+/** Le groupe de survol de la puce du cache : il ouvre sa carte, sous l'en-tête. */
+const SURVOL_CACHE = 'puce-cache'
+/** La largeur de la carte du cache, en cellules. */
+const LARGEUR_CARTE_CACHE = 44
+
+/** Le texte de la puce du cache : `Cache 42 min`, `Cache froid` ; null sans appel connu ou quand le réglage la cache. */
+function texteCache(minutes: number | null, options: Reglages | null): string | null {
+  if (minutes === null || options?.cache === false) return null
+  return minutes === 0 ? t().cache.froid : `${t().cache.nom} ${formatDuree(minutes)}`
+}
+
+type EtatCache = 'chaud' | 'bientot' | 'froid'
+function etatCache(minutes: number, ttl: Cache['ttl']): EtatCache {
+  return minutes === 0 ? 'froid' : minutes <= ALERTE_CACHE[ttl] ? 'bientot' : 'chaud'
+}
+const teinteCache = (etat: EtatCache) => (etat === 'froid' ? GLACE : etat === 'bientot' ? JAUNE : ABRICOT)
+
+/** Une réponse du modèle de la conversation principale : son appel a relu ou écrit le cache, qui vit de nouveau toute sa
+ * durée à partir de l'envoi. */
+async function noterAppel($: Moteur, envoi: number, u: TurnUsage): Promise<void> {
+  const s = await $.session.id()
+  const avant = await read($, cachePrompt)
+  const connu = avant?.session === s ? avant : null
+  const ttl = dureeCache(connu?.ttl ?? '1h', u, connu === null ? 0 : envoi - connu.appel)
+  // Ce que le prochain message renverra : le chiffre du moteur, sinon celui de cette réponse.
+  const contexte = (await $.session.usage()).context.tokens ?? u.input_tokens + u.cache_read_input_tokens + u.cache_creation_input_tokens
+  await changerCache($, async () => ({ session: s, appel: envoi, ttl, contexte, modele: u.model, froid: false }))
+}
+
+/** Change le cache connu, puis sa puce. */
+async function changerCache($: Moteur, changement: (avant: Cache | null) => Promise<Cache | null>): Promise<void> {
+  const apres = await changement(await read($, cachePrompt))
+  await update($, cachePrompt, () => apres)
+  await suivreCache($)
+}
+
+// Le numéro du dernier réveil de la puce du cache : seul lui la recalcule.
+let reveilCache = 0
+/** Recalcule les minutes de la puce du cache ; la puce et sa carte ne se redessinent que quand elles changent. Puis
+ * prévoit un réveil à la minute où le compte à rebours change : un cache froid, ou inconnu, ne change plus seul. */
+async function suivreCache($: Moteur): Promise<void> {
+  const c = await read($, cachePrompt)
+  const maintenant = await $.clock.now()
+  const valable = c !== null && c.session === (await $.session.id()) ? c : null
+  const minutes = valable === null ? null : restantCache(valable, maintenant)
+  if ((await read($, minutesCache)) !== minutes) {
+    await update($, minutesCache, () => minutes)
+    await mettreStatut($)
+  }
+  const numero = ++reveilCache
+  if (valable === null || minutes === null || minutes === 0) return
+  const changement = valable.appel + DUREES_CACHE[valable.ttl] - (minutes - 1) * MINUTE
+  $.clock.after(Math.max(1, changement - maintenant), () => {
+    if (numero === reveilCache) enFond(suivreCache($))
+  })
+}
+
+type CacheLu = { c: Cache; minutes: number }
+/** Le cache connu de la session, et ses minutes ; null sans appel, ou quand le réglage cache la puce. */
+async function lireCache($: Moteur): Promise<CacheLu | null> {
+  const minutes = await read($, minutesCache)
+  const c = await read($, cachePrompt)
+  const options = await read($, reglages)
+  return minutes === null || c === null || options?.cache === false ? null : { c, minutes }
+}
+
+/** La puce du cache, dans l'en-tête du popover : une jauge qui se vide et les minutes qui restent, ou un flocon quand il
+ * est froid. Au survol, sa carte s'ouvre sous l'en-tête. */
+function puceCache($: Moteur, e: Site, { c, minutes }: CacheLu) {
+  const etat = etatCache(minutes, c.ttl)
+  const libelle = texteCache(minutes, null)!
+  if (!riche(e)) {
+    const { Box, Text } = $.ui.resolve(e)
+    return (
+      <Box key="puce-cache">
+        <Text color={teinteCache(etat)}>{libelle}</Text>
+      </Box>
+    )
+  }
+  const { Box, Svg, Text } = $.ui.resolve(e)
+  const teinte = teinteCache(etat)
+  const jauge = etat === 'froid' ? svgFlocon(teinte) : svgJaugeCache((minutes * MINUTE) / DUREES_CACHE[c.ttl], teinte)
+  return (
+    <Box key="puce-cache" flexDirection="row" alignItems="center" gap="xs" hover={{ scope: SURVOL_CACHE, backgroundColor: TRANSPARENT }}>
+      <Svg alt={libelle} source={jauge} width={13} height={13} />
+      <Text size="footnote" weight="medium" tabular color={teinte}>
+        {libelle}
+      </Text>
+    </Box>
+  )
+}
+
+/**
+ * La carte du cache, au survol de sa puce : son état, le contexte qu'il garde et sa jauge, quand il refroidit et quand il
+ * a servi, et ce que coûtera le prochain message, chaud ou froid. Posée en absolu sous l'en-tête, au bord droit,
+ * elle apparaît sans rien déplacer. Le terminal n'a pas de survol : la puce y suffit.
+ */
+function carteDuCache($: Moteur, e: Site, { c, minutes }: CacheLu, maintenant: number) {
+  if (!riche(e)) return null
+  const { Box, Svg, Text } = $.ui.resolve(e)
+  const chaud = minutes > 0
+  const fin = c.appel + DUREES_CACHE[c.ttl]
+  // Froid avant l'heure : un autre modèle a pris la suite, son cache est à refaire.
+  const autreModele = c.froid && fin > maintenant
+  const teinte = teinteCache(etatCache(minutes, c.ttl))
+  const textes = t().cache
+  const estimes = prix === null ? null : prixCache(c, prix)
+  // Deux paires côte à côte, pour une carte basse : quand le cache refroidit, puis ce que coûte le prochain message.
+  const temps: [string, string][] = [
+    ...(autreModele ? [] : [[chaud ? textes.finChaud : textes.finFroid, formatHeure(fin)] as [string, string]]),
+    [textes.appel, formatHeure(c.appel)],
+  ]
+  const couts: [string, string][] =
+    estimes === null
+      ? []
+      : [
+          [textes.prochain, `≈ ${formatCout(chaud ? estimes.relu : estimes.reecrit)}`],
+          [chaud ? textes.siFroid : textes.siChaud, `≈ ${formatCout(chaud ? estimes.reecrit : estimes.relu)}`],
+        ]
+  const duree = t().seuilChoix(c.ttl === '1h' ? 60 : 5)
+  const etat = chaud ? textes.encore(formatDuree(minutes), duree) : autreModele ? textes.nouveauModele(nomModele(c.modele)) : ''
+  const titre = chaud ? textes.chaud : textes.froid
+  // Les noms à gauche, les valeurs alignées à droite : chaque colonne prend la largeur de son plus long texte.
+  const colonne = (cle: string, lignes: string[], ton: Ton, aDroite: boolean) => (
+    <Box key={cle} flexDirection="column" alignItems={aDroite ? 'flex-end' : 'flex-start'}>
+      {lignes.map((x, i) => (
+        <Text key={`${cle}-${i}`} size="caption" tabular {...encre(e, ton)}>
+          {x}
+        </Text>
+      ))}
+    </Box>
+  )
+  const paire = (cle: string, rangs: [string, string][]) =>
+    rangs.length > 0 && (
+      <Box key={cle} flexDirection="row" gap={1}>
+        {colonne(`${cle}-noms`, rangs.map(([nom]) => nom), 'gris', false)}
+        {colonne(`${cle}-valeurs`, rangs.map(([, valeur]) => valeur), 'texte', true)}
+      </Box>
+    )
+  const largeurBarre = Math.round((LARGEUR_CARTE_CACHE - 4) * PX_CELLULE)
+  return (
+    <Box
+      key="carte-cache"
+      position="absolute"
+      top={2}
+      right={1}
+      display="none"
+      hover={{ scope: SURVOL_CACHE, display: 'flex' }}
+      flexDirection="column"
+      gap="xs"
+      width={LARGEUR_CARTE_CACHE}
+      paddingX={1}
+      backgroundColor={ENCRE.fond === SANS_FOND ? FOND_BULLE : ENCRE.fond}
+      borderStyle="round"
+      borderColor={ENCRE.bord}
+    >
+      <Box flexDirection="row" justifyContent="space-between" alignItems="center" gap={2}>
+        <Box flexDirection="row" alignItems="center" gap="xs">
+          <Svg alt={titre} source={chaud ? svgJaugeCache((fin - maintenant) / DUREES_CACHE[c.ttl], teinte) : svgFlocon(teinte)} width={13} height={13} />
+          <Text size="footnote" weight="semibold" {...encre(e, 'vif')}>
+            {titre}
+          </Text>
+          <Text size="caption" tabular {...encre(e, 'gris')}>
+            {t().tokens(formatJetons(c.contexte))}
+          </Text>
+        </Box>
+        <Text size="caption" tabular {...encre(e, 'vif')}>
+          {etat}
+        </Text>
+      </Box>
+      <Svg alt={etat || titre} source={svgBarreCache(chaud ? (fin - maintenant) / DUREES_CACHE[c.ttl] : 0, teinte, largeurBarre)} width={largeurBarre} height={4} />
+      <Box flexDirection="row" justifyContent="space-between" gap={3}>
+        {paire('cache-temps', temps)}
+        {paire('cache-prix', couts)}
+      </Box>
+      <Text size="caption" {...encre(e, 'faible')}>
+        {chaud ? textes.explicationChaud : textes.explicationFroid}
+      </Text>
     </Box>
   )
 }
@@ -1833,6 +2050,42 @@ export const register: Register = on => {
       enFond(rafraichir($))
       enFond(importerHistorique($))
     })
+    enFond(suivreCache($))
+    return next(e)
+  })
+
+  // Chaque appel au modèle de la conversation principale relit ou écrit son cache : le cache vit de nouveau toute sa
+  // durée, à partir de l'envoi. Un appel sans réponse ne touche pas le cache. Les sous-agents ont leur propre cache.
+  on('turn.step', async function* ($, e, next) {
+    const envoi = await $.clock.now()
+    const reponse = yield* next(e)
+    if (e.agentId === undefined && reponse.usage !== null) enFond(noterAppel($, envoi, reponse.usage))
+    return reponse
+  })
+
+  // Une session reprise : le moteur dit depuis quand son dernier appel a eu lieu, et si son cache a sans doute refroidi.
+  // Il connaît la durée du cache : froid avant une heure, le cache vivait 5 min.
+  on('classic.SessionStart', ($, e, next) => {
+    if ((e.source === 'resume' || e.source === 'fork') && typeof e.seconds_since_last_response === 'number') {
+      const depuis = e.seconds_since_last_response * 1_000
+      const ttl: Cache['ttl'] = e.prompt_cache_likely_expired === true && depuis < DUREES_CACHE['1h'] ? '5m' : '1h'
+      const cache = { session: e.session_id, ttl, contexte: e.context_tokens ?? 0, modele: e.model ?? '', froid: false }
+      enFond(changerCache($, async () => ({ ...cache, appel: (await $.clock.now()) - depuis })))
+    } else enFond(suivreCache($))
+    return next(e)
+  })
+
+  // Chaque modèle a son propre cache : après un changement de modèle, le cache du nouveau est à refaire.
+  on('classic.PostModelSwitch', ($, e, next) => {
+    if (e.from_model !== e.to_model) {
+      enFond(changerCache($, async c => (c === null ? null : { ...c, modele: e.to_model, ttl: e.cache_ttl, froid: true })))
+    }
+    return next(e)
+  })
+
+  // Un résumé remplace la conversation : son prochain appel écrit un contexte neuf. La puce attend sa réponse.
+  on('session.compact', ($, e, next) => {
+    if (e.agentId === undefined) enFond(changerCache($, async () => null))
     return next(e)
   })
 

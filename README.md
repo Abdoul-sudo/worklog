@@ -22,6 +22,7 @@
   <a href="#breaks">Breaks</a> ·
   <a href="#project-names">Project names</a> ·
   <a href="#tokens-and-price">Tokens and price</a> ·
+  <a href="#prompt-cache">Prompt cache</a> ·
   <a href="#themes">Themes</a> ·
   <a href="#in-the-terminal">Terminal</a> ·
   <a href="#settings">Settings</a> ·
@@ -36,6 +37,7 @@
 - **Counts your time** while Claude works: answers, subagents, background commands, Ultracode and more.
 - **Counts your tokens** and shows what they would cost on the API.
 - **Shows your whole year** as a heatmap, with 8 themes to choose from.
+- **Shows your prompt cache**: warm or cold, and the price of your next message.
 - **Includes your past work**: at install, it reads your Claude Code history for the time, the tokens and the price.
 - **Keeps your data** on your computer.
 
@@ -164,6 +166,24 @@ Hover over **Tokens**, **API price** or the tokens of a name to see your tokens 
   <img src="docs/screenshots/details.png" width="880" alt="Worklog with Show set to Tokens and price. The pointer is on the API price of today, 21 dollars, and a box is open under it. On the left: input 46.1k tokens for 14 cents, output 413k for 6.37 dollars, cache write 1.7M for 11 dollars, cache read 20.1M for 3.12 dollars. On the right: Opus 5.5, 12.4M tokens for 15 dollars, and Sonnet 5.5, 9.9M tokens for 5.80 dollars.">
 </p>
 
+## Prompt cache
+
+Claude Code keeps your conversation in a prompt cache. While the cache is warm, each message reads the conversation from the cache at a low price. After some time without a message, the cache goes cold. The next message then writes the whole conversation again, at full price.
+
+Worklog shows the cache status at the top, to the left of the tabs:
+
+- **Cache 42 min**: the cache is warm for 42 more minutes.
+- In the last 10 minutes, the text turns yellow.
+- **Cache cold**: the next message writes the whole conversation again.
+
+In the desktop app, hover over the cache status to see more: when the cache expires, how long it lives, the time of the last call, the size of the context, and the estimated price of the next message, warm or cold.
+
+- Each call to the model makes the cache warm again for its full time. Claude Code usually keeps the cache for 1 hour.
+- Each model has its own cache. When you change the model, the cache is cold.
+- Subagents have their own cache. Their calls do not change the status.
+- After `/compact`, the status comes back with the next answer.
+- Worklog estimates the status from the calls it sees. The API does not give the real status.
+
 ## Themes
 
 Worklog comes with 8 themes in the desktop app. You choose one in the settings.
@@ -191,6 +211,7 @@ Clicks in the terminal need the fullscreen mode: `/tui fullscreen`.
 | Setting | Default | What it does |
 | --- | --- | --- |
 | Show the activity heatmap | On | Shows or hides the heatmap. |
+| Show the cache status | On | Shows or hides the cache status. |
 | Show | Time and tokens | Shows the time and the tokens, or the tokens and their API price. |
 | Language | English | English or French. |
 | Stay active during breaks | Up to 1h | A break up to this length is short: it counts as work. |

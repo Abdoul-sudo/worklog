@@ -19,7 +19,11 @@ import {
   calculer,
   cleJour,
   coutReponse,
+  DUREES_CACHE,
+  dureeCache,
   nomModele,
+  prixCache,
+  restantCache,
   choixDemande,
   debutJour,
   demandeEffective,
@@ -1032,5 +1036,44 @@ describe('le prix API', () => {
       'Haiku 5.5',
       'Fable 5.2',
     ])
+  })
+})
+
+describe('le cache de prompt', () => {
+  const CACHE = { session: 'S1', appel: h(9), ttl: '1h' as const, contexte: 150_000, modele: 'claude-opus-5-5', froid: false }
+  const usage = (lu: number, ecrit: number, cache_creation?: { ephemeral_5m_input_tokens?: number; ephemeral_1h_input_tokens?: number }) => ({
+    cache_read_input_tokens: lu,
+    cache_creation_input_tokens: ecrit,
+    ...(cache_creation === undefined ? {} : { cache_creation }),
+  })
+
+  test("il reste au cache les minutes de sa durée après le dernier appel, arrondies vers le haut ; puis il est froid", async () => {
+    expect(restantCache(CACHE, h(9))).toBe(60)
+    expect(restantCache(CACHE, h(9, 50) + 1)).toBe(10)
+    expect(restantCache(CACHE, h(9, 59) + 59_000)).toBe(1)
+    expect(restantCache(CACHE, h(10))).toBe(0)
+    expect(restantCache({ ...CACHE, ttl: '5m' }, h(9, 4))).toBe(1)
+    expect(restantCache({ ...CACHE, ttl: '5m' }, h(9, 5))).toBe(0)
+    // Froid avant l'heure : un autre modèle a pris la suite.
+    expect(restantCache({ ...CACHE, froid: true }, h(9, 1))).toBe(0)
+    expect(DUREES_CACHE['1h']).toBe(60 * MINUTE)
+  })
+
+  test("la durée du cache : 1 h par défaut et dès qu'un écrit pour 1 h ou une relecture tardive la prouve ; 5 min pour un contexte surtout écrit pour 5 min", async () => {
+    expect(dureeCache('1h', usage(100_000, 2_000), 30_000)).toBe('1h')
+    expect(dureeCache('5m', usage(100_000, 2_000, { ephemeral_1h_input_tokens: 2_000 }), 30_000)).toBe('1h')
+    expect(dureeCache('5m', usage(100_000, 2_000), 20 * MINUTE)).toBe('1h')
+    expect(dureeCache('1h', usage(0, 80_000, { ephemeral_5m_input_tokens: 80_000 }), 0)).toBe('5m')
+    // Un petit écrit pour 5 min derrière une grosse relecture ne change rien.
+    expect(dureeCache('1h', usage(100_000, 500, { ephemeral_5m_input_tokens: 500 }), 30_000)).toBe('1h')
+    expect(dureeCache('5m', usage(0, 80_000), 0)).toBe('5m')
+  })
+
+  test("le prochain message : son contexte relu du cache s'il est chaud, réécrit s'il est froid ; sans prix pour un modèle inconnu", async () => {
+    // 150 k tokens relus à 0,20 $ le million, ou réécrits pour 1 h à 8 $, pour 5 min à 5 $.
+    const chaud = prixCache(CACHE, PRIX)
+    expect([arrondi(chaud?.relu ?? null), arrondi(chaud?.reecrit ?? null)]).toEqual([0.03, 1.2])
+    expect(arrondi(prixCache({ ...CACHE, ttl: '5m' }, PRIX)?.reecrit ?? null)).toBe(0.75)
+    expect(prixCache({ ...CACHE, modele: 'claude-inconnu' }, PRIX)).toBeNull()
   })
 })

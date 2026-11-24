@@ -1,5 +1,5 @@
 // Logique pure du comptage : aucun appel à `$`, testée par tests/calcul.test.ts.
-import type { Ecart, Ligne, Part, Plage, Repartition } from '../types'
+import type { Cache, Ecart, Ligne, Part, Plage, Repartition } from '../types'
 import { type Langue, LANGUES, t as texte } from './langue'
 
 export const SANS_ITEM = 'sans nom'
@@ -26,6 +26,8 @@ export type Options = {
   /** Ce que le popover montre à côté des tokens : le temps, ou leur prix API. */
   mesure: Mesure
   theme: Theme
+  /** La puce du cache de prompt. */
+  cache: boolean
 }
 
 // `tout` : le temps et les tokens ; `jetons` : les tokens et leur prix API, sans le temps.
@@ -43,6 +45,7 @@ export const OPTIONS_PAR_DEFAUT: Options = {
   langue: 'en',
   mesure: 'tout',
   theme: 'nuit',
+  cache: true,
 }
 
 /** Les choix des réglages des pauses, en minutes : « Rester actif pendant » et « Puis demander » (0 : jamais). */
@@ -71,6 +74,7 @@ export function lireOptions(brut: unknown): Options {
     langue: LANGUES.find(l => l === r.langue) ?? d.langue,
     mesure: MESURES.find(m => m === r.mesure) ?? d.mesure,
     theme: THEMES_IDS.find(x => x === r.theme) ?? d.theme,
+    cache: oui(r.cache, d.cache),
   }
 }
 
@@ -769,4 +773,42 @@ export function libellePuce(item: string | null, minutes: number, enPause: boole
   // Le terminal dessine ⏱ et ⏸ sur deux colonnes sans les compter : ils mordraient sur le nom.
   const signe = terminal ? (enPause ? '‖' : '◷') : enPause ? '⏸' : '⏱'
   return `${signe} ${nom}${formatDuree(minutes)}`
+}
+
+/** Combien de temps le cache de prompt vit sans appel au modèle. */
+export const DUREES_CACHE = { '5m': 5 * MINUTE, '1h': 60 * MINUTE } as const
+
+/** Les minutes qui restent au cache à `maintenant`, arrondies vers le haut (« 1 min » jusqu'à la dernière seconde) ;
+ * 0 quand il est froid. */
+export function restantCache(cache: Cache, maintenant: number): number {
+  const fin = cache.appel + DUREES_CACHE[cache.ttl]
+  return cache.froid || maintenant >= fin ? 0 : Math.ceil((fin - maintenant) / MINUTE)
+}
+
+/** Les tokens d'une réponse comme l'API les donne : `cache_creation` sépare l'écrit pour 5 min de l'écrit pour 1 h. */
+export type UsageCache = {
+  cache_read_input_tokens: number
+  cache_creation_input_tokens: number
+  cache_creation?: { ephemeral_5m_input_tokens?: number; ephemeral_1h_input_tokens?: number }
+}
+
+/** La durée du cache après une réponse arrivée `depuis` ms après l'appel d'avant. Claude Code écrit en général pour 1 h :
+ * c'est la durée par défaut. Un écrit pour 1 h la confirme ; un cache encore relu plus de cinq minutes après l'appel
+ * d'avant vit aussi 1 h. Seul un contexte surtout écrit, et pour 5 min, donne 5 min : de petits écrits pour 5 min
+ * suivent parfois un cache d'une heure. */
+export function dureeCache(avant: Cache['ttl'], u: UsageCache, depuis: number): Cache['ttl'] {
+  const relu = u.cache_read_input_tokens > u.cache_creation_input_tokens
+  if ((u.cache_creation?.ephemeral_1h_input_tokens ?? 0) > 0) return '1h'
+  if (relu && depuis > DUREES_CACHE['5m']) return '1h'
+  if ((u.cache_creation?.ephemeral_5m_input_tokens ?? 0) > 0 && !relu) return '5m'
+  return avant
+}
+
+/** Le prix API estimé du contexte au prochain message, en dollars : relu du cache s'il est chaud, réécrit s'il est
+ * froid. Null pour un modèle sans prix connu. */
+export function prixCache(cache: Cache, prix: Prix): { relu: number; reecrit: number } | null {
+  const base: Detail = { m: cache.modele, in: 0, out: 0, c5: 0, c1: 0, cr: 0, ctx: Math.floor(cache.contexte / 1_000) }
+  const relu = coutReponse({ ...base, cr: cache.contexte }, prix)
+  const reecrit = coutReponse(cache.ttl === '1h' ? { ...base, c1: cache.contexte } : { ...base, c5: cache.contexte }, prix)
+  return relu === null || reecrit === null ? null : { relu, reecrit }
 }

@@ -1,4 +1,4 @@
-import type { On, RenderSurface } from 'claude-code'
+import type { On, RenderSurface, TurnUsage } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine, MockClock } from 'claude-code/testing'
 
@@ -48,7 +48,17 @@ function monde(
   // Ces tests lisent les textes en français ; celui en anglais garde la langue par défaut.
   mock.store(on, { ...(langue === 'fr' ? { options: { langue: 'fr' } } : {}), ...magasin })
   mock.env(on, { USERPROFILE: 'C:\\Users\\test', ...env })
-  const etat = { session: 'S1', branche: 'main', dossier: 'D:/WORK/FSY', agents: [] as { id: string; status: string }[], fonds: [] as (string | undefined)[], focus: [] as (string | undefined)[] }
+  const etat = {
+    session: 'S1',
+    branche: 'main',
+    dossier: 'D:/WORK/FSY',
+    agents: [] as { id: string; status: string }[],
+    fonds: [] as (string | undefined)[],
+    focus: [] as (string | undefined)[],
+    // Le contexte que le prochain message renverra, et les réponses des prochains appels au modèle.
+    contexte: undefined as number | undefined,
+    reponses: [] as (TurnUsage | null)[],
+  }
   const fichiers = new Map<string, string>()
   const toasts: string[] = []
   const statuts: (string | undefined)[] = []
@@ -103,6 +113,15 @@ function monde(
   on('turn.complete', (_, e) => ({ text: e.answer }))
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
   on('classic.Stop', () => ({}))
+  on('classic.SessionStart', () => ({}))
+  on('classic.PostModelSwitch', () => ({}))
+  on('session.compact', (_, e) => ({ messages: e.messages }))
+  on('session.usage', () => ({ value: { startedAt: h(9), context: { window: 1_000_000, tokens: etat.contexte }, rateLimits: [] } }))
+  on('turn.step', async function* (_, e) {
+    const usage = etat.reponses.shift() ?? null
+    yield { kind: 'stop' as const, stopReason: 'end_turn' as const, usage }
+    return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn' as const, usage }
+  })
   return { horloge, fichiers, toasts, statuts, etat }
 }
 
@@ -1032,4 +1051,141 @@ test("recharger les mods pendant une longue réponse ne coupe pas son temps", { 
   await $.turn.complete({ ...FIN_DE_TOUR, usage: { model: 'm', input_tokens: 1_000, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } })
   await horloge.settle()
   expect(await ligneDe($, 'FLO-I165')).toContain('1 h 30')
+})
+
+/** Ce qu'une réponse d'Opus 5.5 a relu et écrit dans le cache. */
+const reponseOpus = (lu: number, ecrit = 0): TurnUsage => ({
+  model: 'claude-opus-5-5',
+  input_tokens: 10,
+  output_tokens: 200,
+  cache_creation_input_tokens: ecrit,
+  cache_read_input_tokens: lu,
+})
+
+/** Un appel au modèle, de la conversation principale ou d'un sous-agent, et sa réponse. */
+async function appel($: Engine, etat: { reponses: (TurnUsage | null)[] }, reponse: TurnUsage | null, agentId?: string) {
+  etat.reponses.push(reponse)
+  for await (const c of $.turn.step({ turnId: 't', index: 0, model: 'claude-opus-5-5', messageCount: 3, ...(agentId === undefined ? {} : { agentId }) })) void c
+}
+
+type Trouve = { text?: string; props?: Record<string, unknown> }
+
+test("la puce du cache, dans l'en-tête : pleine après un appel, ambre ses dix dernières minutes, puis froide ; sa carte attend le survol", { timeoutMs: 15_000 }, async ($, on) => {
+  const { horloge, fichiers, etat, statuts } = monde(on, ['desktop', 'vscode'])
+  fichiers.set(PRIX_FICHIER, JSON.stringify({ maj: h(8), modeles: { 'claude-opus-5-5': { input_cost_per_token: 4e-6, output_cost_per_token: 2e-5 } } }))
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await horloge.settle()
+  const pied = await $.ui.mount({ ...PIED, surface: 'desktop' })
+  const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
+  await pied.press({ key: 'puce' })
+  const puce = async () => (await bande.find({ key: 'puce-cache' })) as Trouve | undefined
+  // Avant le premier appel, rien à dire du cache.
+  expect(await puce()).toBeUndefined()
+  expect(await bande.find({ key: 'carte-cache' })).toBeUndefined()
+
+  etat.contexte = 150_000
+  await appel($, etat, reponseOpus(150_000))
+  await horloge.settle()
+  expect((await puce())?.text).toBe('Cache 1 h 00')
+  expect(statuts.at(-1)).toContain('Cache 1 h 00')
+  // La carte est dans le popover, cachée jusqu'au survol de la puce.
+  const carte = (await bande.find({ key: 'carte-cache' })) as Trouve | undefined
+  expect(carte?.props?.display).toBe('none')
+  // Prix Anthropic : 150 k tokens relus à 0,40 $ le million, ou réécrits pour 1 h à 8 $.
+  for (const morceau of ['Cache chaud', 'encore 1 h 00 sur 1 h', 'Expire à', '10 h 00', 'Dernier appel', '9 h 00', '150 k tokens', '≈ 0,06 $', '≈ 1,20 $']) {
+    expect(carte?.text).toContain(morceau)
+  }
+
+  // Dix minutes avant le froid, la puce passe à l'ambre.
+  await horloge.advance(50 * 60_000 + 1)
+  const ambre = (await bande.find({ type: 'Text', text: /^Cache 10 min$/ })) as Trouve | undefined
+  expect(ambre?.props?.color).toBe('#E6D06A')
+
+  await horloge.advance(10 * 60_000)
+  expect((await puce())?.text).toBe('Cache froid')
+  expect(statuts.at(-1)).toContain('Cache froid')
+  const froide = (await bande.find({ key: 'carte-cache' }))?.text ?? ''
+  for (const morceau of ['Cache froid', 'Expiré à', '10 h 00', 'réécrit tout le contexte']) expect(froide).toContain(morceau)
+  // Froid, le prochain message coûte la réécriture ; chaud, il aurait coûté la relecture.
+  expect(froide.indexOf('≈ 1,20 $')).toBeLessThan(froide.indexOf('≈ 0,06 $'))
+
+  // Le réglage cache la puce et sa carte.
+  await bande.press({ key: 'reglages' })
+  await bande.press({ key: 'interrupteur-cache' })
+  expect(await puce()).toBeUndefined()
+  expect(await bande.find({ key: 'carte-cache' })).toBeUndefined()
+  await pied.unmount()
+  await bande.unmount()
+})
+
+test("dans le terminal, la puce du cache est dans l'en-tête, sans carte", async ($, on) => {
+  const { horloge, etat } = monde(on)
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  etat.contexte = 40_000
+  await appel($, etat, reponseOpus(40_000))
+  await horloge.settle()
+  const ligne = await $.ui.mount({ ...LIGNE_AIDE, surface: 'terminal' })
+  const bande = await $.ui.mount({ ...BANDE, surface: 'terminal' })
+  await ligne.press({ key: 'puce' })
+  expect((await bande.find({ key: 'puce-cache' }))?.text?.trim()).toBe('Cache 1 h 00')
+  expect(await bande.find({ key: 'carte-cache' })).toBeUndefined()
+  await ligne.unmount()
+  await bande.unmount()
+})
+
+test("le cache suit la reprise d'une session, le changement de modèle et le résumé ; les sous-agents n'y touchent pas", async ($, on) => {
+  const { horloge, etat } = monde(on, ['desktop'])
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  const pied = await $.ui.mount({ ...PIED, surface: 'desktop' })
+  const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
+  await pied.press({ key: 'puce' })
+  const puce = async () => (await bande.find({ key: 'puce-cache' }))?.text
+
+  // Reprise deux heures après le dernier appel : froid.
+  await $.classic.SessionStart({ session_id: 'S1', source: 'resume', seconds_since_last_response: 7_200, context_tokens: 80_000, prompt_cache_likely_expired: true, model: 'claude-opus-5-5' })
+  await horloge.settle()
+  expect(await puce()).toBe('Cache froid')
+  expect((await bande.find({ key: 'carte-cache' }))?.text).toContain('80 k tokens')
+  // Reprise dix minutes après, froid selon le moteur : ce cache vivait 5 min.
+  await $.classic.SessionStart({ session_id: 'S1', source: 'resume', seconds_since_last_response: 600, context_tokens: 80_000, prompt_cache_likely_expired: true, model: 'claude-opus-5-5' })
+  await horloge.settle()
+  expect(await puce()).toBe('Cache froid')
+
+  // Un sous-agent a son propre cache : celui de la conversation reste froid.
+  await appel($, etat, reponseOpus(50_000), 'agent-1')
+  await horloge.settle()
+  expect(await puce()).toBe('Cache froid')
+  // Le premier appel réécrit le contexte, pour 5 min.
+  await appel($, etat, reponseOpus(0, 80_000))
+  await horloge.settle()
+  expect(await puce()).toBe('Cache 5 min')
+  expect((await bande.find({ key: 'carte-cache' }))?.text).toContain('encore 5 min sur 5 min')
+  // Un appel sans réponse ne touche pas le cache.
+  await horloge.advance(3 * 60_000)
+  await appel($, etat, null)
+  await horloge.settle()
+  expect(await puce()).toBe('Cache 2 min')
+
+  // Un autre modèle n'a pas ce cache.
+  await $.classic.PostModelSwitch({
+    from_model: 'claude-opus-5-5',
+    to_model: 'claude-sonnet-5-5',
+    requested_model: 'sonnet',
+    source: 'command',
+    context_tokens: 80_000,
+    prompt_cache_warm: true,
+    cache_ttl: '1h',
+    estimated_cache_write_usd: 0.5,
+    pricing: 'catalog',
+  })
+  await horloge.settle()
+  expect(await puce()).toBe('Cache froid')
+  expect((await bande.find({ key: 'carte-cache' }))?.text).toContain('nouveau modèle : Sonnet 5.5')
+
+  // Un résumé remplace la conversation : la puce attend le prochain appel.
+  await $.session.compact({ trigger: 'manual', messages: [{ role: 'user', text: 'résumé', toolUses: [] }] })
+  await horloge.settle()
+  expect(await bande.find({ key: 'puce-cache' })).toBeUndefined()
+  await pied.unmount()
+  await bande.unmount()
 })

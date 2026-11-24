@@ -376,3 +376,37 @@ export function svgIcone(trace: string, couleur: string, survol = false): string
     `<path d="${trace}" fill="none" stroke="${couleur}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`
   )
 }
+
+/** La jauge du cache, dans sa puce : un anneau plein quand le cache vient de servir, qui se vide jusqu'au froid. */
+export function svgJaugeCache(part: number, couleur: string): string {
+  const tour = 2 * Math.PI * 5
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="${couleur}" stroke-width="2">` +
+    '<circle cx="7" cy="7" r="5" stroke-opacity=".25"/>' +
+    `<circle cx="7" cy="7" r="5" stroke-linecap="round" stroke-dasharray="${(Math.min(1, part) * tour).toFixed(2)} ${tour.toFixed(2)}" transform="rotate(-90 7 7)"/></svg>`
+  )
+}
+
+/** Le cache froid : un flocon au trait, six branches et leurs pointes. */
+export function svgFlocon(couleur: string): string {
+  const point = (angle: number, rayon: number) => `${(7 + rayon * Math.sin(angle)).toFixed(2)} ${(7 - rayon * Math.cos(angle)).toFixed(2)}`
+  const branches = [0, 1, 2, 3, 4, 5].map(i => {
+    const a = (i * Math.PI) / 3
+    return `M7 7L${point(a, 6)}M${point(a - 0.5, 4.6)}L${point(a, 3.6)}L${point(a + 0.5, 4.6)}`
+  })
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="${couleur}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">` +
+    `<path d="${branches.join('')}"/></svg>`
+  )
+}
+
+/** La barre de la carte du cache : la part de sa durée qui lui reste, sur un rail discret. */
+export function svgBarreCache(part: number, couleur: string, largeur: number): string {
+  const plein = Math.max(0, Math.min(1, part)) * largeur
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${largeur} 4" width="${largeur}" height="4">` +
+    `<rect width="${largeur}" height="4" rx="2" fill="${ENCRE.vide}" fill-opacity=".12"/>` +
+    (plein > 0 ? `<rect width="${Math.max(4, plein).toFixed(1)}" height="4" rx="2" fill="${couleur}"/>` : '') +
+    '</svg>'
+  )
+}

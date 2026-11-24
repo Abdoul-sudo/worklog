@@ -69,6 +69,24 @@ export type Reglages = {
   mesure: 'tout' | 'jetons'
   /** Le thème du popover : ses couleurs et son fond animé. */
   theme: 'nuit' | 'simple' | 'aurore' | 'braise' | 'foret' | 'ocean' | 'crepuscule' | 'sakura'
+  /** La puce du cache de prompt, à côté de celle du temps. */
+  cache: boolean
+}
+
+/** Le cache de prompt de la conversation principale, d'après ses derniers appels au modèle. */
+export type Cache = {
+  /** La conversation de ces chiffres : après /clear, ils ne valent plus. */
+  session: string
+  /** L'envoi du dernier appel qui a eu une réponse : il a relu ou écrit le cache, et l'a gardé en vie. */
+  appel: number
+  /** Combien de temps le cache vit sans appel. */
+  ttl: '5m' | '1h'
+  /** Les tokens que le prochain message envoie : relus du cache s'il est chaud, réécrits s'il est froid. */
+  contexte: number
+  /** Le modèle du dernier appel : chaque modèle a son propre cache. */
+  modele: string
+  /** Froid avant l'heure : un autre modèle a pris la suite, et son cache est à refaire. */
+  froid: boolean
 }
 
 declare module 'claude-code' {
@@ -81,6 +99,9 @@ declare module 'claude-code' {
       vue: Shaped<Vue | null>
       frise: Shaped<Frise | null>
       reglages: Shaped<Reglages | null>
+      cache: Shaped<Cache | null>
+      /** Ce que montre la puce du cache : les minutes qui lui restent, 0 quand il est froid ; null sans appel connu. */
+      minutesCache: number | null
     }
   }
 }
