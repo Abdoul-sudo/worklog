@@ -2016,6 +2016,12 @@ function puceCache($: Moteur, e: Site, { c, minutes }: CacheLu) {
   )
 }
 
+/** Un prix estimé : `≈ 1,20 $` ; un prix sous le centime garde son `< 0,01 $`, qui dit déjà qu'il est approché. */
+const environ = (usd: number) => {
+  const texte = formatCout(usd)
+  return texte.startsWith('<') ? texte : `≈ ${texte}`
+}
+
 /**
  * La carte du cache, au survol de sa puce : son état, le contexte qu'il garde et sa jauge, quand il refroidit et quand il
  * a servi, et ce que coûtera le prochain message, chaud ou froid. Posée en absolu sous l'en-tête, au bord droit,
@@ -2040,8 +2046,8 @@ function carteDuCache($: Moteur, e: Site, { c, minutes }: CacheLu, maintenant: n
     estimes === null
       ? []
       : [
-          [textes.prochain, `≈ ${formatCout(chaud ? estimes.relu : estimes.reecrit)}`],
-          [chaud ? textes.siFroid : textes.siChaud, `≈ ${formatCout(chaud ? estimes.reecrit : estimes.relu)}`],
+          [textes.prochain, environ(chaud ? estimes.relu : estimes.reecrit)],
+          [chaud ? textes.siFroid : textes.siChaud, environ(chaud ? estimes.reecrit : estimes.relu)],
         ]
   const duree = t().seuilChoix(c.ttl === '1h' ? 60 : 5)
   const etat = chaud ? textes.encore(formatDuree(minutes), duree) : autreModele ? textes.nouveauModele(nomModele(c.modele)) : ''

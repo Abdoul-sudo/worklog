@@ -1196,3 +1196,20 @@ test("le cache suit la reprise d'une session, le changement de modèle et le ré
   await pied.unmount()
   await bande.unmount()
 })
+
+test("un prix sous le centime garde son « < » sans « ≈ » devant", async ($, on) => {
+  const { horloge, fichiers, etat } = monde(on, ['desktop'])
+  fichiers.set(PRIX_FICHIER, JSON.stringify({ maj: h(8), modeles: { 'claude-opus-5-5': { input_cost_per_token: 4e-6, output_cost_per_token: 2e-5 } } }))
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  etat.contexte = 1_000
+  await appel($, etat, reponseOpus(1_000))
+  await horloge.settle()
+  const pied = await $.ui.mount({ ...PIED, surface: 'desktop' })
+  const bande = await $.ui.mount({ ...BANDE, surface: 'desktop' })
+  await pied.press({ key: 'puce' })
+  const carte = (await bande.find({ key: 'carte-cache' }))?.text ?? ''
+  expect(carte).toContain('< 0,01 $')
+  expect(carte).not.toContain('≈ <')
+  await pied.unmount()
+  await bande.unmount()
+})
