@@ -268,7 +268,7 @@ function cielSakura(): string {
 /** Les thèmes du popover. Simple n'a ni fond propre ni mouvement : le gris de l'app et un cadre fin. */
 export const THEMES: Record<Theme, { encres: Encres; ciel: (() => string) | null }> = {
   nuit: {
-    encres: { fond: '#070A14', bord: '#1C243D', carte: '#151B30', bordCarte: '#2C3453', texte: '#E6E9F2', vif: '#F7F8FC', gris: '#8A93B2', faible: '#707B9D', legende: '#727C9A', accent: ARGILE, vide: '#C9D4FF', ...BLANCS },
+    encres: { fond: '#070A14', bord: '#1C243D', carte: '#151B30', bordCarte: '#2C3453', texte: '#E6E9F2', vif: '#F7F8FC', gris: '#8A93B2', faible: '#707B9D', legende: '#727C9A', accent: '#4CCFE0', vide: '#C9D4FF', ...BLANCS },
     ciel: cielNuit,
   },
   simple: {
