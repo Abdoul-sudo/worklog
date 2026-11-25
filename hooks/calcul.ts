@@ -49,8 +49,8 @@ export const OPTIONS_PAR_DEFAUT: Options = {
 }
 
 /** Les choix des réglages des pauses, en minutes : « Rester actif pendant » et « Puis demander » (0 : jamais). */
-export const SEUILS = [15, 30, 60, 120]
-export const PAUSES_MAX = [0, 60, 120, 240, 480]
+export const SEUILS = [5, 10, 15, 30, 45, 60, 90, 120, 180]
+export const PAUSES_MAX = [0, 30, 60, 120, 180, 240, 360, 480, 720]
 
 /** Les choix de « Puis demander » : jamais, ou une durée plus longue que « Rester actif pendant ». */
 export const choixDemande = (o: Options): number[] => PAUSES_MAX.filter(m => m === 0 || m > o.seuilPause)

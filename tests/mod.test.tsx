@@ -445,6 +445,8 @@ test('les tokens, les onglets, les réglages et la frise', async ($, on) => {
       await bande.press({ key: 'seuil-30' })
       expect((await bande.find({ key: 'seuil-30' }))?.text).toBe('● 30 min')
       expect((await bande.find({ key: 'seuil-60' }))?.text).toBe('○ 1 h')
+      // Une durée qui n'est pas un nombre entier d'heures se lit en minutes.
+      expect((await bande.find({ key: 'seuil-90' }))?.text).toBe('○ 90 min')
       // Les noms des langues suivent la langue de l'interface.
       expect([(await bande.find({ key: 'langue-fr' }))?.text, (await bande.find({ key: 'langue-en' }))?.text]).toEqual(['● Français', '○ Anglais'])
       await bande.press({ key: 'seuil-60' })

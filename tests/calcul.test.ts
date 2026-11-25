@@ -610,10 +610,13 @@ describe('fichiers et textes', () => {
     expect([OPTIONS_PAR_DEFAUT.pauseMax, lireOptions({ pauseMax: 480 }).pauseMax, lireOptions({ pauseMax: 300 }).pauseMax]).toEqual([240, 480, 240])
     expect(lireOptions({ pauseMax: 0 }).pauseMax).toBe(0)
     // « Puis demander » : jamais, ou plus long que « Rester actif pendant ». Plus court ou égal, il ne demande jamais.
-    expect(choixDemande(OPTIONS_PAR_DEFAUT)).toEqual([0, 120, 240, 480])
+    expect(choixDemande(OPTIONS_PAR_DEFAUT)).toEqual([0, 120, 180, 240, 360, 480, 720])
     expect([demandeEffective(OPTIONS_PAR_DEFAUT), demandeEffective({ ...OPTIONS_PAR_DEFAUT, pauseMax: 60 }), demandeEffective({ ...OPTIONS_PAR_DEFAUT, seuilPause: 120, pauseMax: 60 })]).toEqual([240, 0, 0])
     // Une durée qui n'est plus un choix du réglage reprend la valeur par défaut.
-    expect(lireOptions({ seuilPause: 45 }).seuilPause).toBe(60)
+    expect(lireOptions({ seuilPause: 50 }).seuilPause).toBe(60)
+    // Les choix d'avant restent valides.
+    expect([15, 30, 60, 120].map(seuilPause => lireOptions({ seuilPause }).seuilPause)).toEqual([15, 30, 60, 120])
+    expect([0, 60, 120, 240, 480].map(pauseMax => lireOptions({ pauseMax }).pauseMax)).toEqual([0, 60, 120, 240, 480])
     expect([OPTIONS_PAR_DEFAUT.theme, lireOptions({ theme: 'sakura' }).theme, lireOptions({ theme: 'rose' }).theme]).toEqual(['nuit', 'sakura', 'nuit'])
     expect(lireOptions({ seuilPause: 30, motif: '([', jetons: false, activite: 'oui' })).toEqual({ ...OPTIONS_PAR_DEFAUT, seuilPause: 30 })
   })

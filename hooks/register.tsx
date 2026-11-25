@@ -1785,12 +1785,15 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
 const LARGEUR_AIDE = 56
 const largeurAide = (texte: string) => Math.min(LARGEUR_AIDE, Math.ceil(texte.length * 0.8) + 4)
 
+/** La largeur des pauses dans le terminal, à côté de l'affichage : leurs choix y passent à la ligne, sur trois rangs. */
+const LARGEUR_PAUSES = 32
+
 /** Les réglages dans le terminal, où une liste déroulante ne s'ouvre qu'au clavier : chaque réglage montre ses choix,
  * à cliquer ; le choix actuel est plein (●) et clair. L'affichage et le comptage côte à côte quand la place le permet. */
 function vueReglagesTerminal($: Moteur, e: Site, options: Reglages, aCote: boolean) {
   const { Box, Text } = $.ui.resolve(e)
   const choix = <T extends string | number>(cle: string, valeurs: readonly T[], actuelle: T, libelle: (v: T) => string, choisir: (v: T) => unknown) => (
-    <Box key={`choix-${cle}`} flexDirection="row" gap={2}>
+    <Box key={`choix-${cle}`} flexDirection="row" flexWrap="wrap" columnGap={2}>
       {valeurs.map(v => bouton($, e, `${cle}-${v}`, `${v === actuelle ? '●' : '○'} ${libelle(v)}`, v === actuelle ? 'vif' : 'gris', () => choisir(v)))}
     </Box>
   )
@@ -1821,7 +1824,7 @@ function vueReglagesTerminal($: Moteur, e: Site, options: Reglages, aCote: boole
           choix('langue', LANGUES, options.langue, l => t().langues[l], langue => changerReglage($, { langue })),
         )}
       </Box>
-      <Box flexDirection="column">
+      <Box flexDirection="column" {...(aCote ? { width: LARGEUR_PAUSES } : {})}>
         {titre(t().sections.comptage)}
         <Text>{t().seuil}</Text>
         {choix('seuil', SEUILS, options.seuilPause, t().seuilChoix, seuilPause => changerReglage($, { seuilPause }))}
