@@ -36,7 +36,7 @@ import {
   nommer,
 } from '../hooks/calcul'
 import { casesEntre, cellulesActivite, compterSerie, serie, svgActivite } from '../hooks/activite'
-import { choisirTheme, couleurs, svgCiel } from '../hooks/dessins'
+import { ENCRE, THEMES, choisirTheme, couleurs, svgCiel } from '../hooks/dessins'
 import { choisirLangue, t } from '../hooks/langue'
 
 // Ces tests lisent les textes en français ; ceux en anglais choisissent leur langue.
@@ -794,6 +794,24 @@ describe('corrections, tokens et périodes', () => {
       expect(retards(0).slice(0, 2)).toEqual([['d', 0], ['s', 0]])
       expect(retards(10_000).slice(0, 2)).toEqual([['d', -10], ['s', -10]])
       expect(retards(40_000).slice(0, 2)).toEqual([['d', -6], ['s', -12]])
+    } finally {
+      choisirTheme('nuit')
+    }
+  })
+
+  test('dans chaque thème, les textes des cartes au survol restent lisibles : un contraste de 4,5:1 au moins', async () => {
+    // La luminance relative et le contraste de WCAG 2.
+    const luminance = (c: string) =>
+      [1, 3, 5]
+        .map(i => parseInt(c.slice(i, i + 2), 16) / 255)
+        .map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+        .reduce((somme, v, i) => somme + v * [0.2126, 0.7152, 0.0722][i]!, 0)
+    const contraste = (a: string, b: string) => (Math.max(luminance(a), luminance(b)) + 0.05) / (Math.min(luminance(a), luminance(b)) + 0.05)
+    try {
+      for (const theme of Object.keys(THEMES) as (keyof typeof THEMES)[]) {
+        choisirTheme(theme)
+        for (const ton of ['gris', 'texte', 'vif'] as const) expect([theme, ton, contraste(ENCRE[ton], ENCRE.carte) >= 4.5]).toEqual([theme, ton, true])
+      }
     } finally {
       choisirTheme('nuit')
     }

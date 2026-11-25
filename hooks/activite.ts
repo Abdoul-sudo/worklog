@@ -1,7 +1,7 @@
 // La frise d'activité, comme celle de GitHub : une case par jour, une colonne par semaine.
 // Logique pure, testée par tests/activite.test.ts.
 import { cleJour, debutJour, debutSemaine, decalerJours, formatCout, formatDuree, formatJetons, formatJour, majuscule } from './calcul'
-import { ENCRE, FOND_BULLE, SANS_FOND, aUnCiel } from './dessins'
+import { ENCRE, aUnCiel } from './dessins'
 import { t } from './langue'
 import type { Reglages } from '../types'
 
@@ -189,10 +189,9 @@ export function svgActivite(
   const ligneY = (n: number) => Math.round(MARGE_HAUTE + n * LIGNE_CARTE + LIGNE_CARTE * 0.78)
   // Le fond d'une forme prend la largeur que lui donne chaque carte (`<use width>`). Le fond et la bordure sont des
   // attributs : le style de la page ne s'applique pas aux formes réutilisées.
-  const fondBulle = ENCRE.fond === SANS_FOND ? FOND_BULLE : ENCRE.fond
   const modeles = [...new Set(cartes.map(k => k.forme))].map(f => {
     const etiquettes = libellesDe[f].map((l, n) => `<tspan x="${MARGE_BULLE}" y="${ligneY(n + 1)}">${xml(l)}</tspan>`).join('')
-    const fond = `<rect x=".5" y=".5" width="100%" height="${hauteurDe(f) - 1}" rx="7" fill="${fondBulle}" stroke="${ENCRE.bord}"/>`
+    const fond = `<rect x=".5" y=".5" width="100%" height="${hauteurDe(f) - 1}" rx="7" fill="${ENCRE.carte}" stroke="${ENCRE.bordCarte}"/>`
     return `<svg id="${f}" overflow="visible">${fond}${etiquettes === '' ? '' : `<text fill="${ENCRE.gris}">${etiquettes}</text>`}</svg>`
   })
   for (const k of cartes) {

@@ -6,6 +6,10 @@ import { type Theme, SANS_ITEM } from './calcul'
 type Encres = {
   fond: string
   bord: string
+  /** Le fond et le cadre des cartes au survol (tokens, cache, aides ⓘ, jours de la frise) : la teinte du thème, plus
+   * claire que son fond pour se détacher du popover. Les textes gris, texte et vif y gardent un contraste de 4,5:1. */
+  carte: string
+  bordCarte: string
   texte: string
   vif: string
   gris: string
@@ -22,8 +26,6 @@ type Encres = {
 const BLANCS = { survol: '#FFFFFF0A', filet: '#FFFFFF12', choisi: '#FFFFFF17', rail: '#FFFFFF08' }
 /** Pas de fond propre : le popover laisse voir celui de l'app (thème Simple). */
 export const SANS_FOND = '#00000000'
-/** Le fond des bulles de détail quand le thème (Par défaut) n'a pas de fond à lui. */
-export const FOND_BULLE = '#262626'
 const ARGILE = '#E0835F'
 
 /** Le fond de chaque thème : 1600 × 1200, ancré en haut à gauche, que le popover coupe. Ses mouvements sont lents et
@@ -199,35 +201,35 @@ function cielSakura(): string {
 /** Les thèmes du popover. Simple n'a ni fond propre ni mouvement : le gris de l'app et un cadre fin. */
 export const THEMES: Record<Theme, { encres: Encres; ciel: (() => string) | null }> = {
   nuit: {
-    encres: { fond: '#05070F', bord: '#1C243D', texte: '#E6E9F2', vif: '#F7F8FC', gris: '#8A93B2', faible: '#707B9D', legende: '#727C9A', accent: ARGILE, vide: '#C9D4FF', ...BLANCS },
+    encres: { fond: '#05070F', bord: '#1C243D', carte: '#151B30', bordCarte: '#2C3453', texte: '#E6E9F2', vif: '#F7F8FC', gris: '#8A93B2', faible: '#707B9D', legende: '#727C9A', accent: ARGILE, vide: '#C9D4FF', ...BLANCS },
     ciel: cielNuit,
   },
   simple: {
-    encres: { fond: SANS_FOND, bord: '#FFFFFF2E', texte: '#E4E4E4', vif: '#F5F5F5', gris: '#A3A3A3', faible: '#8C8C8C', legende: '#8C8C8C', accent: ARGILE, vide: '#FFFFFF', ...BLANCS },
+    encres: { fond: SANS_FOND, bord: '#FFFFFF2E', carte: '#2A2A2A', bordCarte: '#3D3D3D', texte: '#E4E4E4', vif: '#F5F5F5', gris: '#A3A3A3', faible: '#8C8C8C', legende: '#8C8C8C', accent: ARGILE, vide: '#FFFFFF', ...BLANCS },
     ciel: null,
   },
   aurore: {
-    encres: { fond: '#040C12', bord: '#173241', texte: '#E2F1F2', vif: '#F4FBFB', gris: '#88A8B0', faible: '#678C95', legende: '#6A8C94', accent: '#4FD1C5', vide: '#BFEFF0', ...BLANCS },
+    encres: { fond: '#040C12', bord: '#173241', carte: '#132D32', bordCarte: '#294F57', texte: '#E2F1F2', vif: '#F4FBFB', gris: '#88A8B0', faible: '#678C95', legende: '#6A8C94', accent: '#4FD1C5', vide: '#BFEFF0', ...BLANCS },
     ciel: cielAurore,
   },
   braise: {
-    encres: { fond: '#140F0C', bord: '#3D2B21', texte: '#F2E8E1', vif: '#FBF6F2', gris: '#B39B8D', faible: '#957B6A', legende: '#937C6E', accent: ARGILE, vide: '#FFD9C2', ...BLANCS },
+    encres: { fond: '#140F0C', bord: '#3D2B21', carte: '#2D1F18', bordCarte: '#4F3B30', texte: '#F2E8E1', vif: '#FBF6F2', gris: '#B39B8D', faible: '#957B6A', legende: '#937C6E', accent: ARGILE, vide: '#FFD9C2', ...BLANCS },
     ciel: cielBraise,
   },
   foret: {
-    encres: { fond: '#07110C', bord: '#1E3A2B', texte: '#E3F0E8', vif: '#F5FBF7', gris: '#8FAE9C', faible: '#6E937F', legende: '#739181', accent: '#6FCF97', vide: '#CDEFD9', ...BLANCS },
+    encres: { fond: '#07110C', bord: '#1E3A2B', carte: '#182D22', bordCarte: '#304F40', texte: '#E3F0E8', vif: '#F5FBF7', gris: '#8FAE9C', faible: '#6E937F', legende: '#739181', accent: '#6FCF97', vide: '#CDEFD9', ...BLANCS },
     ciel: cielForet,
   },
   ocean: {
-    encres: { fond: '#06101C', bord: '#1B3550', texte: '#E3EEF7', vif: '#F5FAFD', gris: '#8BA6BF', faible: '#6D88A4', legende: '#6E88A3', accent: '#5AB4F5', vide: '#CFE6FA', ...BLANCS },
+    encres: { fond: '#06101C', bord: '#1B3550', carte: '#132232', bordCarte: '#293F57', texte: '#E3EEF7', vif: '#F5FAFD', gris: '#8BA6BF', faible: '#6D88A4', legende: '#6E88A3', accent: '#5AB4F5', vide: '#CFE6FA', ...BLANCS },
     ciel: cielOcean,
   },
   crepuscule: {
-    encres: { fond: '#0E0A18', bord: '#2E2547', texte: '#ECE8F5', vif: '#FAF8FD', gris: '#A398BD', faible: '#8F86A7', legende: '#8F86A6', accent: '#B794F6', vide: '#DCCFFB', ...BLANCS },
+    encres: { fond: '#0E0A18', bord: '#2E2547', carte: '#231834', bordCarte: '#3D2F55', texte: '#ECE8F5', vif: '#FAF8FD', gris: '#A398BD', faible: '#8F86A7', legende: '#8F86A6', accent: '#B794F6', vide: '#DCCFFB', ...BLANCS },
     ciel: cielCrepuscule,
   },
   sakura: {
-    encres: { fond: '#140B10', bord: '#3D2333', texte: '#F5E9EF', vif: '#FDF7FA', gris: '#B898A8', faible: '#977A8A', legende: '#977A88', accent: '#F49AC1', vide: '#FBD3E4', ...BLANCS },
+    encres: { fond: '#140B10', bord: '#3D2333', carte: '#2C1922', bordCarte: '#4E3140', texte: '#F5E9EF', vif: '#FDF7FA', gris: '#B898A8', faible: '#977A8A', legende: '#977A88', accent: '#F49AC1', vide: '#FBD3E4', ...BLANCS },
     ciel: cielSakura,
   },
 }

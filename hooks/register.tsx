@@ -55,7 +55,6 @@ import {
   ENCRE,
   couleurs,
   APERCU,
-  FOND_BULLE,
   SANS_FOND,
   choisirTheme,
   svgApercu,
@@ -1137,9 +1136,9 @@ function detailJetons(
       flexDirection="row"
       gap={2}
       paddingX={1}
-      backgroundColor={ENCRE.fond === SANS_FOND ? FOND_BULLE : ENCRE.fond}
+      backgroundColor={ENCRE.carte}
       borderStyle="round"
-      borderColor={ENCRE.bord}
+      borderColor={ENCRE.bordCarte}
     >
       {bloc('types', types)}
       {modeles.length > 0 && bloc('modeles', modeles)}
@@ -1666,11 +1665,12 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
           >
             {/* La dernière ligne : sa bulle remonte d'environ 2 px (la bande centre aussi la marge), loin du bas du popover. */}
             <Box
+              key={`carte-aide-${cle}`}
               {...(cle === 'pauseMax' ? { marginBottom: 'xs' as const } : {})}
               paddingX={1}
-              backgroundColor={ENCRE.fond === SANS_FOND ? FOND_BULLE : ENCRE.fond}
+              backgroundColor={ENCRE.carte}
               borderStyle="round"
-              borderColor={ENCRE.bord}
+              borderColor={ENCRE.bordCarte}
             >
               <Text size="caption" {...encre(e, 'texte')}>
                 {texte}
@@ -2105,9 +2105,9 @@ function carteDuCache($: Moteur, e: Site, { c, minutes }: CacheLu, maintenant: n
       gap="xs"
       width={LARGEUR_CARTE_CACHE}
       paddingX={1}
-      backgroundColor={ENCRE.fond === SANS_FOND ? FOND_BULLE : ENCRE.fond}
+      backgroundColor={ENCRE.carte}
       borderStyle="round"
-      borderColor={ENCRE.bord}
+      borderColor={ENCRE.bordCarte}
     >
       <Box flexDirection="row" justifyContent="space-between" alignItems="center" gap={2}>
         <Box flexDirection="row" alignItems="center" gap="xs">
@@ -2128,7 +2128,7 @@ function carteDuCache($: Moteur, e: Site, { c, minutes }: CacheLu, maintenant: n
         {paire('cache-temps', temps)}
         {paire('cache-prix', couts)}
       </Box>
-      <Text size="caption" {...encre(e, 'faible')}>
+      <Text size="caption" {...encre(e, 'gris')}>
         {chaud ? textes.explicationChaud : textes.explicationFroid}
       </Text>
     </Box>

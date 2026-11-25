@@ -1116,6 +1116,8 @@ test("la puce du cache, dans l'en-tête : pleine après un appel, ambre ses dix 
   const aide = (await bande.find({ key: 'bulle-aide-cache' })) as Trouve | undefined
   expect(aide?.props?.display).toBe('none')
   expect(aide?.text).toContain('le cache reste chaud')
+  // Sa carte a la couleur des cartes au survol du thème (Nuit).
+  expect(((await bande.find({ key: 'carte-aide-cache' })) as Trouve | undefined)?.props).toMatchObject({ backgroundColor: '#151B30', borderColor: '#2C3453' })
   expect(await bande.find({ key: 'info-pauseMax' })).toBeDefined()
   expect(await bande.find({ key: 'info-seuil' })).toBeUndefined()
   expect(await bande.find({ key: 'info-activite' })).toBeUndefined()
