@@ -39,53 +39,82 @@ const trame = (couleur: string, opacite: number) =>
 const lueur = (id: string, couleur: string, opacite: number) =>
   `<radialGradient id="${id}"><stop offset="0" stop-color="${couleur}" stop-opacity="${opacite}"/><stop offset="1" stop-color="${couleur}" stop-opacity="0"/></radialGradient>`
 
-/** Le bref éclat d'une étoile de Nuit : quatre rayons fins, de 6 px, autour de son centre. */
-const SCINTILLEMENT = 'M0-6L.7-.7L6 0L.7 .7L0 6L-.7 .7L-6 0L-.7-.7Z'
+/** Un tirage au hasard qui revient toujours le même pour une même graine (mulberry32) : le ciel ne change pas d'un dessin
+ * à l'autre. */
+function hasard(graine: number): () => number {
+  return () => {
+    graine = (graine + 0x6d2b79f5) | 0
+    let t = Math.imul(graine ^ (graine >>> 15), 1 | graine)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
 
-/** Nuit : un ciel étoilé sur le bleu nuit, que traverse lentement une lueur bleue. Des étoiles sur deux plans, blanches,
- * bleutées ou dorées ; de temps en temps, l'une d'elles jette un bref éclat en croix. */
+/** Nuit : un ciel étoilé sur le bleu nuit, que traverse lentement une lueur bleue. Une Voie lactée penchée le traverse :
+ * de petites étoiles s'y serrent. Des étoiles moyennes scintillent, et quatre brillantes, à quatre branches, se posent
+ * dans les coins vides du popover de la bande : entre les totaux et la frise, sous les totaux, en bas. Sur le texte, les
+ * étoiles se font rares, et celles sans branches restent petites : elles se prendraient pour des points du texte. */
 function cielNuit(): string {
-  // Un éclat dure 0,9 s, une fois par cycle ; chaque étoile qui en jette prend l'un de ces cycles, en secondes, et une
-  // phase à elle : les éclats semblent venir au hasard.
-  const cycles = [17, 23, 29, 37, 43, 53]
-  const eclats = cycles
-    .map((duree, k) => {
-      const d = 90 / duree
-      return `@keyframes e${k}{0%,${d.toFixed(2)}%,100%{opacity:0;transform:scale(.2)}${(d * 0.4).toFixed(2)}%{opacity:.95;transform:scale(1)}}`
+  const h = hasard(11)
+  // La Voie lactée : une droite qui monte de (0, 470) à (1600, -50), autour de laquelle les étoiles sont plus serrées.
+  const angle = (-18 * Math.PI) / 180
+  const pres = (x: number, y: number) => Math.exp(-((((y - 210) * Math.cos(angle) - (x - 800) * Math.sin(angle)) / 150) ** 2))
+  const brillantes = [[582, 120, 5.5], [270, 252, 4.5], [846, 432, 5], [1430, 442, 5.5]] as const
+  // Le texte de la vue Aujourd'hui dans la bande, en pixels du ciel : l'en-tête, les totaux, la frise, la liste, l'ajout.
+  const texte = [[60, 50, 310, 105], [820, 50, 1620, 105], [60, 115, 470, 210], [670, 60, 1620, 262], [70, 300, 1590, 378], [60, 400, 230, 432]]
+  const surTexte = (x: number, y: number) => texte.some(([a, b, c, d]) => x > a! && x < c! && y > b! && y < d!)
+  const places: [number, number][] = brillantes.map(([x, y]) => [x, y])
+  // `surLeTexte` : la part des étoiles gardée sur le texte.
+  const placer = (n: number, ecart: number, voieLactee: boolean, surLeTexte: number): [number, number][] => {
+    const prises: [number, number][] = []
+    for (let essai = 0; prises.length < n && essai < 20_000; essai++) {
+      // Les trois quarts dans les 500 px du haut, où se tient le popover de la bande ; les autres pour un panneau plus haut.
+      const x = h() * CIEL.largeur
+      const y = h() < 0.75 ? h() * 500 : 500 + h() * (CIEL.hauteur - 500)
+      if (voieLactee && h() > 0.18 + 0.82 * pres(x, y)) continue
+      if (surTexte(x, y) && h() > surLeTexte) continue
+      if (places.some(([u, v]) => (u - x) ** 2 + (v - y) ** 2 < ecart ** 2)) continue
+      places.push([x, y])
+      prises.push([x, y])
+    }
+    return prises
+  }
+  // Surtout blanc bleuté, quelques-unes chaudes ou plus bleues, comme de vraies étoiles.
+  const teinte = () => {
+    const t = h()
+    return t < 0.12 ? '#FFE8C2' : t < 0.25 ? '#B9CBFF' : '#E3E9FF'
+  }
+  const n = (v: number) => v.toFixed(1)
+  const scintille = (duree: number) => `animation:e ${n(duree)}s ease-in-out ${n(-h() * duree)}s infinite alternate`
+  const moyennes = placer(16, 110, false, 0.1)
+    .map(([x, y]) => `<g style="${scintille(3 + h() * 4)}"><circle cx="${n(x)}" cy="${n(y)}" r="5" fill="url(#a)"/><circle cx="${n(x)}" cy="${n(y)}" r="${n(0.9 + h() * 0.2)}" fill="${teinte()}"/></g>`)
+    .join('')
+  const petites = placer(170, 16, true, 0.3)
+    .map(([x, y]) => {
+      const anime = h() < 0.3 ? ` style="${scintille(2.5 + h() * 4)}"` : ` opacity="${n(0.25 + h() * 0.4)}"`
+      return `<circle cx="${n(x)}" cy="${n(y)}" r="${(0.45 + h() * 0.45).toFixed(2)}" fill="${teinte()}"${anime}/>`
     })
     .join('')
-  const teinte = (i: number) => ['#E8EDFF', '#C9D8FF', '#E8EDFF', '#FFE6BF', '#E8EDFF'][(i * 3) % 5]!
-  // Une place sans paquets ni trous (la suite R2, décalée pour chaque plan). Les trois quarts tiennent dans les 500 px du
-  // haut, où se tient le popover de la bande ; les autres, plus rares, sont pour un panneau plus haut.
-  const place = (i: number, n: number, decalage: number) => {
-    const x = Math.round(((i * 0.7548777 + decalage) % 1) * CIEL.largeur)
-    const v = (i * 0.5698403 + decalage) % 1
-    return [x, Math.round(i < n * 0.75 ? v * 500 : 500 + v * (CIEL.hauteur - 500))] as const
-  }
-  // Au loin : de toutes petites étoiles, pâles et fixes.
-  const poussiere = Array.from({ length: 160 }, (_, i) => {
-    const [x, y] = place(i, 160, 0.3)
-    return `<circle cx="${x}" cy="${y}" r="${(0.5 + (i % 3) * 0.1).toFixed(1)}" fill="${teinte(i)}" fill-opacity="${(0.2 + ((i * 7) % 4) * 0.07).toFixed(2)}"/>`
-  }).join('')
-  // Devant : des étoiles plus nettes, de deux tailles au plus ; plus grandes, elles se prennent pour des points du texte.
-  // Trois sur cinq jettent un éclat.
-  const etoiles = Array.from({ length: 50 }, (_, i) => {
-    const [x, y] = place(i, 50, 0.61)
-    const couleur = teinte(i + 1)
-    const point = `<circle cx="${x}" cy="${y}" r="${(0.9 + (i % 2) * 0.2).toFixed(1)}" fill="${couleur}" fill-opacity="${(0.6 + (i % 4) * 0.1).toFixed(1)}"/>`
-    if (i % 5 >= 3) return point
-    const k = (i * 5) % cycles.length
-    const duree = cycles[k]!
-    const eclat = `<path class="t" d="${SCINTILLEMENT}" fill="${couleur}" style="animation:e${k} ${duree}s ease-out ${(-((i * 7.3) % duree)).toFixed(1)}s infinite"/>`
-    return `${point}<g transform="translate(${x} ${y})">${eclat}</g>`
-  }).join('')
+  // Quatre branches fines, plus longues à la verticale, un cœur blanc et un halo ; l'étoile respire en grandissant un peu.
+  const brille = brillantes
+    .map(([x, y, b]) => {
+      const c = b * 0.12
+      const branches = `M0 ${-b * 1.25}L${c} ${-c}L${b} 0L${c} ${c}L0 ${b * 1.25}L${-c} ${c}L${-b} 0L${-c} ${-c}Z`
+      return (
+        `<g transform="translate(${x} ${y})"><g class="b" style="animation:b ${n(4 + b)}s ease-in-out ${n(-h() * 8)}s infinite alternate">` +
+        `<circle r="${n(b * 2.2)}" fill="url(#a)"/><path d="${branches}" fill="#EEF2FF"/><circle r="${n(b * 0.22)}" fill="#FFFFFF"/></g></g>`
+      )
+    })
+    .join('')
   return (
     ouvrirCiel(
       '.g{animation:g 46s ease-in-out infinite alternate}@keyframes g{from{transform:translate(0,0)}to{transform:translate(520px,40px)}}' +
-        `.t{opacity:0;transform-box:fill-box;transform-origin:center}${eclats}`,
-      lueur('h', '#6E8BFF', 0.08),
+        '@keyframes e{from{opacity:.2}to{opacity:.8}}' +
+        '.b{transform-box:fill-box;transform-origin:center}@keyframes b{from{opacity:.55;transform:scale(.82)}to{opacity:1;transform:scale(1.08)}}',
+      lueur('h', '#6E8BFF', 0.08) + lueur('a', '#C9D4FF', 0.3) + lueur('v', '#A9B8FF', 0.055),
     ) +
-    `<ellipse class="g" cx="260" cy="90" rx="460" ry="190" fill="url(#h)"/>${poussiere}${etoiles}</svg>`
+    `<ellipse class="g" cx="260" cy="90" rx="460" ry="190" fill="url(#h)"/>` +
+    `<ellipse cx="800" cy="210" rx="1050" ry="150" transform="rotate(-18 800 210)" fill="url(#v)"/>${petites}${moyennes}${brille}</svg>`
   )
 }
 
@@ -311,7 +340,7 @@ export function svgApercu(theme: Theme, choisi: boolean): string {
       [[40, 6, 0.5, 0.4], [58, 23, 0.5, 0.35], [36, 16, 0.4, 0.3], [5, 31, 0.5, 0.35], [26, 35, 0.6, 0.5], [47, 36, 0.4, 0.3], [4, 5, 0.4, 0.3], [56, 5, 0.6, 0.6]]
         .map(([x, y, r, o]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#E8EDFF" fill-opacity="${o}"/>`)
         .join('') +
-      `<path transform="translate(49 15) scale(.5)" d="${SCINTILLEMENT}" fill="#E8EDFF"/><circle cx="49" cy="15" r=".8" fill="#E8EDFF"/>`,
+      `<path transform="translate(49 15)" d="M0-3.6L.4-.4L3 0L.4 .4L0 3.6L-.4 .4L-3 0L-.4-.4Z" fill="#E8EDFF"/><circle cx="49" cy="15" r=".8" fill="#FFFFFF"/>`,
     simple: '',
     aurore: `<ellipse cx="18" cy="8" rx="30" ry="12" fill="#2DD4BF" fill-opacity=".15"/>`,
     braise: `<ellipse cx="22" cy="40" rx="40" ry="16" fill="${ARGILE}" fill-opacity=".18"/><circle cx="14" cy="22" r=".9" fill="#FFB38A"/><circle cx="34" cy="16" r=".7" fill="#FFB38A"/><circle cx="52" cy="26" r=".8" fill="#FFB38A"/>`,
