@@ -39,15 +39,53 @@ const trame = (couleur: string, opacite: number) =>
 const lueur = (id: string, couleur: string, opacite: number) =>
   `<radialGradient id="${id}"><stop offset="0" stop-color="${couleur}" stop-opacity="${opacite}"/><stop offset="1" stop-color="${couleur}" stop-opacity="0"/></radialGradient>`
 
-/** Nuit : la trame de points sur le bleu nuit ; une lueur bleue glisse lentement. */
+/** Le bref éclat d'une étoile de Nuit : quatre rayons fins, de 6 px, autour de son centre. */
+const SCINTILLEMENT = 'M0-6L.7-.7L6 0L.7 .7L0 6L-.7 .7L-6 0L-.7-.7Z'
+
+/** Nuit : un ciel étoilé sur le bleu nuit, que traverse lentement une lueur bleue. Des étoiles sur deux plans, blanches,
+ * bleutées ou dorées ; de temps en temps, l'une d'elles jette un bref éclat en croix. */
 function cielNuit(): string {
+  // Un éclat dure 0,9 s, une fois par cycle ; chaque étoile qui en jette prend l'un de ces cycles, en secondes, et une
+  // phase à elle : les éclats semblent venir au hasard.
+  const cycles = [17, 23, 29, 37, 43, 53]
+  const eclats = cycles
+    .map((duree, k) => {
+      const d = 90 / duree
+      return `@keyframes e${k}{0%,${d.toFixed(2)}%,100%{opacity:0;transform:scale(.2)}${(d * 0.4).toFixed(2)}%{opacity:.95;transform:scale(1)}}`
+    })
+    .join('')
+  const teinte = (i: number) => ['#E8EDFF', '#C9D8FF', '#E8EDFF', '#FFE6BF', '#E8EDFF'][(i * 3) % 5]!
+  // Une place sans paquets ni trous (la suite R2, décalée pour chaque plan). Les trois quarts tiennent dans les 500 px du
+  // haut, où se tient le popover de la bande ; les autres, plus rares, sont pour un panneau plus haut.
+  const place = (i: number, n: number, decalage: number) => {
+    const x = Math.round(((i * 0.7548777 + decalage) % 1) * CIEL.largeur)
+    const v = (i * 0.5698403 + decalage) % 1
+    return [x, Math.round(i < n * 0.75 ? v * 500 : 500 + v * (CIEL.hauteur - 500))] as const
+  }
+  // Au loin : de toutes petites étoiles, pâles et fixes.
+  const poussiere = Array.from({ length: 160 }, (_, i) => {
+    const [x, y] = place(i, 160, 0.3)
+    return `<circle cx="${x}" cy="${y}" r="${(0.5 + (i % 3) * 0.1).toFixed(1)}" fill="${teinte(i)}" fill-opacity="${(0.2 + ((i * 7) % 4) * 0.07).toFixed(2)}"/>`
+  }).join('')
+  // Devant : des étoiles plus nettes, de deux tailles au plus ; plus grandes, elles se prennent pour des points du texte.
+  // Trois sur cinq jettent un éclat.
+  const etoiles = Array.from({ length: 50 }, (_, i) => {
+    const [x, y] = place(i, 50, 0.61)
+    const couleur = teinte(i + 1)
+    const point = `<circle cx="${x}" cy="${y}" r="${(0.9 + (i % 2) * 0.2).toFixed(1)}" fill="${couleur}" fill-opacity="${(0.6 + (i % 4) * 0.1).toFixed(1)}"/>`
+    if (i % 5 >= 3) return point
+    const k = (i * 5) % cycles.length
+    const duree = cycles[k]!
+    const eclat = `<path class="t" d="${SCINTILLEMENT}" fill="${couleur}" style="animation:e${k} ${duree}s ease-out ${(-((i * 7.3) % duree)).toFixed(1)}s infinite"/>`
+    return `${point}<g transform="translate(${x} ${y})">${eclat}</g>`
+  }).join('')
   return (
     ouvrirCiel(
-      '.g{animation:g 46s ease-in-out infinite alternate}@keyframes g{from{transform:translate(0,0)}to{transform:translate(520px,40px)}}',
-      trame('#C9D4FF', 0.07) + lueur('h', '#6E8BFF', 0.08),
+      '.g{animation:g 46s ease-in-out infinite alternate}@keyframes g{from{transform:translate(0,0)}to{transform:translate(520px,40px)}}' +
+        `.t{opacity:0;transform-box:fill-box;transform-origin:center}${eclats}`,
+      lueur('h', '#6E8BFF', 0.08),
     ) +
-    `<rect width="${CIEL.largeur}" height="${CIEL.hauteur}" fill="url(#p)"/>` +
-    '<ellipse class="g" cx="260" cy="90" rx="460" ry="190" fill="url(#h)"/></svg>'
+    `<ellipse class="g" cx="260" cy="90" rx="460" ry="190" fill="url(#h)"/>${poussiere}${etoiles}</svg>`
   )
 }
 
@@ -201,7 +239,7 @@ function cielSakura(): string {
 /** Les thèmes du popover. Simple n'a ni fond propre ni mouvement : le gris de l'app et un cadre fin. */
 export const THEMES: Record<Theme, { encres: Encres; ciel: (() => string) | null }> = {
   nuit: {
-    encres: { fond: '#05070F', bord: '#1C243D', carte: '#151B30', bordCarte: '#2C3453', texte: '#E6E9F2', vif: '#F7F8FC', gris: '#8A93B2', faible: '#707B9D', legende: '#727C9A', accent: ARGILE, vide: '#C9D4FF', ...BLANCS },
+    encres: { fond: '#070A14', bord: '#1C243D', carte: '#151B30', bordCarte: '#2C3453', texte: '#E6E9F2', vif: '#F7F8FC', gris: '#8A93B2', faible: '#707B9D', legende: '#727C9A', accent: ARGILE, vide: '#C9D4FF', ...BLANCS },
     ciel: cielNuit,
   },
   simple: {
@@ -269,8 +307,11 @@ export function svgApercu(theme: Theme, choisi: boolean): string {
   const e = THEMES[theme].encres
   const fond = theme === 'simple' ? '#262626' : e.fond
   const decor = {
-    nuit: [8, 20, 32, 44, 56].flatMap(x => [8, 20, 32].map(y => `<circle cx="${x}" cy="${y}" r=".6" fill="${e.vide}" fill-opacity=".35"/>`)).join('') +
-      `<ellipse cx="20" cy="10" rx="28" ry="12" fill="#6E8BFF" fill-opacity=".1"/>`,
+    nuit: `<ellipse cx="20" cy="10" rx="28" ry="12" fill="#6E8BFF" fill-opacity=".1"/>` +
+      [[40, 6, 0.5, 0.4], [58, 23, 0.5, 0.35], [36, 16, 0.4, 0.3], [5, 31, 0.5, 0.35], [26, 35, 0.6, 0.5], [47, 36, 0.4, 0.3], [4, 5, 0.4, 0.3], [56, 5, 0.6, 0.6]]
+        .map(([x, y, r, o]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#E8EDFF" fill-opacity="${o}"/>`)
+        .join('') +
+      `<path transform="translate(49 15) scale(.5)" d="${SCINTILLEMENT}" fill="#E8EDFF"/><circle cx="49" cy="15" r=".8" fill="#E8EDFF"/>`,
     simple: '',
     aurore: `<ellipse cx="18" cy="8" rx="30" ry="12" fill="#2DD4BF" fill-opacity=".15"/>`,
     braise: `<ellipse cx="22" cy="40" rx="40" ry="16" fill="${ARGILE}" fill-opacity=".18"/><circle cx="14" cy="22" r=".9" fill="#FFB38A"/><circle cx="34" cy="16" r=".7" fill="#FFB38A"/><circle cx="52" cy="26" r=".8" fill="#FFB38A"/>`,
