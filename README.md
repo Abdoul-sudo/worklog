@@ -1,7 +1,7 @@
 <h1 align="center">Worklog</h1>
 
 <p align="center">
-  <em>Automatically track the time, tokens and API price of each project in Claude Code, see when your prompt cache goes cold, and get a yearly activity heatmap in 8 themes.</em>
+  <em>Claude Code mod that automatically tracks the time, tokens and API price of each project. It also shows when your prompt cache goes cold, and draws a yearly activity heatmap in 8 themes.</em>
 </p>
 
 <p align="center">
