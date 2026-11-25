@@ -1,0 +1,1 @@
+- [Release notes](release-notes.md): every GitHub release has the changes, then Install, then Update
