@@ -1062,10 +1062,10 @@ describe('le prix API', () => {
 
 describe('le cache de prompt', () => {
   const CACHE = { session: 'S1', appel: h(9), ttl: '1h' as const, contexte: 150_000, modele: 'claude-opus-5-5', froid: false }
-  const usage = (lu: number, ecrit: number, cache_creation?: { ephemeral_5m_input_tokens?: number; ephemeral_1h_input_tokens?: number }) => ({
+  const usage = (lu: number, ecrit: number, parDuree?: { ephemeral_5m_input_tokens?: number; ephemeral_1h_input_tokens?: number }) => ({
     cache_read_input_tokens: lu,
     cache_creation_input_tokens: ecrit,
-    ...(cache_creation === undefined ? {} : { cache_creation }),
+    ...parDuree,
   })
 
   test("il reste au cache les minutes de sa durée après le dernier appel, arrondies vers le haut ; puis il est froid", async () => {

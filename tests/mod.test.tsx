@@ -665,6 +665,21 @@ test('avec WORKLOG_PRICES=off, le mod ne télécharge pas les prix', async ($, o
   expect(fichiers.has(PRIX_FICHIER)).toBe(false)
 })
 
+test("le moteur sépare l'écrit pour 5 min de l'écrit pour 1 h : chacun garde son prix", async ($, on) => {
+  const { horloge, fichiers } = monde(on)
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await $.prompt.submit({ ...PROMPT, text: 'FLO-I1' })
+  await horloge.advance(60_000)
+  // Ces deux champs viennent du moteur, sans être dans ses types.
+  const usage = { model: 'm', input_tokens: 10, output_tokens: 20, cache_creation_input_tokens: 3_000, cache_read_input_tokens: 40, ephemeral_5m_input_tokens: 2_000, ephemeral_1h_input_tokens: 1_000 }
+  await $.turn.complete({ ...FIN_DE_TOUR, usage })
+  // Sans ce détail, tout l'écrit compte pour 1 h.
+  await $.turn.complete({ ...FIN_DE_TOUR, usage: { model: 'm', input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 500, cache_read_input_tokens: 0 } })
+  await horloge.settle()
+  const details = fichiers.get(JOURNAL)!.trim().split('\n').map(l => JSON.parse(l) as { e: string; p?: { c5: number; c1: number }[] }).filter(l => l.e === 'jetons')
+  expect(details.map(l => l.p?.map(p => `${p.c5}/${p.c1}`))).toEqual([['2000/1000'], ['0/500']])
+})
+
 test("dans une bande étroite et basse de l'app desktop, la frise laisse la place à la liste et au pied", async ($, on) => {
   const { horloge } = monde(on, ['desktop'])
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })

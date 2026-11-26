@@ -785,11 +785,13 @@ export function restantCache(cache: Cache, maintenant: number): number {
   return cache.froid || maintenant >= fin ? 0 : Math.ceil((fin - maintenant) / MINUTE)
 }
 
-/** Les tokens d'une réponse comme l'API les donne : `cache_creation` sépare l'écrit pour 5 min de l'écrit pour 1 h. */
+/** Les tokens d'une réponse comme le moteur les donne aux mods. Quand l'API les sépare, il ajoute l'écrit pour 5 min et
+ * l'écrit pour 1 h, à plat ; ses types ne déclarent pas ces deux champs. */
 export type UsageCache = {
   cache_read_input_tokens: number
   cache_creation_input_tokens: number
-  cache_creation?: { ephemeral_5m_input_tokens?: number; ephemeral_1h_input_tokens?: number }
+  ephemeral_5m_input_tokens?: number
+  ephemeral_1h_input_tokens?: number
 }
 
 /** La durée du cache après une réponse arrivée `depuis` ms après l'appel d'avant. Claude Code écrit en général pour 1 h :
@@ -798,9 +800,9 @@ export type UsageCache = {
  * suivent parfois un cache d'une heure. */
 export function dureeCache(avant: Cache['ttl'], u: UsageCache, depuis: number): Cache['ttl'] {
   const relu = u.cache_read_input_tokens > u.cache_creation_input_tokens
-  if ((u.cache_creation?.ephemeral_1h_input_tokens ?? 0) > 0) return '1h'
+  if ((u.ephemeral_1h_input_tokens ?? 0) > 0) return '1h'
   if (relu && depuis > DUREES_CACHE['5m']) return '1h'
-  if ((u.cache_creation?.ephemeral_5m_input_tokens ?? 0) > 0 && !relu) return '5m'
+  if ((u.ephemeral_5m_input_tokens ?? 0) > 0 && !relu) return '5m'
   return avant
 }
 

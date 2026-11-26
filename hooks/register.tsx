@@ -12,6 +12,7 @@ import {
   THEMES_IDS,
   type Corrections,
   type Detail,
+  type UsageCache,
   type Evenement,
   type Prix,
   type Retrait,
@@ -2231,8 +2232,11 @@ export const register: Register = on => {
     const u = e.usage
     if (u !== undefined) {
       const n = u.input_tokens + u.output_tokens + u.cache_creation_input_tokens + u.cache_read_input_tokens
-      // Claude Code écrit son cache pour une heure. L'import suivant remplace ces chiffres par ceux de l'historique.
-      const detail: Detail = { m: u.model, in: u.input_tokens, out: u.output_tokens, c5: 0, c1: u.cache_creation_input_tokens, cr: u.cache_read_input_tokens }
+      // L'écrit pour 5 min (clé API, Bedrock, Vertex) et pour 1 h (abonnement), quand le moteur les sépare ; sinon, tout
+      // pour 1 h. L'import suivant remplace ces chiffres par ceux de l'historique.
+      const { ephemeral_5m_input_tokens: c5, ephemeral_1h_input_tokens: c1 }: UsageCache = u
+      const ecrit = c5 === undefined ? { c5: 0, c1: u.cache_creation_input_tokens } : { c5, c1: c1 ?? 0 }
+      const detail: Detail = { m: u.model, in: u.input_tokens, out: u.output_tokens, ...ecrit, cr: u.cache_read_input_tokens }
       if (n > 0) enFond(noterJetons($, n, detail))
     }
     return next(e)
