@@ -38,6 +38,7 @@ import {
   dureeEcart,
   formatCout,
   formatDuree,
+  formatJour,
   formatHeure,
   formatJetons,
   fusionner,
@@ -47,6 +48,7 @@ import {
   lireOptions,
   nommer,
   nomModele,
+  prixAGarder,
   prixCache,
   prixClaude,
   restantCache,
@@ -154,6 +156,8 @@ const minutesCache = atom({ plugin: 'worklog', key: 'minutesCache' } as const, n
 let chemins: { journal: string; importe: string; projets: string; prix: string } | null = null
 // Les prix API des modèles Claude (prix.json) ; null tant que le mod n'en a pas.
 let prix: Prix | null = null
+// Le jour où le mod a téléchargé ces prix ; les réglages le montrent.
+let prixMaj: number | null = null
 // Les prix gardés, en texte : de nouveaux prix se reconnaissent sans comparer chaque modèle.
 let prixTexte = ''
 // Le dernier essai de téléchargement des prix : après un échec, le suivant attend ESSAI_PRIX_MS.
@@ -364,26 +368,32 @@ async function mettreAJourPrix($: Moteur): Promise<void> {
   if (await $.fs.exists(fichier)) {
     try {
       const garde = JSON.parse(await $.fs.read(fichier)) as { maj?: unknown; modeles?: unknown }
-      if (typeof garde.maj === 'number') maj = garde.maj
+      if (typeof garde.maj === 'number') maj = prixMaj = garde.maj
       if (typeof garde.modeles === 'object' && garde.modeles !== null) garderPrix(garde.modeles as Prix)
     } catch {}
   }
   const maintenant = await $.clock.now()
   if (maintenant - maj < PRIX_MS || maintenant - essaiPrix < ESSAI_PRIX_MS || (await $.env.get('WORKLOG_PRICES')) === 'off') return
   essaiPrix = maintenant
-  // Un gros fichier, sans délai maximal possible : il se télécharge à côté, sans retarder l'import.
+  // Un gros fichier, sans délai maximal possible : il se télécharge à côté, sans retarder l'import. Une liste refusée
+  // se retente comme un échec, après ESSAI_PRIX_MS.
   enFond(
     (async () => {
       const reponse = await $.http.fetch(LITELLM).catch(() => null)
       if (reponse === null || !reponse.ok) return
-      const modeles = prixClaude(JSON.parse(reponse.text))
-      if (Object.keys(modeles).length === 0) return
+      const liste = prixClaude(JSON.parse(reponse.text))
+      const modeles = Object.keys(liste).length === 0 ? null : prixAGarder(prix, liste)
+      if (modeles === null) return
       await $.fs.write(fichier, JSON.stringify({ maj: maintenant, modeles }))
+      prixMaj = maintenant
       garderPrix(modeles)
       await rafraichir($)
     })(),
   )
 }
+
+/** D'où viennent les prix API, et de quel jour : une liste ancienne se voit. */
+const listePrix = () => t().listePrix(prixMaj === null ? null : formatJour(prixMaj))
 
 /** Garde de nouveaux prix : la frise, qui garde les jours passés en cache, se recalcule avec eux. */
 function garderPrix(modeles: Prix): void {
@@ -1631,7 +1641,8 @@ function choixTheme($: Moteur, e: Site, options: Reglages) {
 function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
   if (!riche(e)) return null
   const { Box, Select, Svg, Text } = $.ui.resolve(e)
-  const aides = t().aides
+  // L'aide de « Afficher » dit d'où viennent les prix API, et de quel jour.
+  const aides = { ...t().aides, mesure: listePrix() }
   type Aide = keyof typeof aides
   // Après le nom d'un réglage qui en a besoin, une icône ⓘ. À son survol, son aide s'ouvre à sa droite, centrée sur
   // elle, après la place du pointeur, dans une carte comme celle du cache, sans titre : le nom est juste à côté. La carte
@@ -1751,15 +1762,19 @@ function vueReglages($: Moteur, e: Site, options: Reglages, aCote: boolean) {
         ...affichageLignes,
         ligneReglage(
           'mesure',
-          <Text size="footnote" {...encre(e, 'texte')}>
-            {t().mesure}
-          </Text>,
+          avecAide(
+            'mesure',
+            <Text size="footnote" {...encre(e, 'texte')}>
+              {t().mesure}
+            </Text>,
+          ),
           <Select
             key="mesure"
             value={options.mesure}
             options={MESURES.map(m => ({ value: m, label: t().mesures[m] }))}
             onSelect={valeur => changerReglage($, { mesure: MESURES.find(m => m === valeur) ?? 'tout' })}
           />,
+          'mesure',
         ),
         ligneReglage(
           'langue',
@@ -1819,6 +1834,7 @@ function vueReglagesTerminal($: Moteur, e: Site, options: Reglages, aCote: boole
         {caseACocher('activite', t().bascules.activite)}
         {caseACocher('cache', t().bascules.cache)}
         {reglage('mesure', t().mesure, choix('mesure', MESURES, options.mesure, m => t().mesures[m], mesure => changerReglage($, { mesure })))}
+        <Text dimColor>{listePrix()}</Text>
         {reglage(
           'langue',
           t().langue,

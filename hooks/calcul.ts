@@ -593,6 +593,23 @@ export function prixClaude(liste: unknown): Prix {
   return garde
 }
 
+/** Au-delà de cet écart, un prix qui change pour un même modèle vient sans doute d'une erreur dans la liste de LiteLLM. */
+const ECART_PRIX = 2
+
+/** Les prix à garder après un téléchargement : la nouvelle liste, plus les modèles qu'elle a perdus, à leurs anciens
+ * prix. Null quand un prix d'un même modèle change de plus de ECART_PRIX fois, ou passe à zéro : une liste cassée en
+ * amont recalculerait tout l'historique, alors les anciens prix restent. */
+export function prixAGarder(anciens: Prix | null, nouveaux: Prix): Prix | null {
+  for (const [modele, champs] of Object.entries(nouveaux)) {
+    for (const [cle, apres] of Object.entries(champs)) {
+      const avant = anciens?.[modele]?.[cle]
+      if (typeof avant !== 'number' || typeof apres !== 'number') continue
+      if (Math.max(avant, apres) > ECART_PRIX * Math.min(avant, apres)) return null
+    }
+  }
+  return { ...anciens, ...nouveaux }
+}
+
 export const repartitionVide = (): Repartition => ({
   entree: { n: 0, c: 0 },
   sortie: { n: 0, c: 0 },

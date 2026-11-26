@@ -34,6 +34,7 @@ import {
   lireLignes,
   nomSaisi,
   nommer,
+  prixAGarder,
 } from '../hooks/calcul'
 import { casesEntre, cellulesActivite, compterSerie, serie, svgActivite } from '../hooks/activite'
 import { ENCRE, THEMES, choisirTheme, couleurs, svgCiel } from '../hooks/dessins'
@@ -1058,6 +1059,18 @@ describe('le prix API', () => {
       'Fable 5.2',
     ])
   })
+})
+
+test("une nouvelle liste de prix est gardée, avec les modèles qu'elle a perdus ; un prix qui change de plus de deux fois, ou passe à zéro, la fait refuser", async () => {
+  const anciens = { 'claude-opus-5-5': { input_cost_per_token: 4e-6 }, 'claude-2': { input_cost_per_token: 8e-6 } }
+  expect(prixAGarder(null, { 'claude-opus-5-5': { input_cost_per_token: 1 } })).toEqual({ 'claude-opus-5-5': { input_cost_per_token: 1 } })
+  expect(prixAGarder(anciens, { 'claude-opus-5-5': { input_cost_per_token: 8e-6, output_cost_per_token: 2e-5 } })).toEqual({
+    'claude-opus-5-5': { input_cost_per_token: 8e-6, output_cost_per_token: 2e-5 },
+    'claude-2': { input_cost_per_token: 8e-6 },
+  })
+  expect(prixAGarder(anciens, { 'claude-opus-5-5': { input_cost_per_token: 1.9e-6 } })).toBeNull()
+  expect(prixAGarder(anciens, { 'claude-opus-5-5': { input_cost_per_token: 9e-6 } })).toBeNull()
+  expect(prixAGarder(anciens, { 'claude-opus-5-5': { input_cost_per_token: 0 } })).toBeNull()
 })
 
 describe('le cache de prompt', () => {

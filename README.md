@@ -239,7 +239,9 @@ No, Worklog never uses tokens and does not count toward your plan limits. It onl
 <details>
 <summary><strong>Where does the API price come from?</strong></summary>
 
-Worklog takes the prices from the public [LiteLLM price list](https://github.com/BerriAI/litellm). It gets the list again once a day.
+Worklog takes the prices from the public [LiteLLM price list](https://github.com/BerriAI/litellm). It gets the list again once a day. The settings show the date of the list.
+
+Worklog checks each new list. If a price changes by more than 2 times, Worklog keeps the old list. This stops an error in the LiteLLM list from changing the price of your past days. To use the new list anyway, delete `~/.claude/worklog/prix.json`, then restart Claude Code.
 
 For your past work, Worklog reads the details of each answer in your Claude Code history. If Claude Code deleted an old conversation, the tokens of that conversation have no price.
 

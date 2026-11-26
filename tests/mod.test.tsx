@@ -665,6 +665,36 @@ test('avec WORKLOG_PRICES=off, le mod ne télécharge pas les prix', async ($, o
   expect(fichiers.has(PRIX_FICHIER)).toBe(false)
 })
 
+test("une liste dont un prix change de plus de deux fois est refusée ; les réglages disent de quel jour sont les prix", async ($, on) => {
+  const { horloge, fichiers } = monde(on)
+  // Des prix gardés hier : le mod en télécharge de nouveaux, dix fois plus chers.
+  const garde = JSON.stringify({ maj: new Date(2026, 10, 11, 8).getTime(), modeles: { 'claude-opus-5-5': { input_cost_per_token: 4e-6 } } })
+  fichiers.set(PRIX_FICHIER, garde)
+  let demandes = 0
+  const liste = { 'claude-opus-5-5': { litellm_provider: 'anthropic', input_cost_per_token: 4e-5 } }
+  on('http.fetch', () => {
+    demandes++
+    return { value: { status: 200, ok: true, headers: {}, text: JSON.stringify(liste) } }
+  })
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await travailler($, horloge, 'FLO-I1', 1)
+  expect(demandes).toBe(1)
+  expect(fichiers.get(PRIX_FICHIER)).toBe(garde)
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const bande = await $.ui.mount({ ...BANDE, surface })
+    const puce = await $.ui.mount({ ...(surface === 'terminal' ? LIGNE_AIDE : PIED), surface })
+    await puce.press({ key: 'puce' })
+    await bande.press({ key: 'reglages' })
+    // Dans le terminal, une ligne sous « Afficher » ; dans l'app desktop, l'aide de « Afficher ».
+    expect(await bande.find({ type: 'Text', text: /^Prix API : liste LiteLLM du mercredi 11 novembre\.$/ })).toBeDefined()
+    await bande.press({ key: 'reglages' })
+    await puce.press({ key: 'puce' })
+    await puce.unmount()
+    await bande.unmount()
+  }
+})
+
 test("le moteur sépare l'écrit pour 5 min de l'écrit pour 1 h : chacun garde son prix", async ($, on) => {
   const { horloge, fichiers } = monde(on)
   await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
