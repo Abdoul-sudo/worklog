@@ -5,7 +5,7 @@
 //   Un message automatique (notification, autre session, plugin) clôt le tour : un agent qui tourne seul ne compte pas.
 // Le mod le lance en tâche de fond ; il ne relit que la partie nouvelle de chaque conversation.
 //
-//   node importer.mjs <dossier projects> <dossier de sortie> <motif des ID>
+//   node importer.mjs <dossier projects> <dossier de sortie> [<motif des ID>]
 import fs from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline'
@@ -59,7 +59,8 @@ const etat = lireEtat()
 // (un `cd`), et ses agents aussi : ce sous-dossier ne nomme pas la session.
 etat.dossiers ??= {}
 const vus = new Map(Object.entries(etat.vus))
-const idDe = new RegExp(`(?<![A-Za-z0-9])(?:${motif})(?![A-Za-z0-9])`)
+// Sans motif (WORKLOG_MESSAGES=off), aucun ID ne se cherche dans les messages.
+const idDe = motif === undefined ? null : new RegExp(`(?<![A-Za-z0-9])(?:${motif})(?![A-Za-z0-9])`)
 
 const deux = n => String(n).padStart(2, '0')
 const jourDe = t => {
@@ -174,7 +175,7 @@ function lire(ligne, sousAgent) {
     const texte = texteDe(contenu).trim()
     if (texte === '') return
     if (estHumain(ev, texte)) {
-      const k = idDe.exec(texte)?.[0] ?? null
+      const k = idDe?.exec(texte)?.[0] ?? null
       // Une conversation reprise par l'app recopie les messages déjà vus, sous le même uuid : chacun ne compte qu'une fois,
       // dans la conversation qui a aussi ses réponses. Recopié sans elles, il ouvrirait un tour sans fin. L'ID qu'il cite
       // reste à la reprise, en repère : elle garde son nom.

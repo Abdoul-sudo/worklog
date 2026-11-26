@@ -58,6 +58,8 @@ function monde(
     // Le contexte que le prochain message renverra, et les réponses des prochains appels au modèle.
     contexte: undefined as number | undefined,
     reponses: [] as (TurnUsage | null)[],
+    // Les commandes lancées par le mod.
+    commandes: [] as (readonly string[])[],
   }
   const fichiers = new Map<string, string>()
   const toasts: string[] = []
@@ -81,9 +83,10 @@ function monde(
     })),
   }))
   // Git répond la branche ; Node est absent : l'historique de Claude Code n'est pas importé dans les tests.
-  on('process.run', (_, e) => ({
-    value: { exitCode: e.argv[0] === 'node' ? 1 : 0, stdout: `${etat.branche}\n`, stderr: '', isStdoutTruncated: false, isStderrTruncated: false },
-  }))
+  on('process.run', (_, e) => {
+    etat.commandes.push(e.argv)
+    return { value: { exitCode: e.argv[0] === 'node' ? 1 : 0, stdout: `${etat.branche}\n`, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+  })
   on('agent.list', () => ({ value: etat.agents.map(a => ({ ...a, description: 'agent', type: 'general-purpose' })) as never }))
   on('session.id', () => ({ value: etat.session }))
   on('session.cwd', () => ({ value: etat.dossier }))
@@ -693,6 +696,18 @@ test("une liste dont un prix change de plus de deux fois est refusée ; les rég
     await puce.unmount()
     await bande.unmount()
   }
+})
+
+test("avec WORKLOG_MESSAGES=off, le mod ne cherche pas d'ID dans les messages, ni dans l'historique", async ($, on) => {
+  const { horloge, fichiers, toasts, etat } = monde(on, ['terminal'], { WORKLOG_MESSAGES: 'off' })
+  await $.session.start({ cwd: 'D:/WORK/FSY', surface: 'terminal', isInteractive: true })
+  await travailler($, horloge, 'Corrige le bug FLO-I165 stp', 10)
+  expect(toasts).toEqual([])
+  const lignes = fichiers.get(JOURNAL)!.trim().split('\n').map(l => JSON.parse(l) as { e: string; k: string | null })
+  expect(lignes.map(l => `${l.e}:${l.k}`)).toEqual(['ouverture:null', 'message:null', 'reponse:null', 'jetons:null'])
+  // L'importeur reçoit les deux dossiers, sans motif.
+  const importeur = etat.commandes.find(c => c[0] === 'node')
+  expect(importeur?.length).toBe(4)
 })
 
 test("le moteur sépare l'écrit pour 5 min de l'écrit pour 1 h : chacun garde son prix", async ($, on) => {

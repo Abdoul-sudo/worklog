@@ -352,8 +352,10 @@ async function importerHistorique($: Moteur): Promise<void> {
   importLance = maintenant
   await mettreAJourPrix($).catch(() => undefined)
   const { importe, projets } = await dossiers($)
+  // Sans motif, l'importeur ne cherche pas d'ID dans les messages.
+  const motif = (await chercherDansMessages($)) ? [MOTIF_ID] : []
   const fin = await $.process
-    .run(['node', `${$.plugin.root}/scripts/importer.mjs`, projets, importe, MOTIF_ID], { timeoutMs: 10 * 60_000 })
+    .run(['node', `${$.plugin.root}/scripts/importer.mjs`, projets, importe, ...motif], { timeoutMs: 10 * 60_000 })
     .catch(() => null)
   if (fin === null || fin.exitCode !== 0) return
   cacheFrise = null
@@ -695,12 +697,16 @@ async function calculerFrise($: Moteur): Promise<void> {
   await update($, frise, () => ({ cases: liste, aujourdhui: contientAujourdhui, periode, mesure: options.mesure, serie: suite }))
 }
 
+/** Faux avec WORKLOG_MESSAGES=off : le mod ne lit plus les messages pour y trouver un ID. Le dossier et la branche
+ * donnent encore un item. */
+const chercherDansMessages = async ($: Moteur) => (await $.env.get('WORKLOG_MESSAGES')) !== 'off'
+
 async function apresMessage($: Moteur, texte: string, chercherItem: boolean, instant: number): Promise<void> {
   const s = await $.session.id()
   await lireReglages($)
   if (!(await estManuel($, s))) {
     const deBranche = await itemDeNouvelleBranche($, MOTIF_ID)
-    const nouveau = (chercherItem ? detecterItem(texte, MOTIF_ID) : null) ?? deBranche
+    const nouveau = (chercherItem && (await chercherDansMessages($)) ? detecterItem(texte, MOTIF_ID) : null) ?? deBranche
     if (nouveau !== null && nouveau !== (await itemDe($, s))) {
       await definirItem($, s, nouveau, false)
       $.ui.toast(t().toastItem(nouveau))

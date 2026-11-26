@@ -50,6 +50,20 @@ test("une session garde le nom de son dossier de départ, même quand Claude ou 
   }
 })
 
+test("sans motif (WORKLOG_MESSAGES=off), l'importeur ne prend pas d'ID dans les messages", () => {
+  for (const motif of [['PROJ-\\d+'], []]) {
+    const { racine, projets, sortie } = monde()
+    try {
+      const message = ligne({ type: 'user', sessionId: 'abc', cwd: 'D:\\proj', timestamp: new Date(T).toISOString(), origin: { kind: 'human' }, message: { content: 'on fait PROJ-142' } })
+      fs.writeFileSync(path.join(projets, 'D--proj', 'abc.jsonl'), message + reponse(1, 'D:\\proj', 'r1'))
+      execFileSync(process.execPath, [IMPORTER, projets, sortie, ...motif])
+      assert.equal(lignes(sortie).some(l => l.k === 'PROJ-142'), motif.length > 0)
+    } finally {
+      fs.rmSync(racine, { recursive: true, force: true })
+    }
+  }
+})
+
 test('une fois, les noms déjà importés prennent le dossier de départ de leur session', () => {
   const { racine, projets, sortie } = monde()
   try {

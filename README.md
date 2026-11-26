@@ -141,7 +141,7 @@ You can change the 1h and the 4h in the [settings](#settings).
 Worklog puts the time of each session under one name. It picks the name in this order:
 
 1. The name that you choose, with `/worklog <name>` or in the list.
-2. An ID in your messages, for example `PROJ-142`.
+2. An ID in your messages, for example `PROJ-142`. To stop this, see [Privacy and access](#privacy-and-access).
 3. An ID in the name of your Git branch, for example `feature/PROJ-142-login`.
 4. The name of the project folder. In a Git worktree, the name of the main project.
 
@@ -287,7 +287,11 @@ Worklog runs on your computer and keeps its data there. This is everything it ca
 | Network | Once a day, it downloads the public LiteLLM price list. It sends nothing about you or your work. |
 | Your messages | It reads each message to find an ID, for example `PROJ-142`. It does not keep your messages. |
 
-Two environment variables change this: `WORKLOG_PRICES=off` stops the price download, and `WORKLOG_DATA_DIR` keeps the data in another folder.
+These environment variables change this:
+
+- `WORKLOG_PRICES=off` stops the price download.
+- `WORKLOG_MESSAGES=off` stops the search for an ID in your messages. Worklog then names each session from its folder or its branch.
+- `WORKLOG_DATA_DIR` keeps the data in another folder.
 
 ## Uninstall
 
